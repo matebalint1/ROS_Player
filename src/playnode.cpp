@@ -42,14 +42,13 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "robot_node");
   ros::NodeHandle n;
-  ros::NodeHandle nh("~");
 
-  velocity_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
+  velocity_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 
   ros::topic::waitForMessage<sensor_msgs::Image>("front_camera/image_raw");
   ros::topic::waitForMessage<sensor_msgs::LaserScan>("front_laser/scan");
-  message_filters::Subscriber<sensor_msgs::Image> image_sub(nh, "front_camera/image_raw", 1);
-  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(nh, "front_laser/scan", 1);
+  message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "front_camera/image_raw", 1);
+  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "front_laser/scan", 1);
 
   message_filters::Synchronizer<approx_sync> sync(approx_sync(20), image_sub, laser_sub);
   sync.registerCallback(boost::bind(&perception_callback, _1, _2));
