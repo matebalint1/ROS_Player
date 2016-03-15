@@ -29,7 +29,9 @@
     </node>
 
 	<!-- KI node controlling the robot -->
-	<node pkg="player" name="ki" type="player_node" output="screen"/>
+	<include file="$(find player)/launch/player.launch">
+		<arg name="team" value="$(arg team)" />
+	</include>
   </group>
 
 </launch>

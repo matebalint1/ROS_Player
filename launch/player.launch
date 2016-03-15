@@ -1,0 +1,9 @@
+<launch>
+  <arg name="team" default="1"/>
+ 
+  <!-- KI node controlling the robot -->
+  <group ns="robot$(arg team)">
+	<node pkg="player" name="ki" type="player_node" output="screen"/>
+  </group>
+
+</launch>
