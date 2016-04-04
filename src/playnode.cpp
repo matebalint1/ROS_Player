@@ -33,7 +33,7 @@ void set_velocities(float lin_vel, float ang_vel)
 {
     geometry_msgs::Twist msg;
     msg.linear.x = lin_vel;
-    msg.angular.x = ang_vel;
+    msg.angular.z = ang_vel;
 
     velocity_pub.publish(msg);
 }
