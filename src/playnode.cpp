@@ -12,6 +12,9 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/opencv.hpp"
 
+#include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
+
 #define IMAGE_WINDOW "Camera Input"
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::LaserScan> approx_sync;
@@ -47,9 +50,10 @@ int main(int argc, char **argv)
 
   ros::topic::waitForMessage<sensor_msgs::Image>("front_camera/image_raw");
   ros::topic::waitForMessage<sensor_msgs::LaserScan>("front_laser/scan");
-  message_filters::Subscriber<sensor_msgs::Image> image_sub(n, "front_camera/image_raw", 1);
-  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "front_laser/scan", 1);
 
+  image_transport::ImageTransport it_(n);
+  image_transport::SubscriberFilter image_sub(it_, "front_camera/image_raw", 1);
+  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "front_laser/scan", 1);
   message_filters::Synchronizer<approx_sync> sync(approx_sync(20), image_sub, laser_sub);
   sync.registerCallback(boost::bind(&perception_callback, _1, _2));
 
