@@ -22,23 +22,23 @@ ros::Publisher velocity_pub;
 
 void perception_callback(const sensor_msgs::Image::ConstPtr& msg_img, const sensor_msgs::LaserScan::ConstPtr& msg_laser)
 {
-    ROS_INFO("New image and scan available");
-    cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg_img, sensor_msgs::image_encodings::BGR8);
-    cv::Mat image = cv_ptr->image;
-    cv::flip(image, image, -1);
-    cv::imshow(IMAGE_WINDOW, image);
-    cv::waitKey(10);
+  ROS_INFO("New image and scan available!!");
+  cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg_img, sensor_msgs::image_encodings::BGR8);
+  cv::Mat image = cv_ptr->image;
+  cv::flip(image, image, -1);
+  cv::imshow(IMAGE_WINDOW, image);
+  cv::waitKey(10);
 
-    /* DO SOMETHING WITH image AND msg_laser HERE... OR NOT...*/
+  /* DO SOMETHING WITH image AND msg_laser HERE... OR NOT...*/
 }
 
 void set_velocities(float lin_vel, float ang_vel)
 {
-    geometry_msgs::Twist msg;
-    msg.linear.x = lin_vel;
-    msg.angular.z = ang_vel;
+  geometry_msgs::Twist msg;
+  msg.linear.x = lin_vel;
+  msg.angular.z = ang_vel;
 
-    velocity_pub.publish(msg);
+  velocity_pub.publish(msg);
 }
 
 int main(int argc, char **argv)
@@ -48,7 +48,9 @@ int main(int argc, char **argv)
 
   velocity_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 
+  ROS_INFO("Waiting for camera image");
   ros::topic::waitForMessage<sensor_msgs::Image>("front_camera/image_raw");
+  ROS_INFO("Waiting for laser scan message");
   ros::topic::waitForMessage<sensor_msgs::LaserScan>("front_laser/scan");
 
   image_transport::ImageTransport it_(n);
@@ -62,15 +64,15 @@ int main(int argc, char **argv)
   ros::Rate r(10);
   while(ros::ok())
   {
-      /* THIS LOOP RUNS at 10 Hz */
+    /* THIS LOOP RUNS at 10 Hz */
 
-      /* DO STUFF HERE... OR NOT... */
+    /* DO STUFF HERE... OR NOT... */
 
 //      set_velocities(0.2, 0.0);
 
-      ros::spinOnce();
-      r.sleep();
+    ros::spinOnce();
+    r.sleep();
   }
-
+  
   return 0;
 }
