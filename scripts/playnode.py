@@ -48,7 +48,7 @@ class PlayNode:
         
         # DO SOMETHING WITH image AND laser_msg HERE... OR NOT...
 
-    def set_velocities(linear, angular):
+    def set_velocities(self, linear, angular):
         msg = Twist()
         msg.linear.x = linear
         msg.angular.z = angular
