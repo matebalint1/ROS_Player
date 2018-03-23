@@ -1,11 +1,21 @@
 <launch>
   <arg name="team" default="1"/>
- 
+  
+  <arg name="use_python" default="false"/>
+  
   <!-- KI node controlling the robot -->
   <group ns="robot$(arg team)">
-	<node pkg="player" name="ki" type="player_node" output="screen">
-	   <param name="image_transport" value="compressed"/>
-	</node>
+    <group unless="$(arg use_python)">
+      <node pkg="player" name="player" type="player_node" output="screen">
+	<param name="image_transport" value="compressed"/>
+      </node>
+    </group>
+
+    <group if="$(arg use_python)">
+      <node pkg="player" name="player" type="playnode.py" output="screen">
+	<param name="image_transport" value="compressed"/>
+      </node>
+    </group>
   </group>
 
 </launch>
