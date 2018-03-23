@@ -12,7 +12,7 @@
     </group>
 
     <group if="$(arg use_python)">
-      <node pkg="player" name="player" type="playnode.py" output="screen">
+      <node pkg="player" name="player" type="player_node.py" output="screen">
 	<param name="image_transport" value="compressed"/>
       </node>
     </group>
