@@ -13,7 +13,7 @@ from cv_bridge import CvBridge, CvBridgeError
 class PlayNode:
 
     
-    def __init__(self, image_window="Camera Input", message_slop=0.1, synchroniser_queuesize=20):
+    def __init__(self, window_name="Camera Input", message_slop=0.1, synchroniser_queuesize=20):
         """
         :param message_slop: Messages with a header.stamp within message_slop
         seconds of each other will be considered to be synchronisable
@@ -22,7 +22,8 @@ class PlayNode:
         rospy.loginfo("Initialised PlayNode")
         
         self.bridge = CvBridge()
-        self.image_window = image_window
+        self.image_window = window_name
+        self.image = None
 
         self.velocity_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1000)
         self.image_sub = message_filters.Subscriber("front_camera/image_raw", Image)
@@ -42,12 +43,19 @@ class PlayNode:
             rospy.logerr(e)
             return
 
-        image = cv2.flip(image, -1)
-        cv2.imshow(self.image_window, image)
-        cv2.waitKey(10)
-        
+        self.image = cv2.flip(image, -1)
+
         # DO SOMETHING WITH image AND laser_msg HERE... OR NOT...
 
+    def show_img(self):
+        """Python doesn't like waitKey in the perception_cb
+        """
+        if self.image is not None:
+            cv2.imshow(self.image_window, self.image)
+            cv2.waitKey(1)
+        else:
+            rospy.loginfo("No image to show yet")
+        
     def set_velocities(self, linear, angular):
         msg = Twist()
         msg.linear.x = linear
@@ -64,6 +72,6 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
 
         # 10 Hz loop
-        
+        play_node.show_img()
         loop_rate.sleep()
 
