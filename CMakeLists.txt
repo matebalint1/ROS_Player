@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(player)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++14 ${CMAKE_CXX_FLAGS}")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -136,13 +136,20 @@ include_directories(
 
 ## Declare a C++ executable
 add_executable(player_node src/playnode.cpp)
+add_executable(player_node_class src/playnode_class.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 add_dependencies(player_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(player_node_class ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(player_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+target_link_libraries(player_node_class
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )

@@ -15,21 +15,29 @@
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 
-#define IMAGE_WINDOW "Camera Input"
-
-typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::LaserScan> approx_sync;
+const std::string IMAGE_WINDOW = "Camera image";
 ros::Publisher velocity_pub;
+cv::Mat image;
+sensor_msgs::LaserScan laser_msg;
+bool got_image;
+bool got_laser;
 
-void perception_callback(const sensor_msgs::Image::ConstPtr& msg_img, const sensor_msgs::LaserScan::ConstPtr& msg_laser)
+void image_callback(const sensor_msgs::Image::ConstPtr& msg_img)
 {
-  ROS_INFO("New image and scan available!!");
+  ROS_INFO("Got new image");
   cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg_img, sensor_msgs::image_encodings::BGR8);
-  cv::Mat image = cv_ptr->image;
-  cv::flip(image, image, -1);
-  cv::imshow(IMAGE_WINDOW, image);
-  cv::waitKey(10);
+  // Store the latest image received - this variable always has the most up to
+  // date image.
+  image = cv_ptr->image;
+  got_image = true;
+}
 
-  /* DO SOMETHING WITH image AND msg_laser HERE... OR NOT...*/
+void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg_laser){
+  ROS_INFO("Got new laser scan");
+  // Store the laser message we get. The laser_msg variable always holds the
+  // latest laser message.
+  laser_msg = *msg_laser;
+  got_laser = true;
 }
 
 void set_velocities(float lin_vel, float ang_vel)
@@ -41,11 +49,20 @@ void set_velocities(float lin_vel, float ang_vel)
   velocity_pub.publish(msg);
 }
 
+void show_image() {
+  cv::imshow(IMAGE_WINDOW, image);
+  cv::waitKey(10);
+}
+
+
 int main(int argc, char **argv)
 {
+  // The node name is robot_node
   ros::init(argc, argv, "robot_node");
+  // The nodehandle actually starts the node
   ros::NodeHandle n;
 
+  // Publish messages to move around
   velocity_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 
   ROS_INFO("Waiting for camera image");
@@ -53,26 +70,34 @@ int main(int argc, char **argv)
   ROS_INFO("Waiting for laser scan message");
   ros::topic::waitForMessage<sensor_msgs::LaserScan>("front_laser/scan");
 
-  image_transport::ImageTransport it_(n);
-  image_transport::SubscriberFilter image_sub(it_, "front_camera/image_raw", 1);
-  message_filters::Subscriber<sensor_msgs::LaserScan> laser_sub(n, "front_laser/scan", 1);
-  message_filters::Synchronizer<approx_sync> sync(approx_sync(20), image_sub, laser_sub);
-  sync.registerCallback(boost::bind(&perception_callback, _1, _2));
+  // Images need a special subscriber
+  image_transport::ImageTransport it(n);
+  image_transport::Subscriber image_sub = it.subscribe("front_camera/image_raw", 1, image_callback);
+
+  // basic subscriber for the laser
+  ros::Subscriber laser_sub = n.subscribe("front_laser/scan", 1, laser_callback);
 
   cv::namedWindow(IMAGE_WINDOW);
 
+  // 10Hz loop
   ros::Rate r(10);
   while(ros::ok())
   {
-    /* THIS LOOP RUNS at 10 Hz */
+    if (got_laser && got_image) {
+      // Copy the laser and image. These change whenever the callbacks run, and
+      // we don't want the data changing in the middle of processing.
+      cv::Mat cur_img = image;
+      sensor_msgs::LaserScan cur_laser = laser_msg;
 
-    /* DO STUFF HERE... OR NOT... */
+      // do something useful with laser and image here
 
-//      set_velocities(0.2, 0.0);
+      show_image();
+    }
+
 
     ros::spinOnce();
     r.sleep();
   }
-  
+
   return 0;
 }
