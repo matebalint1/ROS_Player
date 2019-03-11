@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import sys
 
+
 import rospy
 import copy
+import numpy as np
 from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan, Image
 from geometry_msgs.msg import Twist
@@ -47,23 +49,28 @@ class PlayNode:
         We convert the image to an opencv object and update the self.image member
         """
         rospy.loginfo("Received new image")
-
+        """
         try:
-            image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
+            #image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
         except CvBridgeError as e:
             rospy.logerr(e)
             return
 
         self.image = cv2.flip(image, -1)
+        """
+        self.image = msg
+
 
     def show_img(self):
         """Need to do this separately because otherwise it can freeze
+        """
         """
         if self.image is not None:
             cv2.imshow(self.image_window, self.image)
             cv2.waitKey(1)
         else:
             rospy.loginfo("No image to show yet")
+        """
 
     def set_velocities(self, linear, angular):
         """Use this to set linear and angular velocities
@@ -86,6 +93,8 @@ if __name__ == '__main__':
         # We check that we have both laser and image data. Because these are
         # constantly being updated, we should always have the most recent
         # messages received
+
+
         if play_node.laser and play_node.image:
             # Now, we can use the laser and image data to do something. Because
             # the objects in the PlayNode are constantly updated, we need to
@@ -96,6 +105,40 @@ if __name__ == '__main__':
             cur_image = copy.deepcopy(play_node.image)
 
             # Do something useful with laser and image here
+
+
+            range_measurements = cur_laser.ranges
+            range_n = len(range_measurements)
+            angle_increment = abs(cur_laser.angle_increment)
+
+            angele_to_keep_clear = 3.14/2/2 # one side in rads
+
+
+
+            i_start = int(range_n/2 - angele_to_keep_clear/angle_increment)
+            i_end = int(range_n/2 + angele_to_keep_clear/angle_increment)
+            n_samples = (i_end - i_start + 1)
+
+            sub_measurements = np.sort(np.array(range_measurements[i_start:i_end]))
+            #print(sub_measurements)
+
+            sum_of_ranges = 0
+            for i in range(4):
+                if sub_measurements[i] < 6:
+                    sum_of_ranges += sub_measurements[i]
+                else:
+                    sub_measurements += 6
+
+            avg_distance = sum_of_ranges/4
+
+            print(avg_distance)
+
+            if avg_distance < 0.5:
+                play_node.set_velocities(0.1,0.1)
+            else:
+                play_node.set_velocities(0.2, 0)
+
+            #print(cur_laser)
 
             play_node.show_img()
 
