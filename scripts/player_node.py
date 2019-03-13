@@ -49,16 +49,16 @@ class PlayNode:
         We convert the image to an opencv object and update the self.image member
         """
         rospy.loginfo("Received new image")
-        """
+        #"""
         try:
-            #image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
+            image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
         except CvBridgeError as e:
             rospy.logerr(e)
             return
 
         self.image = cv2.flip(image, -1)
-        """
-        self.image = msg
+        #"""
+        #self.image = msg
 
 
     def show_img(self):
@@ -136,7 +136,10 @@ if __name__ == '__main__':
             if avg_distance < 0.5:
                 play_node.set_velocities(-0.1,0.3)
             else:
-                play_node.set_velocities(0.2, 0)
+                # Calculate speed depending of the distance to the closest objects:
+                speed = min(avg_distance, 2)/2 * 0.9 + 0.1
+
+                play_node.set_velocities(speed, 0)
 
             #print(cur_laser)
 
