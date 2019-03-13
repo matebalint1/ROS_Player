@@ -134,7 +134,7 @@ if __name__ == '__main__':
             print(avg_distance)
 
             if avg_distance < 0.5:
-                play_node.set_velocities(0.1,0.1)
+                play_node.set_velocities(-0.1,0.3)
             else:
                 play_node.set_velocities(0.2, 0)
 

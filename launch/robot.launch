@@ -1,5 +1,5 @@
 <launch>
-  <arg name="team" default="2"/>
+  <arg name="team" default="1"/>
  
   <group ns="robot$(arg team)">
 	<!-- Robot drivers -->
