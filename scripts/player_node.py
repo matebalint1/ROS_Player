@@ -318,11 +318,11 @@ if __name__ == '__main__':
 
             range_measurements = cur_laser.ranges
 
-            #simple_collision_avoidance(range_measurements)
+            simple_collision_avoidance(range_measurements)
             #print(cur_laser)
 
-            list_of_obj = get_objects_visible_in_laser_scan(np.array(range_measurements), 0.1, 5.9)
-            collision_avoidance(list_of_obj, 1)
+            #list_of_obj = get_objects_visible_in_laser_scan(np.array(range_measurements), 0.1, 5.9)
+            #collision_avoidance(list_of_obj, 1)
             #print(list_of_obj)
 
             #play_node.show_img()
