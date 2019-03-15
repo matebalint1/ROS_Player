@@ -200,7 +200,6 @@ def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
         y_i += 1
 
 
-
     # Combine double measurements, e.g. objects that are close to each other (closer than 0.1 m)
     i_first = 0
     while True:
@@ -229,13 +228,32 @@ def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
             break
 
 
-    for pos in list_of_obj:
-        print(pos)
+    #for pos in list_of_obj:
+        #print(pos)
 
-    print("Orginaly %d, now:%d" % (len(list_of_obj_radial), len(list_of_obj)))
+    #print("Orginaly %d, now:%d" % (len(list_of_obj_radial), len(list_of_obj)))
 
     return list_of_obj
 
+
+def collision_avoidance(laser_scan_objects, default_speed_forward):
+    robot_v_x = default_speed_forward
+    robot_v_y = 0
+
+    for o in laser_scan_objects:
+        x = o[0]
+        y = o[1]
+        r = np.sqrt(x*x + y*y)
+
+        proximity_factor_of_obstacle = 1 / (r)
+        robot_v_x -= proximity_factor_of_obstacle * x / r
+        robot_v_y -= proximity_factor_of_obstacle * y / r
+
+    robot_v_angle = -0.2*np.arctan2(robot_v_y, robot_v_x)
+    robot_v_total = 0.4*np.sqrt(robot_v_y*robot_v_y + robot_v_x*robot_v_x)
+
+    print("ROBOT speed linear:%f, yaw:%f" % (robot_v_total, robot_v_angle))
+    play_node.set_velocities(robot_v_total, robot_v_angle)
 
 def simple_collision_avoidance(range_measurements):
     range_n = len(range_measurements)  # number of measurements in the scan
@@ -277,7 +295,7 @@ if __name__ == '__main__':
     # You can keep the following in main, or put it into a PlayNode.run() function.
 
     # 10 Hz loop
-    loop_rate = rospy.Rate(10)
+    loop_rate = rospy.Rate(100)
 
     rospy.loginfo("Starting loop")
     while not rospy.is_shutdown():
@@ -304,6 +322,7 @@ if __name__ == '__main__':
             #print(cur_laser)
 
             list_of_obj = get_objects_visible_in_laser_scan(np.array(range_measurements), 0.1, 5.9)
+            collision_avoidance(list_of_obj, 1)
             #print(list_of_obj)
 
             #play_node.show_img()
