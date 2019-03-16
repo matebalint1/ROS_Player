@@ -8,6 +8,9 @@ import numpy as np
 from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan, Image
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+
+from visualization_msgs.msg import Marker
 
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -28,10 +31,16 @@ class PlayNode:
         self.image_window = window_name
         self.image = None
         self.laser = None
+        self.odom = None
 
-        self.velocity_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1000)
-        self.image_sub = rospy.Subscriber("front_camera/image_raw", Image, self.camera_cb)
-        self.laser_sub = rospy.Subscriber("front_laser/scan", LaserScan, self.laser_cb)
+        str_prefix = "robot1/"
+        self.velocity_pub = rospy.Publisher(str_prefix + "cmd_vel", Twist, queue_size=1000)
+        self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/marker", Marker, queue_size=1000)
+
+        self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
+        self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
+        self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
+
 
     def laser_cb(self, msg):
         """This function is called every time a message is received on the
@@ -58,6 +67,11 @@ class PlayNode:
 
         self.image = cv2.flip(image, -1)
 
+    def odom_cb(self, msg):
+        # Odometry data
+        #print("got odometry")
+        #print(msg)
+        self.odom = msg
 
 
     def show_img(self):
@@ -74,89 +88,77 @@ class PlayNode:
         """Use this to set linear and angular velocities
         """
         msg = Twist()
-        msg.linear.x = linear
-        msg.angular.z = angular
+        msg.linear.x = min(linear, 0.5)
+        msg.angular.z = min(angular, 0.5)
         self.velocity_pub.publish(msg)
 
+    def publish_marker_to_rviz(self, x, y, id, action):
+        marker = Marker()
+        marker.id = id
+        marker.header.frame_id = "robot1/base_link"
+        marker.header.stamp = rospy.Time.now()
+        marker.pose.position.x = x
+        marker.pose.position.y = -y
+        marker.pose.position.z = 0
 
-"""
-def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
-    # This function returns a list of objects (point that are close to each other)
-    # in the lidar scan, each cell contains an array containing distance and direction in rad.
+        marker.pose.orientation.x = 0
+        marker.pose.orientation.y = 1
+        marker.pose.orientation.z = 0
+        marker.pose.orientation.w = 0
 
-    # scan data is a numpy array
-    # min_r and max_r define in meters the max distance of the objects
+        marker.scale.x = 0.1
+        marker.scale.y = 0.1
+        marker.scale.z = 0.6
 
-    list_of_objects = []
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
 
-    # defines max diameter of an object (this function does not detect walls)
-    max_object_diameter = 0.15 # m
-    max_distance_between_points = 0.15 # m
-    min_number_of_points_in_one_object = 4
+        marker.type = Marker.CYLINDER
 
-    n = scan_data.size
-    i = 0
-    angle_increment_between_scans = 2*3.1415/n
-    print(scan_data)
-    print(n)
-    while i < n - 1:
+        if action == 0:
+            marker.action = marker.DELETE
+        else:
+            marker.action = marker.ADD
 
-        r_p1 = (scan_data[i])
-        if r_p1 < max_r and r_p1 > min_r:
-            max_number_of_subscans = int(round(max_object_diameter / \
-                                               r_p1 / \
-                                               angle_increment_between_scans))# rad
-            print("max nuber of sub scans %d" % max_number_of_subscans)
-            group_i = 1
-            while group_i <= max_number_of_subscans and i + group_i < n:
-
-                r_p2 = scan_data[i + group_i]
-
-                if r_p2 < max_r and r_p2 > min_r:
-                    #print("r_p2 %f" % r_p2)
-                    # Calculate angle of each point
-                    angle_p1 = i * angle_increment_between_scans
-                    angle_p2 = (i + group_i) * angle_increment_between_scans
-
-                    distance_between_points = np.sqrt(r_p1*r_p1 + r_p2*r_p2 - \
-                                                      2*r_p1*r_p2*np.cos(angle_p1 - angle_p2))
-                    print("distance of p1:%d p2:%d : %f"%(i,i+group_i,distance_between_points))
-                    if distance_between_points <= max_distance_between_points:
-                        group_i += 1
-                    else:
-                        print("got something at index: %d**********************************" % group_i)
-                        if group_i >= min_number_of_points_in_one_object:
-                            # add found object to list
-                            avg_angle = (angle_p1 + angle_p2) / 2
-                            avg_distance = (r_p1 + r_p2) / 2
-                            list_of_objects.append([avg_distance, avg_angle])
-                        # go to next point in main loop
-                        break
-                else:
-                    break
+        self.marker_pub.publish(marker)
 
 
-        i += 1
+def get_delta_pose(odometry_data):
+
+    #print(odometry_data)
+
+    x_now = odometry_data.pose.pose.position.x
+    y_now = odometry_data.pose.pose.position.y
+
+    qx = odometry_data.pose.pose.orientation.x
+    qy = odometry_data.pose.pose.orientation.y
+    qz = odometry_data.pose.pose.orientation.z
+    qw = odometry_data.pose.pose.orientation.w
+
+    siny_cosp = +2.0 * (qw * qz + qx * qy)
+    cosy_cosp = +1.0 - 2.0 * (qy * qy + qz * qz)
+    yaw_now = np.arctan2(siny_cosp, cosy_cosp)
+
+    delta_x = x_now - last_pose_of_robot[0]
+    delta_y = y_now - last_pose_of_robot[1]
+    delta_yaw = yaw_now - last_pose_of_robot[2]
+
+    last_pose_of_robot[0] = x_now
+    last_pose_of_robot[1] = y_now
+    last_pose_of_robot[2] = yaw_now
+
+    return last_pose_of_robot, delta_x, delta_y, delta_yaw
 
 
-    return list_of_objects
-"""
-
-def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
-    min_number_of_measurements_in_2x2_to_be_accepted = 3
-
-    pixel_size = 0.05 # m
-    map_size = 2*5 # m
-    resolution_of_map = int(map_size / pixel_size)
-
-    # Middle of the map is where the robot is
-    map = np.zeros([resolution_of_map, resolution_of_map]) # 2D array
+def raw_lidar_to_2D_numpy_array(scan_data, min_r, max_r):
+    scan_2D = []
 
     n = scan_data.size
     angle_increment_between_scans = 2*3.1415/n
-    i = 0
 
-    # Put each measurement to the map
+    i = 0
     while i < n:
         r = scan_data[i]
 
@@ -164,6 +166,58 @@ def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
             angle = i * angle_increment_between_scans
             x = r * np.cos(angle)
             y = r * np.sin(angle)
+            scan_2D.append([x,y])
+        i += 1
+
+    return scan_2D
+
+
+
+def combine_scan_data(new_scan, scan_data_arr, dx, dy, dyaw , min_r, max_r):
+    # new_scan: 2d scan
+    # scan_data_arr: list containing a arrays of scanss (2D)
+    # delta_pose: list of dx,dy,dyaw
+
+    # Remove first item from scan array if len >=3
+    if len(scan_data_arr) > 3:
+        del scan_data_arr[0]
+
+    # Rotate old points
+    for scan in scan_data_arr:
+        for point in scan:
+            x = point[0]
+            y = point[1]
+
+            # Rotate point around origin
+            x = x * np.cos(dyaw) - y * np.sin(dyaw)
+            y = x * np.sin(dyaw) + y * np.cos(dyaw)
+
+            # Linear translation
+            x += dx
+            y += dy
+
+    # Combine old and new data
+    scan_data_arr.append(raw_lidar_to_2D_numpy_array(new_scan, min_r, max_r))
+
+    return scan_data_arr
+
+
+
+
+def get_objects_visible_in_laser_scan(scan_data_array):
+
+    min_number_of_measurements_in_2x2_to_be_accepted = 3
+    pixel_size = 0.05 # m
+    map_size = 2*5 # m
+    resolution_of_map = int(map_size / pixel_size)
+
+    # Middle of the map is where the robot is
+    map = np.zeros([resolution_of_map, resolution_of_map]) # 2D array
+
+    for scan in scan_data_array:
+        for point in scan:
+            x = point[0]
+            y = point[1]
 
             x_i = int(round((x + map_size/2 ) / pixel_size)) # origin is in the middle of the map
             y_i = int(round((y + map_size/2 ) / pixel_size))
@@ -172,7 +226,7 @@ def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
                 map[y_i, x_i] += 1 # add one to map
                 #print("added to map x:%f   y:%f"% (x,y))
 
-        i += 1
+
 
     # Find all 2x2 cells in the map that contain enough measurements
     list_of_obj = []
@@ -221,8 +275,6 @@ def get_objects_visible_in_laser_scan(scan_data, min_r, max_r):
             else:
                 i_second += 1
 
-
-
         i_first += 1
         if i_first >= len(list_of_obj) - 1:
             break
@@ -254,6 +306,8 @@ def collision_avoidance(laser_scan_objects, default_speed_forward):
 
     print("ROBOT speed linear:%f, yaw:%f" % (robot_v_total, robot_v_angle))
     play_node.set_velocities(robot_v_total, robot_v_angle)
+
+
 
 def simple_collision_avoidance(range_measurements):
     range_n = len(range_measurements)  # number of measurements in the scan
@@ -292,6 +346,9 @@ def simple_collision_avoidance(range_measurements):
 if __name__ == '__main__':
     play_node = PlayNode()
 
+    last_pose_of_robot = [0,0,0] # x,y,yaw
+    scan_data_array_main = [] # For combining multiple laser scans
+
     # You can keep the following in main, or put it into a PlayNode.run() function.
 
     # 10 Hz loop
@@ -304,26 +361,43 @@ if __name__ == '__main__':
         # messages received
 
 
-        if play_node.laser and play_node.image.any():
+        if play_node.laser and play_node.odom:# and play_node.image.any():
             # Now, we can use the laser and image data to do something. Because
             # the objects in the PlayNode are constantly updated, we need to
             # make a deep copy so that the data doesn't change while we're doing
             # computations on it. This isn't very efficient, but we do it just
             # for demonstration purposes
             cur_laser = copy.deepcopy(play_node.laser)
-            cur_image = copy.deepcopy(play_node.image)
+            # cur_image = copy.deepcopy(play_node.image)
 
             # Do something useful with laser and image here
 
-
+            odometry_data = copy.deepcopy(play_node.odom)
             range_measurements = cur_laser.ranges
 
-            simple_collision_avoidance(range_measurements)
+            #simple_collision_avoidance(range_measurements)
             #print(cur_laser)
 
-            #list_of_obj = get_objects_visible_in_laser_scan(np.array(range_measurements), 0.1, 5.9)
+            last_pose_of_robot, delta_x, delta_y, delta_yaw = get_delta_pose(odometry_data)
+            print([delta_x, delta_y, delta_yaw])
+            scan_data_array_main = combine_scan_data(np.array(range_measurements),\
+                                                     scan_data_array_main,\
+                                                     delta_x, delta_y, delta_yaw,\
+                                                     0.1, 5.9)
+            list_of_obj = get_objects_visible_in_laser_scan(scan_data_array_main)
+
+            # Remove old markers
+            for id in range(100):
+                play_node.publish_marker_to_rviz(0, 0, id, 0)
+
+            # Add new markers
+            i = 0
+            for o in list_of_obj:
+                play_node.publish_marker_to_rviz(o[0], o[1], i, 1)
+                i += 1
+
             #collision_avoidance(list_of_obj, 1)
-            #print(list_of_obj)
+            #print(len(list_of_obj))
 
             #play_node.show_img()
 

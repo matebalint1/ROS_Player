@@ -4,7 +4,7 @@
   <arg name="use_python" default="false"/>
   
   <!-- KI node controlling the robot -->
-  <group ns="robot$(arg team)">
+  <!--<group ns="robot$(arg team)"> -->
     <group unless="$(arg use_python)">
       <node pkg="player" name="player" type="player_node" output="screen">
 	<param name="image_transport" value="compressed"/>
@@ -16,6 +16,6 @@
 	<param name="image_transport" value="compressed"/>
       </node>
     </group>
-  </group>
+  <!--</group> -->
 
 </launch>
