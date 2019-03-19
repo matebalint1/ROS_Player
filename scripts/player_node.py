@@ -5,13 +5,15 @@ import sys
 import rospy
 import copy
 import numpy as np
-from std_msgs.msg import String
-from sensor_msgs.msg import LaserScan, Image
-from geometry_msgs.msg import Twist
+from std_msgs.msg import String, Header
+from sensor_msgs.msg import LaserScan, Image, PointCloud2
+import sensor_msgs.point_cloud2
+from geometry_msgs.msg import Twist, Point
 from nav_msgs.msg import Odometry
 
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import MarkerArray, Marker
 
+import time
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -35,7 +37,10 @@ class PlayNode:
 
         str_prefix = "robot1/"
         self.velocity_pub = rospy.Publisher(str_prefix + "cmd_vel", Twist, queue_size=1000)
-        self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/marker", Marker, queue_size=1000)
+        self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/visualization_marker", Marker, queue_size=1000)
+        #self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/visualization_marker_array", MarkerArray, queue_size=1000)
+
+        self.point_cloud_pub = rospy.Publisher(str_prefix + "visualization_msgs/object_cloud", PointCloud2, queue_size=1000)
 
         self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
         self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
@@ -124,6 +129,73 @@ class PlayNode:
 
         self.marker_pub.publish(marker)
 
+    """
+    def publish_marker_array_to_rviz(self, array):
+
+        max_number_of_markers = 100
+        marker_array = MarkerArray()
+
+        id = 0
+        for a in array:
+            marker = Marker()
+            marker.id = id
+            marker.header.frame_id = "robot1/base_link"
+            #marker.header.stamp = rospy.Time.now()
+            marker.pose.position.x = a[0]
+            marker.pose.position.y = -a[1]
+            marker.pose.position.z = 0
+
+            marker.pose.orientation.x = 0
+            marker.pose.orientation.y = 1
+            marker.pose.orientation.z = 0
+            marker.pose.orientation.w = 0
+
+            marker.scale.x = 0.1
+            marker.scale.y = 0.1
+            marker.scale.z = 0.6
+
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+            marker.color.a = 1.0
+
+            marker.type = Marker.CYLINDER
+            marker.action = marker.ADD
+
+            marker_array.markers.append(marker)
+
+            id += 1
+            id = min(id, max_number_of_markers)
+
+        # Remove old markers
+        while id <= max_number_of_markers:
+            marker = Marker()
+            marker.action = marker.DELETE
+            marker_array.markers.append(marker)
+            id += 1
+
+
+        self.marker_pub.publish(marker_array)
+    """
+
+    def publish_point_cloud(self, points):
+        # points are in a 2d list: [[x,y], ... ]
+
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "robot1/base_link"
+
+        # Add z coordinate to points
+        cloud_points = []
+        for p in points:
+            cloud_points.append([p[0],-p[1],0])
+
+        scaled_polygon_pcl = sensor_msgs.point_cloud2.create_cloud_xyz32(header, cloud_points)
+
+        self.point_cloud_pub.publish(scaled_polygon_pcl)
+
+
+
 
 def get_delta_pose(odometry_data):
 
@@ -179,7 +251,7 @@ def combine_scan_data(new_scan, scan_data_arr, dx, dy, dyaw , min_r, max_r):
     # delta_pose: list of dx,dy,dyaw
 
     # Remove first item from scan array if len >=3
-    if len(scan_data_arr) > 3:
+    if len(scan_data_arr) > 4:
         del scan_data_arr[0]
 
     # Rotate old points
@@ -254,7 +326,8 @@ def get_objects_visible_in_laser_scan(scan_data_array):
         y_i += 1
 
 
-    # Combine double measurements, e.g. objects that are close to each other (closer than 0.1 m)
+    # Combine double measurements, e.g. objects that are close to each other
+    combine_objects_closer_than = 0.2
     i_first = 0
     while True:
         i_second = i_first + 1
@@ -266,7 +339,7 @@ def get_objects_visible_in_laser_scan(scan_data_array):
 
             distance_between_points = np.sqrt((p1[0]-p2[0]) * (p1[0]-p2[0]) + (p1[1]-p2[1]) * (p1[1]-p2[1]))
             #print(distance_between_points)
-            if distance_between_points <= 0.1:
+            if distance_between_points <= combine_objects_closer_than:
                 avg_x = (p1[0] + p2[0]) / 2
                 avg_y = (p1[1] + p2[1]) / 2
 
@@ -331,7 +404,7 @@ def simple_collision_avoidance(range_measurements):
 
     avg_distance = sum_of_ranges / 4
 
-    print(avg_distance)
+    #print(avg_distance)
 
     if avg_distance < 0.5:
         play_node.set_velocities(-0.1, 0.3)
@@ -362,6 +435,7 @@ if __name__ == '__main__':
 
 
         if play_node.laser and play_node.odom:# and play_node.image.any():
+            ###start_time = time.time()
             # Now, we can use the laser and image data to do something. Because
             # the objects in the PlayNode are constantly updated, we need to
             # make a deep copy so that the data doesn't change while we're doing
@@ -375,30 +449,37 @@ if __name__ == '__main__':
             odometry_data = copy.deepcopy(play_node.odom)
             range_measurements = cur_laser.ranges
 
-            #simple_collision_avoidance(range_measurements)
+            simple_collision_avoidance(range_measurements)
             #print(cur_laser)
 
+            # Pose change:
             last_pose_of_robot, delta_x, delta_y, delta_yaw = get_delta_pose(odometry_data)
-            print([delta_x, delta_y, delta_yaw])
+            #print([delta_x, delta_y, delta_yaw])
+
+            # Combine old and new laser scans using delta pose
             scan_data_array_main = combine_scan_data(np.array(range_measurements),\
                                                      scan_data_array_main,\
                                                      delta_x, delta_y, delta_yaw,\
                                                      0.1, 5.9)
+
+            # Find obstacles from the combined point cloud
             list_of_obj = get_objects_visible_in_laser_scan(scan_data_array_main)
 
             # Remove old markers
-            for id in range(100):
-                play_node.publish_marker_to_rviz(0, 0, id, 0)
-
+            #for id in range(100):
+                #play_node.publish_marker_to_rviz(0, 0, id, 0)
             # Add new markers
-            i = 0
-            for o in list_of_obj:
-                play_node.publish_marker_to_rviz(o[0], o[1], i, 1)
-                i += 1
+            #i = 0
+            #for o in list_of_obj:
+            #    play_node.publish_marker_to_rviz(o[0], o[1], i, 1)
+            #    i += 1
+
+            play_node.publish_point_cloud(list_of_obj)
 
             #collision_avoidance(list_of_obj, 1)
             #print(len(list_of_obj))
 
             #play_node.show_img()
+            ###print("Time diff: %f s" % (time.time() - start_time))
 
         loop_rate.sleep()
