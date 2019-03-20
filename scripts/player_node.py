@@ -199,7 +199,7 @@ class PlayNode:
         # Add z coordinate to points
         cloud_points = []
         for p in points:
-            cloud_points.append([p[0],-p[1],0])
+            cloud_points.append([p[0],p[1],0])
 
         scaled_polygon_pcl = sensor_msgs.point_cloud2.create_cloud_xyz32(header, cloud_points)
 
@@ -210,7 +210,7 @@ class PlayNode:
 
 def get_delta_pose(odometry_data):
 
-    #print(odometry_data)
+    print(odometry_data)
 
     x_now = odometry_data.pose.pose.position.x
     y_now = odometry_data.pose.pose.position.y
@@ -267,7 +267,7 @@ def combine_scan_data(new_scan, scan_data_arr, dx, dy, dyaw , min_r, max_r):
     # delta_pose: list of dx,dy,dyaw
 
     # Remove first item from scan array if len >=3
-    if len(scan_data_arr) >= 1:
+    if len(scan_data_arr) >= 2:
         del scan_data_arr[0]
 
     # Rotate old points
@@ -295,7 +295,7 @@ def combine_scan_data(new_scan, scan_data_arr, dx, dy, dyaw , min_r, max_r):
 def get_objects_visible_in_laser_scan(scan_data_array):
 
     min_number_of_measurements_in_2x2_to_be_accepted = 1
-    pixel_size = 0.05 # m
+    pixel_size = 0.1 # m
     map_size = 2*6 # m
     resolution_of_map = int(map_size / pixel_size)
 
@@ -435,7 +435,7 @@ def simple_collision_avoidance_2(obj_array):
     # This function user already recognized objects for the laser scan
 
     # Sector to keep empty in front of the robot
-    sector_angle = 90 # deg
+    sector_angle = 60 # deg
     angle_limit = sector_angle / 2 * 3.1415/180 # rad
 
     closest_obj = 6 # m (max range of lidar)
@@ -451,10 +451,10 @@ def simple_collision_avoidance_2(obj_array):
 
     print("Closest object in the front %f m" % closest_obj)
     if closest_obj < 0.7:
-        play_node.set_velocities(-0.1, 0.3)
+        play_node.set_velocities(-0.1, 0.2)
     else:
         # Calculate speed depending of the distance to the closest objects:
-        speed = min(closest_obj, 1) / 1 * 0.4
+        speed = min(closest_obj, 1) / 1 * 0.2
         play_node.set_velocities(speed, 0)
 
 
@@ -486,7 +486,7 @@ def simple_collision_avoidance(range_measurements):
     #print(avg_distance)
 
     if avg_distance < 0.5:
-        play_node.set_velocities(-0.1, 0.3)
+        play_node.set_velocities(0.0, 0.3)
     else:
         # Calculate speed depending of the distance to the closest objects:
         speed = min(avg_distance, 1) / 1 * 0.4 + 0.1
