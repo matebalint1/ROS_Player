@@ -17,6 +17,8 @@ import time
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
+import lidar_processor
+
 # You don't have to use a class, but it keeps things together and means that you
 # don't use global variables
 class PlayNode:
@@ -41,9 +43,11 @@ class PlayNode:
         #self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/visualization_marker_array", MarkerArray, queue_size=1000)
 
         self.point_cloud_pub = rospy.Publisher(str_prefix + "visualization_msgs/object_cloud", PointCloud2, queue_size=1000)
+        self.point_cloud_pub2 = rospy.Publisher(str_prefix + "visualization_msgs/object_cloud2", PointCloud2, queue_size=1000)
 
         self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
         self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
+        #self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
         self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
 
 
@@ -205,12 +209,28 @@ class PlayNode:
 
         self.point_cloud_pub.publish(scaled_polygon_pcl)
 
+    def publish_point_cloud2(self, points):
+        # points are in a 2d list: [[x,y], ... ]
+
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "robot1/base_link"
+
+        # Add z coordinate to points
+        cloud_points = []
+        for p in points:
+            cloud_points.append([p[0],p[1],0])
+
+        scaled_polygon_pcl = sensor_msgs.point_cloud2.create_cloud_xyz32(header, cloud_points)
+
+        self.point_cloud_pub2.publish(scaled_polygon_pcl)
+
 
 
 
 def get_delta_pose(odometry_data):
 
-    print(odometry_data)
+    #print(odometry_data)
 
     x_now = odometry_data.pose.pose.position.x
     y_now = odometry_data.pose.pose.position.y
@@ -233,202 +253,6 @@ def get_delta_pose(odometry_data):
     last_pose_of_robot[2] = yaw_now
 
     return last_pose_of_robot, delta_x, delta_y, delta_yaw
-
-
-def raw_lidar_to_2D_array(scan_data, min_r, max_r):
-
-    # The following limits are used to mask out the back side of the robot.
-    scan_angle_lower_limit = 50 * 3.1415/180 # rad
-    scan_angle_upper_limit = (360 -50) * 3.1415 / 180  # rad
-
-    scan_2D = []
-
-    n = scan_data.size
-    angle_increment_between_scans = 2*3.1415/n
-
-    i = 0
-    while i < n:
-        r = scan_data[i]
-        angle = i * angle_increment_between_scans
-
-        if r < max_r and r > min_r and angle <= scan_angle_upper_limit and angle >= scan_angle_lower_limit:
-            x = r * np.cos(angle)
-            y = r * np.sin(angle)
-            scan_2D.append([x,y])
-        i += 1
-
-    return scan_2D
-
-
-
-def combine_scan_data(new_scan, scan_data_arr, dx, dy, dyaw , min_r, max_r):
-    # new_scan: 2d scan
-    # scan_data_arr: list containing a arrays of scans (2D)
-    # delta_pose: list of dx,dy,dyaw
-
-    # Remove first item from scan array if len >=3
-    if len(scan_data_arr) >= 2:
-        del scan_data_arr[0]
-
-    # Rotate old points
-    for scan in scan_data_arr:
-        for point in scan:
-            x = point[0]
-            y = point[1]
-
-            # Rotate point around origin
-            x = x * np.cos(dyaw) - y * np.sin(dyaw)
-            y = x * np.sin(dyaw) + y * np.cos(dyaw)
-
-            # Linear translation
-            x += dx
-            y += dy
-
-    # Combine old and new data
-    scan_data_arr.append(raw_lidar_to_2D_array(np.array(new_scan.ranges), min_r, max_r))
-
-    return scan_data_arr
-
-
-
-
-def get_objects_visible_in_laser_scan(scan_data_array):
-
-    min_number_of_measurements_in_2x2_to_be_accepted = 1
-    pixel_size = 0.1 # m
-    map_size = 2*6 # m
-    resolution_of_map = int(map_size / pixel_size)
-
-    # Middle of the map is where the robot is
-    map = np.zeros([resolution_of_map, resolution_of_map]) # 2D array
-
-    # Put individual scans to the map grid
-    for scan in scan_data_array:
-        for point in scan:
-            x = point[0]
-            y = point[1]
-
-            x_i = int(round((x + map_size/2 ) / pixel_size)) # origin is in the middle of the map
-            y_i = int(round((y + map_size/2 ) / pixel_size))
-
-            if x_i < resolution_of_map and y_i < resolution_of_map:
-                map[y_i, x_i] += 1 # add one to map
-                #print("added to map x:%f   y:%f"% (x,y))
-
-
-
-    # Find all 2x2 cells in the map that contain enough measurements
-    list_of_obj = []
-    y_i = 0
-    while y_i < resolution_of_map - 1:
-        x_i = 0
-        while x_i < resolution_of_map - 1:
-            number_of_measurements_2x2 = map[y_i,x_i] + \
-                                        map[y_i + 1,x_i] + \
-                                        map[y_i + 1, x_i + 1] + \
-                                        map[y_i, x_i + 1]
-
-            if number_of_measurements_2x2 >= min_number_of_measurements_in_2x2_to_be_accepted:
-                x = -((x_i + 0.5) * pixel_size - map_size/2)
-                y = -((y_i + 0.5) * pixel_size - map_size/2)
-                list_of_obj.append([x, y])
-
-            x_i += 1
-        y_i += 1
-
-    """
-    # Combine double measurements, e.g. objects that are close to each other
-    combine_objects_closer_than = 0.1 # m
-    i_first = 0
-    while True:
-        i_second = i_first + 1
-
-        while i_second < len(list_of_obj):
-
-            p1 = list_of_obj[i_first]
-            p2 = list_of_obj[i_second]
-
-            distance_between_points = np.sqrt((p1[0]-p2[0]) * (p1[0]-p2[0]) + (p1[1]-p2[1]) * (p1[1]-p2[1]))
-            #print(distance_between_points)
-            if distance_between_points <= combine_objects_closer_than:
-                avg_x = (p1[0] + p2[0]) / 2
-                avg_y = (p1[1] + p2[1]) / 2
-
-                list_of_obj[i_first] = [avg_x, avg_y]
-                list_of_obj.pop(i_second)
-            else:
-                i_second += 1
-
-        i_first += 1
-        if i_first >= len(list_of_obj) - 1:
-            break
-    """
-
-    combine_objects_closer_than = 0.3  # m
-    new_list_of_obj = []
-
-    while len(list_of_obj) > 1:
-        close_objects_index = []
-        close_objects_index.append(0)
-
-        p1 = list_of_obj[0]
-        i_second = 1
-
-        # Find close objects
-        while i_second < len(list_of_obj):
-            p2 = list_of_obj[i_second]
-            distance_between_points = np.sqrt((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1]))
-
-            if distance_between_points <= combine_objects_closer_than:
-                close_objects_index.append(i_second)
-
-            i_second += 1
-
-        # Calculate average position of found nearby objects
-        avg_x = 0
-        avg_y = 0
-        for i in close_objects_index:
-            #print("i:%d  x%f y%f" % (i, float(list_of_obj[i][0]),float(list_of_obj[i][1])))
-            weight = 1/float(len(close_objects_index))
-            #print(weight)
-            avg_x +=  weight * list_of_obj[i][0]
-            avg_y +=  weight * list_of_obj[i][1]
-
-
-        # Add found object to the new object array
-        new_list_of_obj.append([avg_x,avg_y])
-
-
-        # Pop used objects from the orginal array
-        close_objects_index.sort(reverse=True)
-        for i in close_objects_index:
-            list_of_obj.pop(i)
-
-    #print("Orginaly %d, now:%d" % (len(list_of_obj_radial), len(list_of_obj)))
-
-    return new_list_of_obj
-
-
-def collision_avoidance(laser_scan_objects, default_speed_forward):
-    # Not working properly, needs development
-    robot_v_x = default_speed_forward
-    robot_v_y = 0
-
-    for o in laser_scan_objects:
-        x = o[0]
-        y = o[1]
-        r = np.sqrt(x*x + y*y)
-
-        proximity_factor_of_obstacle = 1 / (r)
-        robot_v_x -= proximity_factor_of_obstacle * x / r
-        robot_v_y -= proximity_factor_of_obstacle * y / r
-
-    robot_v_angle = -0.2*np.arctan2(robot_v_y, robot_v_x)
-    robot_v_total = 0.4*np.sqrt(robot_v_y*robot_v_y + robot_v_x*robot_v_x)
-
-    print("ROBOT speed linear:%f, yaw:%f" % (robot_v_total, robot_v_angle))
-    play_node.set_velocities(robot_v_total, robot_v_angle)
-
 
 
 def simple_collision_avoidance_2(obj_array):
@@ -456,7 +280,6 @@ def simple_collision_avoidance_2(obj_array):
         # Calculate speed depending of the distance to the closest objects:
         speed = min(closest_obj, 1) / 1 * 0.2
         play_node.set_velocities(speed, 0)
-
 
 
 def simple_collision_avoidance(range_measurements):
@@ -495,15 +318,18 @@ def simple_collision_avoidance(range_measurements):
 
 
 if __name__ == '__main__':
+
     play_node = PlayNode()
+    lidar = lidar_processor.LidarProcessor(0.1, 5.9, 0.4)
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
 
+
     # You can keep the following in main, or put it into a PlayNode.run() function.
 
     # 10 Hz loop
-    loop_rate = rospy.Rate(100)
+    loop_rate = rospy.Rate(10)
 
     rospy.loginfo("Starting loop")
     while not rospy.is_shutdown():
@@ -513,41 +339,40 @@ if __name__ == '__main__':
 
 
         if play_node.laser and play_node.odom:# and play_node.image.any():
-            ##start_time = time.time() # for measuring speed
+            start_time = time.time() # for measuring speed
 
             # Now, we can use the laser and image data to do something. Because
             # the objects in the PlayNode are constantly updated, we need to
             # make a deep copy so that the data doesn't change while we're doing
             # computations on it. This isn't very efficient, but we do it just
             # for demonstration purposes
+
             cur_laser = copy.deepcopy(play_node.laser)
             # cur_image = copy.deepcopy(play_node.image)
-
-
             odometry_data = copy.deepcopy(play_node.odom)
-            #range_measurements = cur_laser.ranges
-            #simple_collision_avoidance(range_measurements)
+
+            odom_time = float(odometry_data.header.stamp.secs) + float(odometry_data.header.stamp.nsecs )/ 1000000000.0
+            laser_time = float(cur_laser.header.stamp.secs) + float(cur_laser.header.stamp.nsecs) / 1000000000.0
+            #print("Laser t:%f, odom t:%f" % (laser_time, odom_time))
+            #print("Time diff %f s" % (laser_time - odom_time))
+            #print(cur_laser.header.stamp.nsecs/ 1000000000.0)
+
+            simple_collision_avoidance(cur_laser.ranges)
 
             # Pose change:
             last_pose_of_robot, delta_x, delta_y, delta_yaw = get_delta_pose(odometry_data)
             #print([delta_x, delta_y, delta_yaw])
 
-            # Combine old and new laser scans using delta pose
-            scan_data_array_main = combine_scan_data(cur_laser,\
-                                                     scan_data_array_main,\
-                                                     delta_x, delta_y, delta_yaw,\
-                                                     0.1, 5.9)
-
-            # Find obstacles from the combined point cloud
-            list_of_obj = get_objects_visible_in_laser_scan(scan_data_array_main)
-
-            simple_collision_avoidance_2(list_of_obj)
+            list_of_obj = lidar.add_scan(cur_laser)
+            #simple_collision_avoidance_2(list_of_obj)
             play_node.publish_point_cloud(list_of_obj)
+            #play_node.publish_point_cloud2(list_of_obj_last_last)
+
 
             #collision_avoidance(list_of_obj, 1)
             #print(len(list_of_obj))
 
             #play_node.show_img()
-            ###print("Time diff: %f s" % (time.time() - start_time))
+            #print("Time diff: %f s" % (time.time() - start_time))
 
         loop_rate.sleep()
