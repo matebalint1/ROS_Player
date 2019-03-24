@@ -18,6 +18,7 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
 import lidar_processor
+import robot_pose
 
 # You don't have to use a class, but it keeps things together and means that you
 # don't use global variables
@@ -40,7 +41,7 @@ class PlayNode:
         str_prefix = "robot1/"
         self.velocity_pub = rospy.Publisher(str_prefix + "cmd_vel", Twist, queue_size=1000)
         self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/visualization_marker", Marker, queue_size=1000)
-        #self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/visualization_marker_array", MarkerArray, queue_size=1000)
+        self.marker_pub = rospy.Publisher(str_prefix + "visualization_msgs/visualization_marker_array", MarkerArray, queue_size=1000)
 
         self.point_cloud_pub = rospy.Publisher(str_prefix + "visualization_msgs/object_cloud", PointCloud2, queue_size=1000)
         self.point_cloud_pub2 = rospy.Publisher(str_prefix + "visualization_msgs/object_cloud2", PointCloud2, queue_size=1000)
@@ -209,6 +210,7 @@ class PlayNode:
 
         self.point_cloud_pub.publish(scaled_polygon_pcl)
 
+
     def publish_point_cloud2(self, points):
         # points are in a 2d list: [[x,y], ... ]
 
@@ -252,7 +254,7 @@ def get_delta_pose(odometry_data):
     last_pose_of_robot[1] = y_now
     last_pose_of_robot[2] = yaw_now
 
-    return last_pose_of_robot, delta_x, delta_y, delta_yaw
+    return last_pose_of_robot, delta_x, delta_y, delta_yaw, yaw_now
 
 
 def simple_collision_avoidance_2(obj_array):
@@ -320,11 +322,11 @@ def simple_collision_avoidance(range_measurements):
 if __name__ == '__main__':
 
     play_node = PlayNode()
-    lidar = lidar_processor.LidarProcessor(0.1, 5.9, 0.4)
+    lidar = lidar_processor.LidarProcessor()
+    pose = robot_pose.RobotPose()
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
-
 
     # You can keep the following in main, or put it into a PlayNode.run() function.
 
@@ -357,22 +359,36 @@ if __name__ == '__main__':
             #print("Time diff %f s" % (laser_time - odom_time))
             #print(cur_laser.header.stamp.nsecs/ 1000000000.0)
 
-            simple_collision_avoidance(cur_laser.ranges)
-
             # Pose change:
-            last_pose_of_robot, delta_x, delta_y, delta_yaw = get_delta_pose(odometry_data)
+            last_pose_of_robot, delta_x, delta_y, delta_yaw, yaw_now = get_delta_pose(odometry_data)
             #print([delta_x, delta_y, delta_yaw])
 
-            list_of_obj = lidar.add_scan(cur_laser)
-            #simple_collision_avoidance_2(list_of_obj)
+            # Process lidar
+            list_of_obj, total_delta_odom = lidar.add_scan(cur_laser, delta_x, delta_y, delta_yaw, yaw_now)
+            list_of_all_scans = lidar.get_sum_of_scan_array()
+
             play_node.publish_point_cloud(list_of_obj)
-            #play_node.publish_point_cloud2(list_of_obj_last_last)
+            play_node.publish_point_cloud2(list_of_all_scans)
 
+            # Update odometry
+            pose.update_odom_pose(total_delta_odom[0][0],
+                                  total_delta_odom[0][1],
+                                  total_delta_odom[0][2])
+            pose.update_odom_pose(total_delta_odom[1][0],
+                                  total_delta_odom[1][1],
+                                  total_delta_odom[1][2])
 
-            #collision_avoidance(list_of_obj, 1)
-            #print(len(list_of_obj))
+            #print(pose.get_pose_on_map())
+            # Movement of the robot
+            #simple_collision_avoidance(cur_laser.ranges)
+            play_node.set_velocities(-0.1, 0.2)
+            #play_node.set_velocities(1, 0)
+            # simple_collision_avoidance_2(list_of_obj)
+
 
             #play_node.show_img()
             #print("Time diff: %f s" % (time.time() - start_time))
 
         loop_rate.sleep()
+
+    play_node.set_velocities(0, 0) # make sure robot stops after stopping program

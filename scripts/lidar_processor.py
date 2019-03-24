@@ -1,31 +1,36 @@
 import numpy as np
+from scipy.spatial import distance
 
 class LidarProcessor:
 
-    def __init__(self, min_r, max_r, max_distance_between_two_neighbor_points_in_an_object):
+    def __init__(self, min_r = 0.1, max_r = 5.9, max_distance_between_two_neighbor_points_in_an_object = 0.4):
         self._min_r = min_r # m
         self._max_r = max_r # m
         self._max_distance_between_two_neighbor_points_in_an_object = max_distance_between_two_neighbor_points_in_an_object
 
-        self._max_object_size = 0.12 # m
-        self._size_of_scan_array = 3 # scans
+        self._max_object_size = 0.1 # m
+        self._min_object_size = -1 # m
+        self._size_of_scan_array = 30 # scans
         self._crop_angle = 90  # deg (total)
 
         self.scan_array = [] # contains objects from previous scans
 
 
-    def add_scan(self, raw_scan):
+    def add_scan(self, raw_scan, dx = 0, dy = 0, dyaw = 0, yaw_now = 0):
 
         found_objects = self._get_objects_from_laser_scan(raw_scan)
-        filtered_objects = self._filter_objects_larger_than_from_list(found_objects, self._max_object_size)
+        filtered_objects = self._filter_objects(found_objects)
 
-        self._combine_scan_data(filtered_objects, 0, 0, 0)
-
-        return  filtered_objects
+        total_odom = self._combine_scan_data_percise(filtered_objects, dx, dy, dyaw, yaw_now)
+        return  filtered_objects, total_odom
 
 
     def get_scan_array(self):
         return self.scan_array
+
+    def get_sum_of_scan_array(self):
+        # for test purposes, return 1d version of all points
+        return sum(self.scan_array, [])
 
 
     def _get_objects_from_laser_scan(self, raw_scan):
@@ -94,39 +99,10 @@ class LidarProcessor:
         return list_of_obj_cartesian
 
 
-    def _combine_scan_data(self, new_scan, dx, dy, dyaw):
-        # new_scan: 2d scan
-        # scan_data_arr: list containing a arrays of scans (2D)
-        # delta_pose: list of dx,dy,dyaw
+    def _filter_objects(self, obj_array):
+        # Removes too big or too small objects from array
+        # Array format [[x1,y1,x2,y2], ...]
 
-        # Remove first item from scan array if len >=3
-        if len(self.scan_array) >= self._size_of_scan_array:
-            del self.scan_array[0]
-
-        # Rotate old points
-        for scan in self.scan_array:
-            for point in scan:
-                x = point[0]
-                y = point[1]
-
-                # Rotate point around origin
-                x = x * np.cos(dyaw) - y * np.sin(dyaw)
-                y = x * np.sin(dyaw) + y * np.cos(dyaw)
-
-                # Linear translation
-                x += dx
-                y += dy
-
-                # Save translated values
-                point[0] = x
-                point[1] = y
-
-        # Combine old and new data
-        self.scan_array.append(new_scan)
-
-
-
-    def _filter_objects_larger_than_from_list(self, obj_array, max_size):
         filtered_obj = []
 
         for obj in obj_array:
@@ -137,7 +113,7 @@ class LidarProcessor:
 
             distance = np.sqrt((p1_x - p2_x) * (p1_x - p2_x) + (p1_y - p2_y) * (p1_y - p2_y))
 
-            if distance <= max_size:
+            if distance <= self._max_object_size and distance >= self._min_object_size:
                 avg_x = (p1_x + p2_x) / 2
                 avg_y = (p1_y + p2_y) / 2
 
@@ -145,6 +121,172 @@ class LidarProcessor:
 
         return filtered_obj
 
+
+
+    def _combine_scan_data(self, new_scan, dx, dy, dyaw, yaw_now):
+        # new_scan: 2d scan
+        # scan_data_arr: list containing a arrays of scans (2D)
+        # delta_pose: dx,dy,dyaw, in odom frame
+
+        # Calculate dx, dy in base_link frame
+        dyaw_frames = -yaw_now + 3.1415/2 # add 90 deg
+        dy_base = -(dx * np.cos(dyaw_frames) - dy * np.sin(dyaw_frames))
+        dx_base = -(dx * np.sin(dyaw_frames) + dy * np.cos(dyaw_frames))
+        #print("base_link dx:%f, dy:%f" % (dx_base,dy_base))
+
+        # Remove first item from scan array if len >=3
+        if len(self.scan_array) >= self._size_of_scan_array:
+            del self.scan_array[0]
+
+        # Rotate old points
+        for scan in self.scan_array:
+            for point in scan:
+                # Rotate point around origin
+                x = point[0] * np.cos(-dyaw) - point[1] * np.sin(-dyaw)
+                y = point[0] * np.sin(-dyaw) + point[1] * np.cos(-dyaw)
+
+                # Linear translation
+                x += dx_base
+                y += dy_base
+
+                # Save translated values
+                point[0] = x
+                point[1] = y
+
+        # Combine old and new data
+        self.scan_array.append(new_scan)
+
+
+    def _combine_scan_data_percise(self, new_scan, dx, dy, dyaw, yaw_now):
+        # Matches point structures to minimise odometry error
+        # new_scan: 2d scan
+        # scan_data_arr: list containing a arrays of scans (2D)
+        # delta_pose: dx,dy,dyaw, in odom frame
+        # Return list of matched translation: [dx, dy, dyaw]
+
+        # Calculate dx, dy in base_link frame
+        dyaw_odom_to_robot = -yaw_now + 3.1415/2 # add 90 deg
+        dy_base = -(dx * np.cos(dyaw_odom_to_robot) - dy * np.sin(dyaw_odom_to_robot))
+        dx_base = -(dx * np.sin(dyaw_odom_to_robot) + dy * np.cos(dyaw_odom_to_robot))
+        #print("base_link dx:%f, dy:%f" % (dx_base,dy_base))
+
+        # Remove first item from scan array if len >=3
+        if len(self.scan_array) >= self._size_of_scan_array:
+            del self.scan_array[0]
+
+        """
+        # Rotate all old points according to the odometry information
+        for scan in self.scan_array:
+            for point in scan:
+                # Rotate point around origin
+                x = point[0] * np.cos(-dyaw) - point[1] * np.sin(-dyaw)
+                y = point[0] * np.sin(-dyaw) + point[1] * np.cos(-dyaw)
+
+                # Linear translation
+                x += dx_base
+                y += dy_base
+
+                # Save translated values
+                point[0] = x
+                point[1] = y
+        """
+
+        # Match new and last scan to minimise odometry error
+        x_diff_avg = 0
+        y_diff_avg = 0
+        angle_diff = 0
+        if len(self.scan_array) > 0:
+            x_diff_avg, y_diff_avg, angle_diff = self._match_points(new_scan, self.scan_array[len(self.scan_array) - 1])
+            #print([x_diff_avg, y_diff_avg, angle_diff])
+
+            # Rotate all points according to the new odometry data
+            for scan in self.scan_array:
+                for point in scan:
+                    # Rotate point around origin
+                    x = point[0] * np.cos(angle_diff) - point[1] * np.sin(angle_diff)
+                    y = point[0] * np.sin(angle_diff) + point[1] * np.cos(angle_diff)
+
+                    # Linear translation
+                    x += x_diff_avg
+                    y += y_diff_avg
+
+                    # Save translated values
+                    point[0] = x
+                    point[1] = y
+
+
+        # Combine old and new data
+        if len(new_scan) > 0:
+            self.scan_array.append(new_scan)
+
+        return [[dx_base, dy_base, -dyaw], [x_diff_avg, y_diff_avg, angle_diff]]
+
+
+    def _closest_point(self, point, points):
+        closest_index = distance.cdist([point], points).argmin()
+        dist = np.linalg.norm(point-points[closest_index])
+        return closest_index, dist
+
+
+    def _match_points(self, point_array1, point_array2):
+        # Finds a translation to match point as close as possible to each other
+        # Returns translation: dx, dy, dyaw and translated point_array2 around origo
+
+        if(len(point_array1) == 0 or len(point_array1) == 0):
+            return 0,0,0
+
+        p1a = np.array(point_array1, dtype=float)
+        p2a = np.array(point_array2, dtype=float)
+
+        # Find corresponding points:
+        matching_points = []
+        i = 0
+        while i < p1a.shape[0] and i < p2a.shape[0]:
+
+            i2, dist = self._closest_point(p1a[i], p2a)
+            if dist <= 0.5:
+                matching_points.append([p1a[i, 0],
+                                        p1a[i, 1],
+                                        p2a[i2, 0],
+                                        p2a[i2, 1]])
+            i += 1
+
+        matching_points_np = np.array(matching_points, dtype=float)
+
+        if matching_points_np.shape[0] == 0:
+            # no matching point found
+            return 0,0,0
+
+        # Calculate rotation difference:
+        angle_diff = np.arctan2(matching_points_np[:,1], matching_points_np[:,0]) - \
+                     np.arctan2(matching_points_np[:,3], matching_points_np[:,2])
+
+        angle_diff = np.sort(angle_diff)
+        #print(angle_diff)
+        crop_index = int(round(angle_diff.size * 0.2))  # crop data 20 % of largest and smallest values
+        yaw_diff = np.average(angle_diff[crop_index : angle_diff.size - crop_index])
+        #print("mean %f median %f" % (np.mean(angle_diff), np.median(angle_diff)))
+
+        # Rotate p2 in matching_points_np, according to the angle_diff variable
+        p2_x = matching_points_np[:, 2] * np.cos(yaw_diff) - matching_points_np[:, 3] * np.sin(yaw_diff)
+        p2_y = matching_points_np[:, 2] * np.sin(yaw_diff) + matching_points_np[:, 3] * np.cos(yaw_diff)
+
+        matching_points_np[:, 2] = p2_x
+        matching_points_np[:, 3] = p2_y
+
+        # Find linear x and y translation for matching points and sort
+        x_diff = np.sort(matching_points_np[:, 0] - matching_points_np[:, 2])
+        y_diff = np.sort(matching_points_np[:, 1] - matching_points_np[:, 3])
+
+        crop_index = int(round(x_diff.size * 0.2)) # crop data 20 % of largest and smallest values
+        x_diff_avg = np.average(x_diff[crop_index : x_diff.size - crop_index])
+        y_diff_avg = np.average(y_diff[crop_index : x_diff.size - crop_index])
+
+        # Move matching points according to the translation
+        matching_points_np[:, 2] += x_diff_avg
+        matching_points_np[:, 3] += y_diff_avg
+
+        return x_diff_avg, y_diff_avg, yaw_diff#, matching_points_np[:,2:3]
 
     #def get_hough_transform
     #def
