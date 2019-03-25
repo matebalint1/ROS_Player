@@ -21,6 +21,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 import lidar_processor
 import robot_pose
+import  field_finder
 
 # You don't have to use a class, but it keeps things together and means that you
 # don't use global variables
@@ -326,6 +327,7 @@ if __name__ == '__main__':
     play_node = PlayNode()
     lidar = lidar_processor.LidarProcessor()
     pose = robot_pose.RobotPose()
+    finder = field_finder.FieldFinder(lidar)
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
@@ -374,7 +376,7 @@ if __name__ == '__main__':
             play_node.publish_point_cloud2(list_of_all_scans)
 
             # Hough transform
-            accumulator, thetas, rhos = lidar.get_hough_transform(np.array(list_of_obj))
+            accumulator, thetas, rhos = finder.get_hough_transform(np.array(list_of_obj))
 
             # Update odometry
             pose.update_odom_pose(total_delta_odom[0][0],
