@@ -16,12 +16,12 @@ class RobotPose:
     def get_pose_odom(self):
         return self._x, self._y, self._yaw
 
+
     def get_pose_on_map(self):
-        # TODO testing
         # Calculate transformation from odom to map
         dyaw = self._translation_odometry_to_map[2]
-        x_map = (self._x * np.cos(dyaw) - self._y * np.sin(dyaw))
-        y_map = (self._x * np.sin(dyaw) + self._y * np.cos(dyaw))
+        x_map = (self._x * np.cos(-dyaw) - self._y * np.sin(-dyaw))
+        y_map = (self._x * np.sin(-dyaw) + self._y * np.cos(-dyaw))
 
         x_map += self._translation_odometry_to_map[0]
         y_map += self._translation_odometry_to_map[1]
@@ -33,8 +33,19 @@ class RobotPose:
     def get_odometry_to_map_translation(self):
         return self._translation_odometry_to_map
 
+
     def set_get_odometry_to_map_translation(self, translation):
         self._translation_odometry_to_map = translation
+
+
+    def set_robot_pose_in_map_frame(self, x_new, y_new, yaw_new):
+        # calculates correct offset between map and odom frame
+
+        x_map, y_map, yaw_map = self.get_pose_on_map()
+        self._translation_odometry_to_map[0] = -x_map + x_new
+        self._translation_odometry_to_map[1] = -y_map + y_new
+        self._translation_odometry_to_map[2] = -yaw_map + self._yaw + yaw_new
+
 
     def update_odom_pose(self, dx, dy, dyaw):
         # inputs are in robot frame

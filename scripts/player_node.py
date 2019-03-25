@@ -5,6 +5,8 @@ import sys
 import rospy
 import copy
 import numpy as np
+
+
 from std_msgs.msg import String, Header
 from sensor_msgs.msg import LaserScan, Image, PointCloud2
 import sensor_msgs.point_cloud2
@@ -330,9 +332,10 @@ if __name__ == '__main__':
 
     # You can keep the following in main, or put it into a PlayNode.run() function.
 
+
     # 10 Hz loop
     loop_rate = rospy.Rate(10)
-
+    i = 0
     rospy.loginfo("Starting loop")
     while not rospy.is_shutdown():
         # We check that we have both laser and image data. Because these are
@@ -370,6 +373,9 @@ if __name__ == '__main__':
             play_node.publish_point_cloud(list_of_obj)
             play_node.publish_point_cloud2(list_of_all_scans)
 
+            # Hough transform
+            accumulator, thetas, rhos = lidar.get_hough_transform(np.array(list_of_obj))
+
             # Update odometry
             pose.update_odom_pose(total_delta_odom[0][0],
                                   total_delta_odom[0][1],
@@ -379,12 +385,14 @@ if __name__ == '__main__':
                                   total_delta_odom[1][2])
 
             #print(pose.get_pose_on_map())
+
+
             # Movement of the robot
             #simple_collision_avoidance(cur_laser.ranges)
             play_node.set_velocities(-0.1, 0.2)
             #play_node.set_velocities(1, 0)
             # simple_collision_avoidance_2(list_of_obj)
-
+            i+=1
 
             #play_node.show_img()
             #print("Time diff: %f s" % (time.time() - start_time))
