@@ -331,7 +331,7 @@ if __name__ == '__main__':
     play_node = PlayNode()
     lidar = lidar_processor.LidarProcessor()
     pose = robot_pose.RobotPose()
-    finder = field_finder.FieldFinder(lidar) # used for finding the field
+    #finder = field_finder.FieldFinder(lidar) # used for finding the field
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
