@@ -289,32 +289,36 @@ def simple_collision_avoidance_2(obj_array):
 
 def simple_collision_avoidance(range_measurements):
     # This function uses raw laser scan measurements
+    # and uses them to calculate the closest obstacles in
+    # front of the robot. If an obstacle is closer than allowed
+    # the robot will rotate untill there is enough space in front of it. 
 
     range_n = len(range_measurements)  # number of measurements in the scan
     angle_increment = abs(cur_laser.angle_increment)  # get increment between scans in array
-    angele_to_keep_clear = 3.14 / 2 / 2  # rad, defines the angle of the scan than is kept clear of obstacles
+    angele_to_keep_clear = 3.14 / 2 / 2  # rad, defines the angle of the scan than is kept clear of obstacles (one sided)
 
     i_start = int(range_n / 2 - angele_to_keep_clear / angle_increment)  # index
     i_end = int(range_n / 2 + angele_to_keep_clear / angle_increment)  # index
 
     # Convert measuremts to numpy array and sort it from smallest to largest
     sub_measurements = np.sort(np.array(range_measurements[i_start:i_end]))
+
     # Remove infinity
     sub_measurements[sub_measurements == np.inf] = 6
-    #print(sub_measurements)
 
     # Calculate the average distance of the 4 closest scans
-    avg_distance = np.average(sub_measurements[0:3])#sum_of_ranges / 4.0
+    avg_distance = np.average(sub_measurements[0:3])
 
     speed_forward = 0
     speed_rotational = 0
 
+    # Determine speed for robot
     if avg_distance < 0.65:
-        speed_forward = 0.05
+        speed_forward = 0
         speed_rotational = 0.2
     else:
         # Calculate speed depending of the distance to the closest objects:
-        speed_forward = min(avg_distance, 1) / 1 * 0.4 + 0.1
+        speed_forward = min(avg_distance, 1) / 1 * 0.2 + 0.1
 
 
     print("Distance to obstacle %f m, setting speeds %f m/s  %f rad/s" %
@@ -381,7 +385,7 @@ if __name__ == '__main__':
             # Find field of lidar data if possible
             #field = finder.find_field(np.array(list_of_obj))
 
-            # Update odometry
+            #Update odometry
             pose.update_odom_pose(total_delta_odom[0][0],
                                   total_delta_odom[0][1],
                                   total_delta_odom[0][2])
@@ -394,7 +398,7 @@ if __name__ == '__main__':
 
             # Movement of the robot
             simple_collision_avoidance(cur_laser.ranges)
-            #play_node.set_velocities(-0.1, 0.2)
+            #play_node.set_velocities(10, 0)
             #play_node.set_velocities(1, 0)
             #simple_collision_avoidance_2(list_of_obj)
 
