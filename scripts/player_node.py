@@ -10,12 +10,8 @@ from geometry_msgs.msg import Twist, Point
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
-import lidar_processor
-import robot_pose
-#import  field_finder
 
-# You don't have to use a class, but it keeps things together and means that you
-# don't use global variables
+
 class PlayNode:
 
     def __init__(self, window_name="Camera Input"):
@@ -138,9 +134,6 @@ def simple_collision_avoidance(range_measurements):
 if __name__ == '__main__':
 
     play_node = PlayNode()
-    lidar = lidar_processor.LidarProcessor()
-    pose = robot_pose.RobotPose()
-    #finder = field_finder.FieldFinder(lidar) # used for finding the field
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
@@ -157,7 +150,7 @@ if __name__ == '__main__':
         # messages received
 
 
-        if play_node.laser and play_node.odom:# and play_node.image.any():
+        if play_node.laser:# and play_node.image.any():
             #start_time = time.time() # for measuring speed
 
 
