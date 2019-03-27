@@ -21,7 +21,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 import lidar_processor
 import robot_pose
-import  field_finder
+#import  field_finder
 
 # You don't have to use a class, but it keeps things together and means that you
 # don't use global variables
