@@ -11,7 +11,6 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
 
-
 class PlayNode:
 
     def __init__(self, window_name="Camera Input"):
@@ -86,8 +85,6 @@ class PlayNode:
 
 
 
-
-
 def simple_collision_avoidance(range_measurements):
     # This function uses raw laser scan measurements
     # and uses them to calculate the closest obstacles in
@@ -137,8 +134,6 @@ if __name__ == '__main__':
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
-
-    # You can keep the following in main, or put it into a PlayNode.run() function.
 
 
     # 10 Hz loop
