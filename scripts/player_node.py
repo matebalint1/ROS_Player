@@ -299,26 +299,30 @@ def simple_collision_avoidance(range_measurements):
 
     # Convert measuremts to numpy array and sort it from smallest to largest
     sub_measurements = np.sort(np.array(range_measurements[i_start:i_end]))
-    # print(sub_measurements)
+    # Remove infinity
+    sub_measurements[sub_measurements == np.inf] = 6
+    #print(sub_measurements)
 
     # Calculate the average distance of the 4 closest scans
-    sum_of_ranges = 0
-    for i in range(4):
-        if sub_measurements[i] < 6:
-            sum_of_ranges += sub_measurements[i]
-        else:
-            sub_measurements += 6
+    avg_distance = np.average(sub_measurements[0:3])#sum_of_ranges / 4.0
 
-    avg_distance = sum_of_ranges / 4
+    speed_forward = 0
+    speed_rotational = 0
 
-    #print(avg_distance)
-
-    if avg_distance < 0.5:
-        play_node.set_velocities(0.0, 0.3)
+    if avg_distance < 0.65:
+        speed_forward = 0.05
+        speed_rotational = 0.2
     else:
         # Calculate speed depending of the distance to the closest objects:
-        speed = min(avg_distance, 1) / 1 * 0.4 + 0.1
-        play_node.set_velocities(speed, 0)
+        speed_forward = min(avg_distance, 1) / 1 * 0.4 + 0.1
+
+
+    print("Distance to obstacle %f m, setting speeds %f m/s  %f rad/s" %
+          (avg_distance, speed_forward, speed_rotational))
+
+    if avg_distance < 0.05:
+        return # do not do anything
+    play_node.set_velocities(speed_forward, speed_rotational)
 
 
 
@@ -327,7 +331,7 @@ if __name__ == '__main__':
     play_node = PlayNode()
     lidar = lidar_processor.LidarProcessor()
     pose = robot_pose.RobotPose()
-    finder = field_finder.FieldFinder(lidar)
+    finder = field_finder.FieldFinder(lidar) # used for finding the field
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
@@ -337,7 +341,6 @@ if __name__ == '__main__':
 
     # 10 Hz loop
     loop_rate = rospy.Rate(10)
-    i = 0
     rospy.loginfo("Starting loop")
     while not rospy.is_shutdown():
         # We check that we have both laser and image data. Because these are
@@ -346,7 +349,7 @@ if __name__ == '__main__':
 
 
         if play_node.laser and play_node.odom:# and play_node.image.any():
-            start_time = time.time() # for measuring speed
+            #start_time = time.time() # for measuring speed
 
             # Now, we can use the laser and image data to do something. Because
             # the objects in the PlayNode are constantly updated, we need to
@@ -358,8 +361,8 @@ if __name__ == '__main__':
             # cur_image = copy.deepcopy(play_node.image)
             odometry_data = copy.deepcopy(play_node.odom)
 
-            odom_time = float(odometry_data.header.stamp.secs) + float(odometry_data.header.stamp.nsecs )/ 1000000000.0
-            laser_time = float(cur_laser.header.stamp.secs) + float(cur_laser.header.stamp.nsecs) / 1000000000.0
+            #odom_time = float(odometry_data.header.stamp.secs) + float(odometry_data.header.stamp.nsecs )/ 1000000000.0
+            #laser_time = float(cur_laser.header.stamp.secs) + float(cur_laser.header.stamp.nsecs) / 1000000000.0
             #print("Laser t:%f, odom t:%f" % (laser_time, odom_time))
             #print("Time diff %f s" % (laser_time - odom_time))
             #print(cur_laser.header.stamp.nsecs/ 1000000000.0)
@@ -375,8 +378,8 @@ if __name__ == '__main__':
             play_node.publish_point_cloud(list_of_obj)
             play_node.publish_point_cloud2(list_of_all_scans)
 
-            # Hough transform
-            accumulator, thetas, rhos = finder.get_hough_transform(np.array(list_of_obj))
+            # Find field of lidar data if possible
+            #field = finder.find_field(np.array(list_of_obj))
 
             # Update odometry
             pose.update_odom_pose(total_delta_odom[0][0],
@@ -390,11 +393,10 @@ if __name__ == '__main__':
 
 
             # Movement of the robot
-            #simple_collision_avoidance(cur_laser.ranges)
-            play_node.set_velocities(-0.1, 0.2)
+            simple_collision_avoidance(cur_laser.ranges)
+            #play_node.set_velocities(-0.1, 0.2)
             #play_node.set_velocities(1, 0)
-            # simple_collision_avoidance_2(list_of_obj)
-            i+=1
+            #simple_collision_avoidance_2(list_of_obj)
 
             #play_node.show_img()
             #print("Time diff: %f s" % (time.time() - start_time))
