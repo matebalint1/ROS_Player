@@ -21,7 +21,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 import lidar_processor
 import robot_pose
-#import  field_finder
+import  field_finder
 
 # You don't have to use a class, but it keeps things together and means that you
 # don't use global variables
@@ -50,9 +50,12 @@ class PlayNode:
         self.point_cloud_pub2 = rospy.Publisher(str_prefix + "visualization_msgs/object_cloud2", PointCloud2, queue_size=1000)
 
         self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
-        self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
-        #self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
-        self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
+
+        #self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
+        #self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
+        # Rosbags
+        self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
+        self.odom_sub = rospy.Subscriber("odombag", Odometry, self.odom_cb)
 
 
     def laser_cb(self, msg):
@@ -335,7 +338,7 @@ if __name__ == '__main__':
     play_node = PlayNode()
     lidar = lidar_processor.LidarProcessor()
     pose = robot_pose.RobotPose()
-    #finder = field_finder.FieldFinder(lidar) # used for finding the field
+    finder = field_finder.FieldFinder(lidar) # used for finding the field
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
@@ -383,7 +386,7 @@ if __name__ == '__main__':
             play_node.publish_point_cloud2(list_of_all_scans)
 
             # Find field of lidar data if possible
-            #field = finder.find_field(np.array(list_of_obj))
+            field = finder.find_field(np.array(list_of_obj))
 
             #Update odometry
             pose.update_odom_pose(total_delta_odom[0][0],
@@ -397,7 +400,7 @@ if __name__ == '__main__':
 
 
             # Movement of the robot
-            simple_collision_avoidance(cur_laser.ranges)
+            #simple_collision_avoidance(cur_laser.ranges)
             #play_node.set_velocities(10, 0)
             #play_node.set_velocities(1, 0)
             #simple_collision_avoidance_2(list_of_obj)

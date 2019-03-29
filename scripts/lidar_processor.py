@@ -176,7 +176,7 @@ class LidarProcessor:
         if len(self.scan_array) >= self._size_of_scan_array:
             del self.scan_array[0]
 
-        """
+        #"""
         # Rotate all old points according to the odometry information
         for scan in self.scan_array:
             for point in scan:
@@ -191,12 +191,13 @@ class LidarProcessor:
                 # Save translated values
                 point[0] = x
                 point[1] = y
-        """
+        #"""
 
         # Match new and last scan to minimise odometry error
         x_diff_avg = 0
         y_diff_avg = 0
         angle_diff = 0
+        """
         if len(self.scan_array) > 0:
             x_diff_avg, y_diff_avg, angle_diff = self._match_points(new_scan, self.scan_array[len(self.scan_array) - 1])
             #print([x_diff_avg, y_diff_avg, angle_diff])
@@ -216,7 +217,7 @@ class LidarProcessor:
                     point[0] = x
                     point[1] = y
 
-
+        """
         # Combine old and new data
         if len(new_scan) > 0:
             self.scan_array.append(new_scan)
