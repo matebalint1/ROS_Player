@@ -5,14 +5,14 @@ from scipy.spatial import distance
 
 class LidarProcessor:
 
-    def __init__(self, min_r = 0.1, max_r = 5.9, max_distance_between_two_neighbor_points_in_an_object = 0.4):
+    def __init__(self, min_r = 0.1, max_r = 5.9, max_distance_between_two_neighbor_points_in_an_object = 0.07):#0.07 good
         self._min_r = min_r # m
         self._max_r = max_r # m
         self._max_distance_between_two_neighbor_points_in_an_object = max_distance_between_two_neighbor_points_in_an_object
 
-        self._max_object_size = 0.1 # m
-        self._min_object_size = -1 # m
-        self._size_of_scan_array = 30 # scans
+        self._max_object_size = 0.08 # m used for filtering too big objects
+        self._min_object_size = 0.04 # m sed for filtering too small objects (-1 == not in use)
+        self._size_of_scan_array = 100 # number of scans to be stored in array
         self._crop_angle = 90  # deg (total)
 
         self.scan_array = [] # contains objects from previous scans
@@ -172,7 +172,7 @@ class LidarProcessor:
         dx_base = -(dx * np.sin(dyaw_odom_to_robot) + dy * np.cos(dyaw_odom_to_robot))
         #print("base_link dx:%f, dy:%f" % (dx_base,dy_base))
 
-        # Remove first item from scan array if len >=3
+        # Remove first item from scan array if it is longer than desired
         if len(self.scan_array) >= self._size_of_scan_array:
             del self.scan_array[0]
 

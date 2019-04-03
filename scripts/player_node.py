@@ -51,11 +51,11 @@ class PlayNode:
 
         self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
 
-        #self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
-        #self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
+        self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
+        self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
         # Rosbags
-        self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
-        self.odom_sub = rospy.Subscriber("odombag", Odometry, self.odom_cb)
+        #self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
+        #self.odom_sub = rospy.Subscriber("odombag", Odometry, self.odom_cb)
 
 
     def laser_cb(self, msg):
@@ -389,12 +389,12 @@ if __name__ == '__main__':
             field = finder.find_field(np.array(list_of_obj))
 
             #Update odometry
-            pose.update_odom_pose(total_delta_odom[0][0],
-                                  total_delta_odom[0][1],
-                                  total_delta_odom[0][2])
-            pose.update_odom_pose(total_delta_odom[1][0],
-                                  total_delta_odom[1][1],
-                                  total_delta_odom[1][2])
+            #pose.update_odom_pose(total_delta_odom[0][0],
+            #                      total_delta_odom[0][1],
+            #                      total_delta_odom[0][2])
+            #pose.update_odom_pose(total_delta_odom[1][0],
+            #                      total_delta_odom[1][1],
+            #                      total_delta_odom[1][2])
 
             #print(pose.get_pose_on_map())
 
