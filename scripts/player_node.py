@@ -84,41 +84,41 @@ class PlayNode:
         self.velocity_pub.publish(msg)
 
 
-def edge(image_scan)
-	#Noise removal for the purpose of differentiation and finally edge_dettection
-	
-  
-	#Capture livestream video content from camera 0 
-	cap = cv2.VideoCapture(0) 
-  
-	while(1): 
-  
-    	# Take each frame 
-    	_, frame = cap.read() 
-      
-    	# Convert to HSV for simpler calculations 
-    	hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
-      
-    	# Calcution of Sobelx 
-    	sobelx = cv2.Sobel(frame,cv2.CV_64F,1,0,ksize=5) 
-      
-    	# Calculation of Sobely 
-    	sobely = cv2.Sobel(frame,cv2.CV_64F,0,1,ksize=5) 
-      
-    	# Calculation of Laplacian 
-    	laplacian = cv2.Laplacian(frame,cv2.CV_64F) 
-      
-    	cv2.imshow('sobelx',sobelx) 
-    	cv2.imshow('sobely',sobely) 
-    	cv2.imshow('laplacian',laplacian) 
-    	k = cv2.waitKey(5) & 0xFF
-    	if k == 27: 
-        break
-  
-	cv2.destroyAllWindows() 
-  
-	#release the frame 
-	cap.release() 
+def edge(image_scan):
+    #Noise removal for the purpose of differentiation and finally edge_detection
+
+
+    #Capture livestream video content from camera 0
+    cap = cv2.VideoCapture(0)
+
+    while True:
+
+        # Take each frame
+        frame = cap.read()
+
+        # Convert to HSV for simpler calculations
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Calcution of Sobelx
+        sobelx = cv2.Sobel(frame,cv2.CV_64F,1,0,ksize=5)
+
+        # Calculation of Sobely
+        sobely = cv2.Sobel(frame,cv2.CV_64F,0,1,ksize=5)
+
+        # Calculation of Laplacian
+        laplacian = cv2.Laplacian(frame,cv2.CV_64F)
+
+        cv2.imshow('sobelx',sobelx)
+        cv2.imshow('sobely',sobely)
+        cv2.imshow('laplacian',laplacian)
+        k = cv2.waitKey(5) & 0xFF
+        if k == 27:
+            break
+
+    cv2.destroyAllWindows()
+
+    #release the frame
+    cap.release()
 	
 
 
@@ -185,6 +185,7 @@ if __name__ == '__main__':
 
         if play_node.laser:# and play_node.image.any():
             #start_time = time.time() # for measuring speed
+
 
 
             cur_laser = copy.deepcopy(play_node.laser)
