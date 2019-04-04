@@ -16,20 +16,25 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/voxel_grid.h>
 #include <boost/foreach.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <pcl_ros/transforms.h>
+
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
 
 const std::string IMAGE_WINDOW = "Camera image";
 
-// You don't have to use a class, but it keeps things together and means that
-// you don't use global variables
 class PlayNode {
   public:
+
   PlayNode(int argc, char **argv){
     ros::init(argc, argv, "robot_node");
     n = std::make_unique<ros::NodeHandle>();
     
+    tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
+    tf_listener = new tf2_ros::TransformListener(*tfBuffer);
+
     velocity_pub = n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
     kinect_pub = n->advertise<PointCloud> ("player/kinect_processed", 1);
 
@@ -114,32 +119,52 @@ class PlayNode {
     // we don't want the data changing in the middle of processing.
     //cv::Mat cur_img = image;
     //sensor_msgs::LaserScan cur_laser = laser_msg;
+ 
+    PointCloudPrt cur_kinect_in (new PointCloud(kinect_msg)); // make copy
+    PointCloudPrt cur_kinect (new PointCloud);
 
-    PointCloudPrt cur_kinect (new PointCloud(kinect_msg));
-    //pcl::PCLPointCloud2 filtered;
-    //pcl::VoxelGrid<pcl::PCLPointCloud2> vg;
-    //vg.setInputCloud(cur_kinect);
-    //vg.setLeafSize(0.01f, 0.01f, 0.01f);
-    //vg.filter(filtered);
+     tf::Transform transform;//(/*tf::Quaternion(0,0,0,0)*/);
+    geometry_msgs::TransformStamped transformStamped;
+    try{
+       transformStamped = tfBuffer->lookupTransform("robot1/base_link",(*cur_kinect_in).header.frame_id,  ros::Time(0));
+      
+      tf::Vector3 vector(transformStamped.transform.translation.x,
+                         transformStamped.transform.translation.y,
+                         transformStamped.transform.translation.z);
+
+      tf::Quaternion rotation(transformStamped.transform.rotation.x,
+                              transformStamped.transform.rotation.y,
+                              transformStamped.transform.rotation.z,
+                              transformStamped.transform.rotation.w);
+      
+      transform.setOrigin(vector);
+      transform.setRotation(rotation);
+
+    }catch (tf2::TransformException &ex) {
+      ROS_ERROR("%s",ex.what());
+      ros::Duration(1.0).sleep();
+    }
+
+    pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect, transform);
 
     PointCloudPrt cloud_filtered (new PointCloud);
     PointCloudPrt cloud_pass(new PointCloud);
 
-    pcl::VoxelGrid<pcl::PointXYZRGB> sor;
+    pcl::VoxelGrid<pcl::PointXYZRGB> voxel_grid_filter;
     pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
 
     //pass through filter
     pass_through_filter.setInputCloud (cur_kinect);
-    pass_through_filter.setFilterLimits (0.0, 1.0);
+    pass_through_filter.setFilterFieldName ("z");
+    pass_through_filter.setFilterLimits (0.0, 2.0);
     pass_through_filter.filter (*cloud_pass);
 
     //voxel grid filter
-    sor.setInputCloud(cloud_pass);
-    sor.setLeafSize(0.05, 0.05, 0.05);
-    sor.filter(*cloud_filtered);
+    voxel_grid_filter.setInputCloud(cloud_pass);
+    voxel_grid_filter.setLeafSize(0.02, 0.02, 0.02);
+    voxel_grid_filter.filter(*cloud_filtered);
     
     pub_pointcloud(*cloud_filtered);
-    
   }
 
   bool got_messages() const {
@@ -147,6 +172,7 @@ class PlayNode {
   }
 
   private:
+
   bool got_image;
   bool got_laser;
   bool got_kinect;
@@ -160,6 +186,9 @@ class PlayNode {
   image_transport::Subscriber image_sub;
   ros::Subscriber laser_sub;
   ros::Subscriber kinect_sub;
+
+  tf2_ros::Buffer* tfBuffer;
+  tf2_ros::TransformListener* tf_listener;
   
   cv::Mat image;
   sensor_msgs::LaserScan laser_msg;
