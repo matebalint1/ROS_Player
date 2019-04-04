@@ -13,9 +13,12 @@
 
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/filters/voxel_grid.h>
 #include <boost/foreach.hpp>
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
+typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
 
 const std::string IMAGE_WINDOW = "Camera image";
 
@@ -87,17 +90,22 @@ class PlayNode {
     velocity_pub.publish(msg);
   }
 
-  void pub_pointcloud() {
+  void pub_pointcloud(PointCloud& cloud) {
     PointCloud::Ptr msg (new PointCloud);
     msg->header.frame_id = "robot1/base_link";
-    msg->height = msg->width = 1;
 
+    msg->height = cloud.height;
+    msg->width = cloud.width;
+
+    /*
     pcl::PointXYZRGB p (1.0, 2.0, 3.0);
     uint8_t r = 255, g = 255, b = 0;    // Example: Red color
     uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
     p.rgb = *reinterpret_cast<float*>(&rgb);
-
     msg->points.push_back (p);
+    */
+    msg->points = cloud.points;
+
     kinect_pub.publish(msg);
   }
 
@@ -107,8 +115,30 @@ class PlayNode {
     //cv::Mat cur_img = image;
     //sensor_msgs::LaserScan cur_laser = laser_msg;
 
-    PointCloud cur_kinect = kinect_msg;
-    pub_pointcloud();
+    PointCloudPrt cur_kinect (new PointCloud(kinect_msg));
+    //pcl::PCLPointCloud2 filtered;
+    //pcl::VoxelGrid<pcl::PCLPointCloud2> vg;
+    //vg.setInputCloud(cur_kinect);
+    //vg.setLeafSize(0.01f, 0.01f, 0.01f);
+    //vg.filter(filtered);
+
+    PointCloudPrt cloud_filtered (new PointCloud);
+    PointCloudPrt cloud_pass(new PointCloud);
+
+    pcl::VoxelGrid<pcl::PointXYZRGB> sor;
+    pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
+
+    //pass through filter
+    pass_through_filter.setInputCloud (cur_kinect);
+    pass_through_filter.setFilterLimits (0.0, 1.0);
+    pass_through_filter.filter (*cloud_pass);
+
+    //voxel grid filter
+    sor.setInputCloud(cloud_pass);
+    sor.setLeafSize(0.05, 0.05, 0.05);
+    sor.filter(*cloud_filtered);
+    
+    pub_pointcloud(*cloud_filtered);
     
   }
 
