@@ -27,7 +27,8 @@ class PlayNode {
     ros::init(argc, argv, "robot_node");
     n = std::make_unique<ros::NodeHandle>();
     
-    velocity_pub = n->advertise<geometry_msgs::Twist>("cmd_vel", 1000);
+    velocity_pub = n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
+    kinect_pub = n->advertise<PointCloud> ("player/kinect_processed", 1);
 
     //ROS_INFO("Waiting for camera image");
     //ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
@@ -65,11 +66,11 @@ class PlayNode {
 
   void kinect_callback(const PointCloud::ConstPtr& msg){
     ROS_INFO("Got new kinect");
-    printf ("Cloud: width = %d, height = %d\n", msg->width, msg->height);
+    //printf ("Cloud: width = %d, height = %d\n", msg->width, msg->height);
 
     //BOOST_FOREACH (const pcl::PointXYZRGB& pt, msg->points)
     //  printf ("\t(%f, %f, %d)\n", pt.x, pt.y, pt.r);
-
+    kinect_msg = *msg;
     got_kinect = true;
   }
 
@@ -86,12 +87,28 @@ class PlayNode {
     velocity_pub.publish(msg);
   }
 
+  void pub_pointcloud() {
+    PointCloud::Ptr msg (new PointCloud);
+    msg->header.frame_id = "robot1/base_link";
+    msg->height = msg->width = 1;
+
+    pcl::PointXYZRGB p (1.0, 2.0, 3.0);
+    uint8_t r = 255, g = 255, b = 0;    // Example: Red color
+    uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
+    p.rgb = *reinterpret_cast<float*>(&rgb);
+
+    msg->points.push_back (p);
+    kinect_pub.publish(msg);
+  }
+
   void process_messages() {
     // Copy the laser and image. These change whenever the callbacks run, and
     // we don't want the data changing in the middle of processing.
     //cv::Mat cur_img = image;
     //sensor_msgs::LaserScan cur_laser = laser_msg;
-      
+
+    PointCloud cur_kinect = kinect_msg;
+    pub_pointcloud();
     
   }
 
@@ -108,12 +125,15 @@ class PlayNode {
   std::unique_ptr<image_transport::ImageTransport> it;
   
   ros::Publisher velocity_pub;
+  ros::Publisher kinect_pub;
+
   image_transport::Subscriber image_sub;
   ros::Subscriber laser_sub;
   ros::Subscriber kinect_sub;
   
   cv::Mat image;
   sensor_msgs::LaserScan laser_msg;
+  PointCloud kinect_msg;
 };
 
 int main(int argc, char **argv){
