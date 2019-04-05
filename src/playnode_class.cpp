@@ -9,8 +9,6 @@
 #include "sensor_msgs/Image.h"
 #include "std_msgs/String.h"
 
-#include <image_transport/image_transport.h>
-
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
@@ -18,6 +16,8 @@
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 #include <boost/foreach.hpp>
+
+#include "pointcloud_processor.hpp"
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
@@ -61,6 +61,8 @@ class PlayNode {
 
         kinect_sub = n->subscribe("robot1/kinect/depth_registered/points", 1,
                                   &PlayNode::kinect_callback, this);
+
+        pointcloud_processor = PointcloudProcessor();
     }
 
     void image_callback(const sensor_msgs::Image::ConstPtr &msg) {
@@ -108,12 +110,12 @@ class PlayNode {
         msg->width = cloud.width;
 
         /*
-pcl::PointXYZRGB p (1.0, 2.0, 3.0);
-uint8_t r = 255, g = 255, b = 0;    // Example: Red color
-uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
-p.rgb = *reinterpret_cast<float*>(&rgb);
-msg->points.push_back (p);
-*/
+        pcl::PointXYZRGB p (1.0, 2.0, 3.0);
+        uint8_t r = 255, g = 255, b = 0;    // Example: Red color
+        uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
+        p.rgb = *reinterpret_cast<float*>(&rgb);
+        msg->points.push_back (p);
+        */
         msg->points = cloud.points;
 
         kinect_pub.publish(msg);
@@ -133,8 +135,10 @@ msg->points.push_back (p);
         geometry_msgs::TransformStamped transformStamped;
         try {
             // Find transformation for pointcloud from the buffer
+            // (*cur_kinect_in).header.frame_id ==
+            // "robot1/kinect_rgb_optical_frame"
             transformStamped = tfBuffer->lookupTransform(
-                "robot1/base_link", (*cur_kinect_in).header.frame_id,
+                "robot1/base_link", "robot1/kinect_rgb_optical_frame",
                 ros::Time(0));
 
             // Convert TransformStamped to Transform
@@ -156,24 +160,9 @@ msg->points.push_back (p);
         // Transform pointcloud to base_link tf frame
         pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect, transform);
 
-        // Empty pointclouds for filtered objects
-        PointCloudPrt cloud_filtered(new PointCloud);
-        PointCloudPrt cloud_pass(new PointCloud);
-
-        // Pass through filter
-        pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
-        pass_through_filter.setInputCloud(cur_kinect);
-        pass_through_filter.setFilterFieldName("z");
-        pass_through_filter.setFilterLimits(0.0, 2.0);
-        pass_through_filter.filter(*cloud_pass);
-
-        // Voxel grid filter
-        pcl::VoxelGrid<pcl::PointXYZRGB> voxel_grid_filter;
-        voxel_grid_filter.setInputCloud(cloud_pass);
-        voxel_grid_filter.setLeafSize(0.02, 0.02, 0.02);
-        voxel_grid_filter.filter(*cloud_filtered);
-
-        pub_pointcloud(*cloud_filtered);
+        pointcloud_processor.process_pointcloud(cur_kinect);
+        pub_pointcloud(*pointcloud_processor.get_floor_pointcloud());
+        got_kinect = false;
     }
 
     bool got_messages() const {
@@ -201,6 +190,8 @@ msg->points.push_back (p);
     cv::Mat image;
     sensor_msgs::LaserScan laser_msg;
     PointCloud kinect_msg;
+
+    PointcloudProcessor pointcloud_processor;
 };
 
 int main(int argc, char **argv) {
