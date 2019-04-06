@@ -128,9 +128,12 @@ class PlayNode {
         // cv::Mat cur_img = image;
         // sensor_msgs::LaserScan cur_laser = laser_msg;
 
-        PointCloudPrt cur_kinect_in(new PointCloud(kinect_msg));  // make copy
-        PointCloudPrt cur_kinect(new PointCloud);
+        // Copy input cloud
+        PointCloudPrt cur_kinect_in(new PointCloud(kinect_msg));
+        // Temporary pointcloud for transformation
+        PointCloudPrt cur_kinect(new PointCloud);  
 
+        // Find transformation to desired frame
         tf::Transform transform;  //(/*tf::Quaternion(0,0,0,0)*/);
         geometry_msgs::TransformStamped transformStamped;
         try {
@@ -160,8 +163,12 @@ class PlayNode {
         // Transform pointcloud to base_link tf frame
         pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect, transform);
 
+        // Process pointcloud
         pointcloud_processor.process_pointcloud(cur_kinect);
-        pub_pointcloud(*pointcloud_processor.get_floor_pointcloud());
+
+        // Publish pointcloud
+        pub_pointcloud(*pointcloud_processor.get_not_floor_pointcloud());
+
         got_kinect = false;
     }
 
