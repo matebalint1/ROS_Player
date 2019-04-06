@@ -80,7 +80,7 @@ class PlayNode {
     }
 
     void kinect_callback(const PointCloud::ConstPtr &msg) {
-        ROS_INFO("Got new kinect");
+        //ROS_INFO("Got new kinect");
         // printf ("Cloud: width = %d, height = %d\n", msg->width, msg->height);
 
         // BOOST_FOREACH (const pcl::PointXYZRGB& pt, msg->points)
