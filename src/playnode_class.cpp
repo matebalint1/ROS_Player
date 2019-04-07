@@ -2,22 +2,21 @@
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/image_encodings.h>
-#include "cv_bridge/cv_bridge.h"
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv2/opencv.hpp"
+
 #include "ros/ros.h"
 #include "sensor_msgs/Image.h"
 #include "std_msgs/String.h"
 
-#include <pcl/filters/passthrough.h>
-#include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
-#include <boost/foreach.hpp>
 
 #include "pointcloud_processor.hpp"
+
+#include "cv_bridge/cv_bridge.h"        // do not move up
+#include "opencv2/highgui/highgui.hpp"  // do not move up
+#include "opencv2/opencv.hpp"           // do not move up
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
@@ -80,7 +79,7 @@ class PlayNode {
     }
 
     void kinect_callback(const PointCloud::ConstPtr &msg) {
-        //ROS_INFO("Got new kinect");
+        // ROS_INFO("Got new kinect");
         // printf ("Cloud: width = %d, height = %d\n", msg->width, msg->height);
 
         // BOOST_FOREACH (const pcl::PointXYZRGB& pt, msg->points)
@@ -131,7 +130,7 @@ class PlayNode {
         // Copy input cloud
         PointCloudPrt cur_kinect_in(new PointCloud(kinect_msg));
         // Temporary pointcloud for transformation
-        PointCloudPrt cur_kinect(new PointCloud);  
+        PointCloudPrt cur_kinect(new PointCloud);
 
         // Find transformation to desired frame
         tf::Transform transform;  //(/*tf::Quaternion(0,0,0,0)*/);
