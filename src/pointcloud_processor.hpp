@@ -577,36 +577,29 @@ class PointcloudProcessor {
         }
     }
 
-    void save_cloud_to_file(PointCloudPrt& cloud) {}
+    void save_cloud_to_file(PointCloudPrt& cloud, std::string path_and_name) {
+        if (cloud->points.size() > 0) {
+            pcl::io::savePCDFileASCII(path_and_name, *cloud);
+        }
+    }
 
     void process_pointcloud(PointCloudPrt& cloud) {
         // Processes a new point cloud and extracts useful information
 
         // Reduce nuber of points in the pointcloud
         voxel_grid_filter_m(cloud, pointcloud_temp);
+        
         std::vector<int> indices;
         pcl::removeNaNFromPointCloud(*cloud, *pointcloud_temp2, indices);
-        for (auto pt = pointcloud_temp2->begin(); pt != pointcloud_temp2->end();
-             ++pt) {
-            if (!std::isfinite(pt->x) || !std::isfinite(pt->y) ||
-                !std::isfinite(pt->z)) {
-                std::cout << "is not finite" << *pt << std::endl;
-            }
-        }
+
         // object_recognition(pointcloud_temp2, pointcloud_puck_model);
 
-        planar_segmentation(pointcloud_temp, pointcloud_floor,
-                            pointcloud_not_floor);
+        planar_segmentation(cloud, pointcloud_floor, pointcloud_not_floor);
 
         // Find interestin colors in the cloud
         edit_colors_of_pointcloud(pointcloud_floor);
         edit_colors_of_pointcloud(pointcloud_not_floor);
 
-        pcl::io::savePCDFileASCII(
-            "/home/cnc/Desktop/Hockey/Pointclouds/scene.pcd", *cloud);
-        pcl::io::savePCDFileASCII(
-            "/home/cnc/Desktop/Hockey/Pointclouds/puck.pcd",
-            *pointcloud_puck_model);
         return;
 
         // Blue goals
