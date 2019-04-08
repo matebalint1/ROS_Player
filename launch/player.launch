@@ -1,7 +1,7 @@
 <launch>
   <arg name="team" default="1"/>
   
-  <arg name="use_python" default="false"/>
+  <arg name="use_python" default="true"/>
   
   <!-- KI node controlling the robot -->
   <!--<group ns="robot$(arg team)"> -->

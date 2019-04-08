@@ -26,7 +26,7 @@ const std::string IMAGE_WINDOW = "Camera image";
 class PlayNode {
    public:
     PlayNode(int argc, char **argv) {
-        ros::init(argc, argv, "robot_node");
+        ros::init(argc, argv, "pointcloud_node");
         n = std::make_unique<ros::NodeHandle>();
 
         tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
