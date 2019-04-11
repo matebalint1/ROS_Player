@@ -30,7 +30,15 @@ class PlayNode:
         self.velocity_pub = rospy.Publisher(str_prefix + "cmd_vel", Twist, queue_size=1000)
 
         self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
+
         self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
+<<<<<<< HEAD
+=======
+        self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
+        # Rosbags
+        #self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
+        #self.odom_sub = rospy.Subscriber("odombag", Odometry, self.odom_cb)
+>>>>>>> 2893026231ccef885e07255b2e38a70c8029fd66
 
 
     def laser_cb(self, msg):
@@ -169,6 +177,7 @@ def simple_collision_avoidance(range_measurements):
 if __name__ == '__main__':
 
     play_node = PlayNode()
+
 
     last_pose_of_robot = [0,0,0] # x,y,yaw
     scan_data_array_main = [] # For combining multiple laser scans
