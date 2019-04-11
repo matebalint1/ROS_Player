@@ -647,7 +647,7 @@ class PointcloudProcessor {
 
     PointCloudPrt& get_floor_pointcloud() { return pointcloud_floor; }
     PointCloudPrt& get_not_floor_pointcloud() {
-        return pointcloud_not_floor_blue;
+        return pointcloud_temp;
     }
 
    private:
