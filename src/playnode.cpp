@@ -55,8 +55,7 @@ void show_image() {
 }
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv){
   // The node name is robot_node
   ros::init(argc, argv, "robot_node");
   // The nodehandle actually starts the node
@@ -66,30 +65,29 @@ int main(int argc, char **argv)
   velocity_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 
   ROS_INFO("Waiting for camera image");
-  ros::topic::waitForMessage<sensor_msgs::Image>("front_camera/image_raw");
+  ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
   ROS_INFO("Waiting for laser scan message");
-  ros::topic::waitForMessage<sensor_msgs::LaserScan>("front_laser/scan");
+  ros::topic::waitForMessage<sensor_msgs::LaserScan>("robot1/front_laser/scan");
 
   // Images need a special subscriber
   image_transport::ImageTransport it(n);
-  image_transport::Subscriber image_sub = it.subscribe("front_camera/image_raw", 1, image_callback);
+  image_transport::Subscriber image_sub = it.subscribe("robot1/front_camera/image_raw", 1, image_callback);
 
   // basic subscriber for the laser
-  ros::Subscriber laser_sub = n.subscribe("front_laser/scan", 1, laser_callback);
+  ros::Subscriber laser_sub = n.subscribe("robot1/front_laser/scan", 1, laser_callback);
 
   cv::namedWindow(IMAGE_WINDOW);
 
   // 10Hz loop
   ros::Rate r(10);
-  while(ros::ok())
-  {
+  while(ros::ok()){
     if (got_laser && got_image) {
       // Copy the laser and image. These change whenever the callbacks run, and
       // we don't want the data changing in the middle of processing.
       cv::Mat cur_img = image;
-      sensor_msgs::LaserScan cur_laser = laser_msg;
+      //sensor_msgs::LaserScan cur_laser = laser_msg;
 
-      // do something useful with laser and image here
+      
 
       show_image();
     }
