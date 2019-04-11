@@ -32,13 +32,7 @@ class PlayNode:
         self.image_sub = rospy.Subscriber(str_prefix + "front_camera/image_raw", Image, self.camera_cb)
 
         self.laser_sub = rospy.Subscriber(str_prefix + "front_laser/scan", LaserScan, self.laser_cb)
-<<<<<<< HEAD
-=======
-        self.odom_sub = rospy.Subscriber(str_prefix + "odom", Odometry, self.odom_cb)
-        # Rosbags
-        #self.laser_sub = rospy.Subscriber("scan", LaserScan, self.laser_cb)
-        #self.odom_sub = rospy.Subscriber("odombag", Odometry, self.odom_cb)
->>>>>>> 2893026231ccef885e07255b2e38a70c8029fd66
+
 
 
     def laser_cb(self, msg):
