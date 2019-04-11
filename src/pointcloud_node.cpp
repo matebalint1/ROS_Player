@@ -168,7 +168,7 @@ class PlayNode {
         // Publish pointcloud
         pub_pointcloud(*pointcloud_processor.get_not_floor_pointcloud());
 
-        got_kinect = false;
+        got_kinect = false; // reset
     }
 
     bool got_messages() const {
@@ -204,8 +204,8 @@ int main(int argc, char **argv) {
     PlayNode playNode(argc, argv);
     // cv::namedWindow(IMAGE_WINDOW);
 
-    // 10 Hz loop
-    ros::Rate r(10);
+    // 20 Hz loop
+    ros::Rate r(20);
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
 

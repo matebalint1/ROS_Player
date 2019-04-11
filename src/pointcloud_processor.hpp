@@ -194,6 +194,7 @@ class PointcloudProcessor {
 
     void statistical_outlier_removal_filter_m(PointCloudPrt& cloud_in,
                                               PointCloudPrt& cloud_out) {
+        // Not very useful
         statistical_outlier_removal_filter.setInputCloud(cloud_in);
         statistical_outlier_removal_filter.setMeanK(50);
         statistical_outlier_removal_filter.setStddevMulThresh(0.1);
@@ -287,8 +288,8 @@ class PointcloudProcessor {
     }
 
     void radius_outlier_removal(PointCloudPrt& cloud_in,
-                                PointCloudPrt& cloud_out, double radius = 0.04,
-                                int min_neighbors = 2) {
+                                PointCloudPrt& cloud_out, double radius = 0.05,
+                                int min_neighbors = 5) {
         pcl::RadiusOutlierRemoval<pcl::PointXYZRGB> outrem;
         // build the filter
         outrem.setInputCloud(cloud_in);
@@ -586,22 +587,23 @@ class PointcloudProcessor {
     void process_pointcloud(PointCloudPrt& cloud) {
         // Processes a new point cloud and extracts useful information
 
-        // Reduce nuber of points in the pointcloud
-        voxel_grid_filter_m(cloud, pointcloud_temp);
-        
+        // Remove NaNs
         std::vector<int> indices;
-        pcl::removeNaNFromPointCloud(*cloud, *pointcloud_temp2, indices);
+        pcl::removeNaNFromPointCloud(*cloud, *pointcloud_temp, indices);
 
-        // object_recognition(pointcloud_temp2, pointcloud_puck_model);
+        // Reduce nuber of points in the pointcloud
+        voxel_grid_filter_m(pointcloud_temp, pointcloud_temp2);
 
-        planar_segmentation(cloud, pointcloud_floor, pointcloud_not_floor);
+        // Segment cloud into floor and not floor
+        planar_segmentation(pointcloud_temp2, pointcloud_floor,
+                            pointcloud_not_floor);
 
-        // Find interestin colors in the cloud
+        // Find interesting colors in the cloud (maps specific color regions to
+        // a specific color value for filtering the points later)
         edit_colors_of_pointcloud(pointcloud_floor);
         edit_colors_of_pointcloud(pointcloud_not_floor);
 
-        return;
-
+        // Filter region by color:
         // Blue goals
         color_filter(pointcloud_floor, pointcloud_floor_blue, 0, 0, 255);
         // Yellow goals
@@ -617,11 +619,24 @@ class PointcloudProcessor {
         color_filter(pointcloud_not_floor, pointcloud_not_floor_yellow, 255,
                      255, 0);
 
-        // std::vector<int> indices;
-        pcl::removeNaNFromPointCloud(*pointcloud_not_floor_green,
-                                     *pointcloud_temp2, indices);
-        radius_outlier_removal(pointcloud_temp2, pointcloud_temp);
+        // Remove outliers from filtered pointclouds
+        pcl::removeNaNFromPointCloud(*pointcloud_not_floor_blue,
+                                     *pointcloud_temp, indices);
+        if (pointcloud_not_floor_blue->points.size() > 0) {
+            radius_outlier_removal(pointcloud_temp, pointcloud_not_floor_blue);
+        }
+        // TODO ...
 
+        // Find pucks and poles from not floor pointclouds
+        // TODO
+
+        // Find goals from floor pointclouds
+        // TODO
+
+        // Return found objects to pointcloud_node
+        // TODO
+
+        // For reference and debugging:
         // std::cerr << "Cloud before filtering: " << std::endl;
         // std::cerr << *pointcloud_not_floor_green << std::endl;
         // statistical_outlier_removal_filter_m(pointcloud_not_floor_green,
@@ -631,7 +646,9 @@ class PointcloudProcessor {
     }
 
     PointCloudPrt& get_floor_pointcloud() { return pointcloud_floor; }
-    PointCloudPrt& get_not_floor_pointcloud() { return pointcloud_temp2; }
+    PointCloudPrt& get_not_floor_pointcloud() {
+        return pointcloud_not_floor_blue;
+    }
 
    private:
     pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
