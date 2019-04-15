@@ -13,7 +13,15 @@
 #include "opencv2/opencv.hpp"
 
 #include <image_transport/image_transport.h>
-#include <image_transport/subscriber_filter.h>
+#include <image_transport/subscriber_filterh>
+
+// Sement Added by Reza//
+// Aims at Re-Exporting in-game Objects
+#include <pcl/sample_consensus/mlesac.h>
+typedef pcl::PointCould<PointT> CouldPTr;
+
+
+
 
 const std::string IMAGE_WINDOW = "Camera image";
 ros::Publisher velocity_pub;
@@ -30,6 +38,12 @@ void image_callback(const sensor_msgs::Image::ConstPtr& msg_img)
   // date image.
   image = cv_ptr->image;
   got_image = true;
+}
+
+
+void feature_extract(CloudPtr& raw_Cloud, CloudPTr& output_Cloud)
+{
+
 }
 
 void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg_laser){
@@ -87,7 +101,7 @@ int main(int argc, char **argv){
       cv::Mat cur_img = image;
       //sensor_msgs::LaserScan cur_laser = laser_msg;
 
-      
+
 
       show_image();
     }
