@@ -15,7 +15,7 @@
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filterh>
 
-// Sement Added by Reza//
+// Segment Added by Reza//
 // Aims at Re-Exporting in-game Objects
 #include <pcl/sample_consensus/mlesac.h>
 #include <pcl_ros/point_cloud.h>
@@ -40,16 +40,15 @@ void image_callback(const sensor_msgs::Image::ConstPtr& msg_img)
   // Store the latest image received - this variable always has the most up to
   // date image.
   image = cv_ptr->image;
+
   got_image = true;
 }
 
 
-CloudPTr feature_extract(CloudPtr& raw_Cloud)
-{
-     out_PointCloud= new PointCloud();
+Class Cloud_Processor {
+public:
+Cloud_Processor
 
-     outCloudPtr = CloudPTr(out_PointCloud);
-     SampleModel model= new SampleConsensusModel ();
 
 
 
@@ -122,3 +121,4 @@ int main(int argc, char **argv){
 
   return 0;
 }
+
