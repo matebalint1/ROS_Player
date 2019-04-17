@@ -33,6 +33,7 @@
 #include <pcl/kdtree/impl/kdtree_flann.hpp>
 
 #include <pcl/io/pcd_io.h>
+#include <chrono>
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPtr;
@@ -116,10 +117,11 @@ class PointcloudProcessor {
     }
 
     void voxel_grid_filter_m(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
-                             double leaf_size = 0.02) {
+                             double leaf_size = 0.02, int min_n_points = 0) {
         // Voxel grid filter
         voxel_grid_filter.setInputCloud(cloud_in);
         voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+        voxel_grid_filter.setMinimumPointsNumberPerVoxel(min_n_points);
         voxel_grid_filter.filter(*cloud_out);
     }
     /*
@@ -604,7 +606,8 @@ class PointcloudProcessor {
 
         PointType result_point = PointType(0, 0, 0);
         uint32_t rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
-        result_point.rgb = *reinterpret_cast<float*>(&rgb);
+        float black = *reinterpret_cast<float*>(&rgb);
+        result_point.rgb = black;
 
         PointType min_point;
         PointType max_point;
@@ -642,6 +645,7 @@ class PointcloudProcessor {
         float blue = *reinterpret_cast<float*>(&rgb);
         rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
         float green = *reinterpret_cast<float*>(&rgb);
+        
 
         for (auto pt = cloud->begin(); pt < cloud->end(); pt++) {
             if (pt->rgb == yellow) {
@@ -653,9 +657,10 @@ class PointcloudProcessor {
             }
         }
 
-        std::cout << blue_points << " g" << green_points << " y"
-                  << yellow_points << std::endl;
+        //std::cout << blue_points << " g" << green_points << " y"
+        //          << yellow_points << std::endl;
 
+        rgb = black; // default for no puck or pole
         if (blue_points > green_points && blue_points > yellow_points &&
             blue_points > color_threshold) {
             // Blue
@@ -695,6 +700,7 @@ class PointcloudProcessor {
         PointCloudPtr cloud_f(new PointCloud);
         PointCloudPtr result(new PointCloud);
 
+        /*
         // Create the segmentation object for the planar model and set all the
         // parameters
         pcl::SACSegmentation<PointType> seg;
@@ -741,7 +747,7 @@ class PointcloudProcessor {
             extract.setNegative(true);
             extract.filter(*cloud_f);
             *cloud = *cloud_f;
-        }
+        }*/
 
         // Creating the KdTree object for the search method of the extraction
         pcl::search::KdTree<PointType>::Ptr tree(
@@ -790,31 +796,46 @@ class PointcloudProcessor {
         return result;
     }
 
+    
+
     void process_pointcloud(PointCloudPtr& cloud) {
         // Processes a new point cloud and extracts useful information
-
+        auto start_time = std::chrono::high_resolution_clock::now();
         // Remove NaNs
         std::vector<int> indices;
-        pcl::removeNaNFromPointCloud(*cloud, *pointcloud_temp, indices);
+        //pcl::removeNaNFromPointCloud(*cloud, *pointcloud_temp, indices);
 
         // Segment cloud into floor and not floor
-        planar_segmentation(pointcloud_temp, pointcloud_floor,
+        planar_segmentation(cloud, pointcloud_floor,
                             pointcloud_not_floor);
+        //std::cout << "not floor points: " << *pointcloud_not_floor << std::endl;
 
         // Apply radius filter twice
-        radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02,
-                               17);
-        radius_outlier_removal(pointcloud_temp2, pointcloud_temp, 0.02, 15);
+        //radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02,
+        //                       17);
+        //radius_outlier_removal(pointcloud_temp2, pointcloud_not_floor, 0.02, 15);
+
 
         // Reduce nuber of points in the pointcloud
-        voxel_grid_filter_m(pointcloud_temp, pointcloud_not_floor, 0.01);
+        //std::cout << *cloud << std::endl;
+        voxel_grid_filter_m(pointcloud_not_floor, pointcloud_temp2, 0.015, 5);
+        //std::cout << *pointcloud_temp << std::endl;
+
+        radius_outlier_removal(pointcloud_temp2, pointcloud_not_floor, 0.02, 3);
+
+        // Reduce nuber of points in the pointcloud
+        //voxel_grid_filter_m(pointcloud_temp, pointcloud_not_floor, 0.01);
 
         // Highlight interesting colors
         edit_colors_of_pointcloud(pointcloud_not_floor);
 
-        // Find pucs and poles from not floor pointcoud
+        // Find pucks and poles from not floor pointcoud
         pointcloud_temp = get_bucks_and_poles(pointcloud_not_floor);
 
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto delta_time = end_time - start_time;
+        std::cout << "Took " <<delta_time/std::chrono::milliseconds(1) << "ms to run.\n";
+        
         return;
 
         // Reduce nuber of points in the pointcloud
