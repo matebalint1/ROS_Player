@@ -18,7 +18,10 @@
 // Sement Added by Reza//
 // Aims at Re-Exporting in-game Objects
 #include <pcl/sample_consensus/mlesac.h>
-typedef pcl::PointCould<PointT> CouldPTr;
+#include <pcl_ros/point_cloud.h>
+//#include <SacModel.h>
+typedef pcl::PointCould<pcl::PointXYZRGB>::PTr CouldPTr;
+typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
 
 
@@ -41,8 +44,14 @@ void image_callback(const sensor_msgs::Image::ConstPtr& msg_img)
 }
 
 
-void feature_extract(CloudPtr& raw_Cloud, CloudPTr& output_Cloud)
+CloudPTr feature_extract(CloudPtr& raw_Cloud)
 {
+     out_PointCloud= new PointCloud();
+
+     outCloudPtr = CloudPTr(out_PointCloud);
+     SampleModel model= new SampleConsensusModel ();
+
+
 
 }
 
