@@ -20,8 +20,13 @@
 #include <pcl/sample_consensus/mlesac.h>
 #include <pcl_ros/point_cloud.h>
 //#include <SacModel.h>
-typedef pcl::PointCould<pcl::PointXYZRGB>::PTr CouldPTr;
+
+typedef typedef pcl::PointXYZRGB Point_RGB_3D;
+typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr Cloud_PTr;
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
+typedef pcl::io::loadPCDFile PCL_Path;
+typedef pcl::visualization::PCLVisualizer PCL_Visualizer;
+
 
 
 
@@ -45,9 +50,21 @@ void image_callback(const sensor_msgs::Image::ConstPtr& msg_img)
 }
 
 
-Class Cloud_Processor {
+class Cloud_Processor {
 public:
-Cloud_Processor
+PointCloud_Processor ()
+{
+    Cloud_PTr raw_Cloud(new PointCloud<Point_RGB_3D>);
+    Cloud_PTr fitered_Cloud(new PointCloud<Point_RGB_3D>);
+
+
+
+
+
+    processed_type1=Cloud_PTr (new PointCloud);
+
+
+}
 
 
 
