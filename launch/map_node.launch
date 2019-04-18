@@ -1,0 +1,7 @@
+<launch>
+  <arg name="team" default="1"/>
+  
+  <node pkg="player" name="map_node" type="map_node" output="screen">
+  </node>
+   
+</launch>
