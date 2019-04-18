@@ -34,7 +34,7 @@ class PlayNode {
 
         velocity_pub =
             n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
-        kinect_pub = n->advertise<PointCloud>("player/kinect_processed", 1);
+        kinect_pub = n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
 
         // ROS_INFO("Waiting for camera image");
         // ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
@@ -103,7 +103,8 @@ class PlayNode {
 
     void pub_pointcloud(PointCloud &cloud) {
         PointCloud::Ptr msg(new PointCloud);
-        msg->header.frame_id = "robot1/base_link";
+        //msg->header.frame_id = "robot1/base_link";
+        msg->header.frame_id = "robot1/odom";
 
         msg->height = cloud.height;
         msg->width = cloud.width;
@@ -140,7 +141,8 @@ class PlayNode {
             // (*cur_kinect_in).header.frame_id ==
             // "robot1/kinect_rgb_optical_frame"
             transformStamped = tfBuffer->lookupTransform(
-                "robot1/base_link", "robot1/kinect_rgb_optical_frame",
+                //"robot1/base_link", "robot1/kinect_rgb_optical_frame",
+                "robot1/odom", "robot1/kinect_rgb_optical_frame",
                 ros::Time(0));
 
             // Convert TransformStamped to Transform

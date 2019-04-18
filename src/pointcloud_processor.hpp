@@ -35,10 +35,11 @@
 #include <pcl/io/pcd_io.h>
 #include <chrono>
 
-typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
-typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPtr;
 
 typedef pcl::PointXYZRGB PointType;
+typedef pcl::PointCloud<PointType> PointCloud;
+typedef pcl::PointCloud<PointType>::Ptr PointCloudPtr;
+
 typedef pcl::Normal NormalType;
 typedef pcl::ReferenceFrame RFType;
 typedef pcl::SHOT352 DescriptorType;
