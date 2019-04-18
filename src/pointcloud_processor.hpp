@@ -602,56 +602,48 @@ class PointcloudProcessor {
         // This method takes as input a pointcloud of a suspected pole or puck.
         // Returns a point containing information (x,y,z,r,g,b) of the object if
         // it fulfills the requirements.
-        int color_threshold = 5;  // min number of points in main color
 
-        PointType result_point = PointType(0, 0, 0);
-        uint32_t rgb =
-            ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
-        float black = *reinterpret_cast<float*>(&rgb);
-        result_point.rgb = black;
+        int color_threshold = 5;  // min number of points in main color
+        PointType result_point = PointType(0, 0, 0.2);
 
         PointType min_point;
         PointType max_point;
         pcl::getMinMax3D(*cloud, min_point, max_point);
 
+        // Calculate metrics of the pointcloud
         double average_x = 0.5 * (max_point.x + min_point.x);
         double average_y = 0.5 * (max_point.y + min_point.y);
-        //result_point.x = average_x;
-        //result_point.y = average_y;
+        double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
+                                  pow(max_point.x - min_point.x, 2));
 
-        // Check if size is within limits
+        // Check if size of the pointcloud is within the limits
         if (!(max_point.z - min_point.z >= 0.1 &&
-              max_point.z - min_point.z <= 0.52 &&
-              max_point.x - min_point.x <= 0.14 &&
-              max_point.y - min_point.y <= 0.14)) {
-            //rgb = ((uint32_t)255 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
-            //result_point.rgb = *reinterpret_cast<float*>(&rgb);
-            // size does not match -> return a black point
+              max_point.z - min_point.z <= 0.52 && diagonal_xy <= 0.16 &&
+              diagonal_xy >= 0.06)) {
+            // std::cout << "too big, diagonal: " << diagonal_xy<< std::endl;
+            uint32_t rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
+            result_point.rgb = *reinterpret_cast<float*>(&rgb);
+            result_point.x = 0;
+            result_point.y = 0;
+
+            // size does not match -> return a black point in origo
             return result_point;
         }
 
-        // Get main highlighted color
-        // Blue bucks
-        // color_filter(cloud, pointcloud_not_floor_blue, 0, 0, 255);
-        // Green bucks
-        // color_filter(cloud, pointcloud_not_floor_green, 0, 255, 0);
-        // Yellow bucks
-        // color_filter(cloud, pointcloud_not_floor_yellow, 255, 255, 0);
-
-        // Compare number of found colors
-        int blue_points = 0;   // pointcloud_not_floor_blue->points.size();
-        int green_points = 0;  // pointcloud_not_floor_green->points.size();
-        int yellow_points =
-            0;  // pointcloud_not_floor_yellow->points.size();blue_points++;
-
         // Calculate values for colors
-        rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
+        uint32_t rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
         float yellow = *reinterpret_cast<float*>(&rgb);
         rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
         float blue = *reinterpret_cast<float*>(&rgb);
         rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
         float green = *reinterpret_cast<float*>(&rgb);
+        rgb = ((uint32_t)255 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
+        float cyan = *reinterpret_cast<float*>(&rgb);
 
+        // Calculate color frequencies
+        int blue_points = 0;
+        int green_points = 0;
+        int yellow_points = 0;
         for (auto pt = cloud->begin(); pt < cloud->end(); pt++) {
             if (pt->rgb == yellow) {
                 yellow_points++;
@@ -665,31 +657,35 @@ class PointcloudProcessor {
         // std::cout << blue_points << " g" << green_points << " y"
         //          << yellow_points << std::endl;
 
-        rgb = black;  // default for no puck or pole
+        // Determine to which catecory the object belongs to
+        float choosen_color = 0;
         if (blue_points > green_points && blue_points > yellow_points &&
             blue_points > color_threshold) {
             // Blue
-            rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
+            choosen_color = blue;
 
         } else if (green_points > blue_points && green_points > yellow_points &&
                    green_points > color_threshold) {
             // Green
-            rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
+            choosen_color = green;
 
         } else if (yellow_points > green_points &&
                    yellow_points > blue_points &&
                    yellow_points > color_threshold) {
             // Yellow
-            rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
+            choosen_color = yellow;
         } else {
+            // Unknown
+            choosen_color = cyan;
+
             // Put unknown objects to origo
-             average_x = 0;
-             average_y = 0;
+            // average_x = 0;
+            // average_y = 0;
         }
 
         // Return point, color represents point type: green -> buck, blue or
         // yellow -> pole.
-        result_point.rgb = *reinterpret_cast<float*>(&rgb);
+        result_point.rgb = choosen_color;
         result_point.x = average_x;
         result_point.y = average_y;
 
@@ -761,8 +757,8 @@ class PointcloudProcessor {
 
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<PointType> ec;
-        ec.setClusterTolerance(0.02);  // 2cm
-        ec.setMinClusterSize(20);
+        ec.setClusterTolerance(0.03);  // 2cm
+        ec.setMinClusterSize(16);
         ec.setMaxClusterSize(25000);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
@@ -815,14 +811,15 @@ class PointcloudProcessor {
     void process_pointcloud(PointCloudPtr& cloud) {
         // Processes a new point cloud and extracts useful information
         auto start_time = std::chrono::high_resolution_clock::now();
-        // Remove NaNs
-        std::vector<int> indices;
-        // pcl::removeNaNFromPointCloud(*cloud, *pointcloud_temp, indices);
 
         // Reduce nuber of points in the pointcloud
         // std::cout << *cloud << std::endl;
         voxel_grid_filter_m(cloud, pointcloud_temp2, 0.015, 5);
         // std::cout << *pointcloud_temp << std::endl;
+
+        // Find interesting colors in the cloud (maps specific color regions to
+        // a specific color value for filtering the points later)
+        edit_colors_of_pointcloud(pointcloud_temp2);
 
         // Segment cloud into floor and not floor
         planar_segmentation(pointcloud_temp2, pointcloud_floor,
@@ -830,26 +827,15 @@ class PointcloudProcessor {
         // std::cout << "not floor points: " << *pointcloud_not_floor <<
         // std::endl;
 
-        // Apply radius filter twice
-        // radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02,
-        //                       17);
-        // radius_outlier_removal(pointcloud_temp2, pointcloud_not_floor, 0.02,
-        // 15);
-
         // save_cloud_to_file(pointcloud_not_floor,
-        // "/home/cnc/Desktop/Hockey/PCL-cluster-segmentation-tests/not-floor2.pcd"
-        // );
+        //"/home/cnc/Desktop/Hockey/PCL-cluster-segmentation-tests/not-floor2.pcd"
+        //);
 
+        // Remove outliers
         radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02, 3);
 
-        // Reduce nuber of points in the pointcloud
-        // voxel_grid_filter_m(pointcloud_temp, pointcloud_not_floor, 0.01);
-
-        // Highlight interesting colors
-        edit_colors_of_pointcloud(pointcloud_temp2);
-
         // Find pucks and poles from not floor pointcoud
-        pointcloud_temp = get_bucks_and_poles(pointcloud_temp2);
+        recognized_objects = get_bucks_and_poles(pointcloud_temp2);
 
         auto end_time = std::chrono::high_resolution_clock::now();
         auto delta_time = end_time - start_time;
@@ -858,17 +844,6 @@ class PointcloudProcessor {
 
         return;  //----------------------------------------------------
 
-        // Reduce nuber of points in the pointcloud
-        voxel_grid_filter_m(pointcloud_temp, pointcloud_temp2);
-
-        // Segment cloud into floor and not floor
-        planar_segmentation(pointcloud_temp2, pointcloud_floor,
-                            pointcloud_not_floor);
-
-        // Find interesting colors in the cloud (maps specific color regions to
-        // a specific color value for filtering the points later)
-        edit_colors_of_pointcloud(pointcloud_floor);
-        edit_colors_of_pointcloud(pointcloud_not_floor);
 
         // Filter region by color:
         // Blue goals
@@ -877,6 +852,7 @@ class PointcloudProcessor {
         color_filter(pointcloud_floor, pointcloud_floor_yellow, 255, 255, 0);
 
         // Remove outliers from filtered pointclouds
+        std::vector<int> indices;
         pcl::removeNaNFromPointCloud(*pointcloud_not_floor_blue,
                                      *pointcloud_temp, indices);
         if (pointcloud_not_floor_blue->points.size() > 0) {
@@ -898,7 +874,7 @@ class PointcloudProcessor {
 
         // TODO ...
 
-        edit_z_to(pointcloud_not_floor_blue, 0.2);
+        edit_z_to(pointcloud_floor, 0);
         edit_z_to(pointcloud_not_floor_green, 0.2);
         edit_z_to(pointcloud_not_floor_yellow, 0.2);
 
@@ -912,14 +888,11 @@ class PointcloudProcessor {
 
         // Return found objects to pointcloud_node
         // TODO
-
-        // For reference and debugging:
-        // std::cerr << "Cloud after filtering: " << std::endl;
-        // std::cerr << *pointcloud_temp << std::endl;
     }
 
     PointCloudPtr& get_floor_pointcloud() { return pointcloud_floor; }
-    PointCloudPtr& get_not_floor_pointcloud() { return pointcloud_temp; }
+    PointCloudPtr& get_not_floor_pointcloud() { return pointcloud_not_floor; }
+    PointCloudPtr& get_recognized_objects() { return recognized_objects;}
 
    private:
     pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
@@ -939,6 +912,8 @@ class PointcloudProcessor {
     PointCloudPtr pointcloud_not_floor_green;
     PointCloudPtr pointcloud_not_floor_blue;
     PointCloudPtr pointcloud_not_floor_yellow;
+
+    PointCloudPtr recognized_objects;
 
     PointCloudPtr pointcloud_puck_model;
     PointCloudPtr pointcloud_pole_model;

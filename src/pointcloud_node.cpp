@@ -166,7 +166,7 @@ class PlayNode {
         pointcloud_processor.process_pointcloud(cur_kinect);
 
         // Publish pointcloud
-        pub_pointcloud(*pointcloud_processor.get_not_floor_pointcloud());
+        pub_pointcloud(*pointcloud_processor.get_recognized_objects());
 
         got_kinect = false; // reset
     }
