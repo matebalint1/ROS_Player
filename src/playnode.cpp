@@ -19,21 +19,57 @@
 // Aims at Re-Exporting in-game Objects
 #include <pcl/sample_consensus/mlesac.h>
 #include <pcl_ros/point_cloud.h>
+#include <pcl/sample_consensus/sac_model_circle3d.h> // Deploys 3D_Circular Feature Models
 //#include <SacModel.h>
 
 typedef typedef pcl::PointXYZRGB Point_RGB_3D;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr Cloud_PTr;
+typedef pcl::PointCloud<Point_RGB_3D>::ConstPtr Cloud_ConstPTr;
+
+
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::io::loadPCDFile PCL_Path;
 typedef pcl::visualization::PCLVisualizer PCL_Visualizer;
 
+typedef pcl::MaximumLikelihoodSampleConsensus< Point_RGB_3D > MaximumLikelihood;
+typedef pcl::SampleConsensusModelCircle3D< Point_RGB_3D> Circular_M3D;
+typedef boost::shared_ptr< SampleConsensusModelCircle3D< PointT > > Circular_M3D_Ptr;
+
+class Cloud_Processor {
+public:
+PointCloud_Processor ()
+{
+    public:
+
+
+
+    Cloud_PTr raw_Cloud (new PointCloud);
+    Cloud_PTr filtered_Cloud (new PointCloud);
+
+    const Cloud_ConstPTr  circular_ReferenceCloud (& new PointCloud);
 
 
 
 
-const std::string IMAGE_WINDOW = "Camera image";
-ros::Publisher velocity_pub;
-cv::Mat image;
+    PointCloud filtered_Cloud;
+
+
+
+
+    Circular_M3D cicle3D new (circular_ReferenceCloud, random= false));
+    MaximumLikelihood cylindricalLikelyHood= new MaximumLikelihood(& );
+    cylindricalLikelyHood::ComputeModel(0);
+
+
+
+
+
+
+    processed_type1=Cloud_PTr (new PointCloud);
+
+
+}
+
 sensor_msgs::LaserScan laser_msg;
 bool got_image;
 bool got_laser;
@@ -50,21 +86,9 @@ void image_callback(const sensor_msgs::Image::ConstPtr& msg_img)
 }
 
 
-class Cloud_Processor {
-public:
-PointCloud_Processor ()
-{
-    Cloud_PTr raw_Cloud(new PointCloud<Point_RGB_3D>);
-    Cloud_PTr fitered_Cloud(new PointCloud<Point_RGB_3D>);
 
 
 
-
-
-    processed_type1=Cloud_PTr (new PointCloud);
-
-
-}
 
 
 
