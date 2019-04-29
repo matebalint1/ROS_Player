@@ -16,6 +16,7 @@
 #include <boost/foreach.hpp>
 
 #include <pcl/ModelCoefficients.h>
+#include <pcl/common/centroid.h>
 #include <pcl/common/common.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree.h>
@@ -44,10 +45,10 @@ class PointcloudProcessor {
         pointcloud_not_floor_blue = PointCloudPtr(new PointCloud);
         pointcloud_not_floor_yellow = PointCloudPtr(new PointCloud);
 
-        //pointcloud_puck_model = PointCloudPtr(new PointCloud);
-        //pointcloud_pole_model = PointCloudPtr(new PointCloud);
-        //generate_puck_pointcloud(pointcloud_puck_model);
-        //generate_pole_pointcloud(pointcloud_pole_model);
+        // pointcloud_puck_model = PointCloudPtr(new PointCloud);
+        // pointcloud_pole_model = PointCloudPtr(new PointCloud);
+        // generate_puck_pointcloud(pointcloud_puck_model);
+        // generate_pole_pointcloud(pointcloud_pole_model);
 
         pass_through_filter = pcl::PassThrough<pcl::PointXYZRGB>();
         voxel_grid_filter = pcl::VoxelGrid<pcl::PointXYZRGB>();
@@ -386,18 +387,23 @@ class PointcloudProcessor {
     PointType is_buck_or_pole(PointCloudPtr& cloud) {
         // This method takes as input a pointcloud of a suspected pole or puck.
         // Returns a point containing information (x,y,z,r,g,b) of the object if
-        // it fulfills the requirements.
+        // it fulfills the requirements. If the cloud has wrong size a black
+        // point in the origo is returnet. If only the color requirements are
+        // not fulfilled a magenta point is returned at the position of the
+        // object.
 
         int color_threshold = 5;  // min number of points in main color
         PointType result_point = PointType(0, 0, 0.2);
 
+        // Calculate metrics of the pointcloud
         PointType min_point;
         PointType max_point;
+        PointType centroid;
         pcl::getMinMax3D(*cloud, min_point, max_point);
+        pcl::computeCentroid(*cloud, centroid);
 
-        // Calculate metrics of the pointcloud
-        double average_x = 0.5 * (max_point.x + min_point.x);
-        double average_y = 0.5 * (max_point.y + min_point.y);
+        double average_x = centroid.x;
+        double average_y = centroid.y;
         double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
                                   pow(max_point.x - min_point.x, 2));
 
@@ -423,7 +429,7 @@ class PointcloudProcessor {
         rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
         float green = *reinterpret_cast<float*>(&rgb);
         rgb = ((uint32_t)255 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
-        float cyan = *reinterpret_cast<float*>(&rgb);
+        float magenta = *reinterpret_cast<float*>(&rgb);
 
         // Calculate color frequencies
         int blue_points = 0;
@@ -438,9 +444,6 @@ class PointcloudProcessor {
                 blue_points++;
             }
         }
-
-        // std::cout << blue_points << " g" << green_points << " y"
-        //          << yellow_points << std::endl;
 
         // Determine to which catecory the object belongs to
         float choosen_color = 0;
@@ -460,16 +463,12 @@ class PointcloudProcessor {
             // Yellow
             choosen_color = yellow;
         } else {
-            // Unknown
-            choosen_color = cyan;
-
-            // Put unknown objects to origo
-            // average_x = 0;
-            // average_y = 0;
+            // Unknown type
+            choosen_color = magenta;
         }
 
         // Return point, color represents point type: green -> buck, blue or
-        // yellow -> pole.
+        // yellow -> pole, magenta -> unknown.
         result_point.rgb = choosen_color;
         result_point.x = average_x;
         result_point.y = average_y;
@@ -486,55 +485,6 @@ class PointcloudProcessor {
         PointCloudPtr cloud_f(new PointCloud);
         PointCloudPtr result(new PointCloud);
 
-        /*
-        // Create the segmentation object for the planar model and set all the
-        // parameters
-        pcl::SACSegmentation<PointType> seg;
-        pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
-        PointCloudPtr cloud_plane(new PointCloud());
-        pcl::PCDWriter writer;
-        seg.setOptimizeCoefficients(true);
-        seg.setModelType(pcl::SACMODEL_PLANE);
-        seg.setMethodType(pcl::SAC_RANSAC);
-        seg.setMaxIterations(100);
-        seg.setDistanceThreshold(0.02);
-
-        int i = 0, nr_points = (int)cloud->points.size();
-        while (true) {
-            break;  //!!!!!!!!!!!!!!!!
-            // Segment the largest planar component from the remaining cloud
-            seg.setInputCloud(cloud);
-            seg.segment(*inliers, *coefficients);
-            if (inliers->indices.size() == 0) {
-                std::cout << "Could not estimate a planar model for the given "
-                             "dataset."
-                          << std::endl;
-                break;
-            }
-
-            // Extract the planar inliers from the input cloud
-            pcl::ExtractIndices<PointType> extract;
-            extract.setInputCloud(cloud);
-            extract.setIndices(inliers);
-            extract.setNegative(false);
-
-            // Get the points associated with the planar surface
-            extract.filter(*cloud_plane);
-            std::cout << "PointCloud representing the planar component: "
-                      << cloud_plane->points.size() << " data points."
-                      << std::endl;
-
-            if (cloud_plane->points.size() < 2000) {
-                break;  // stop if found planes are too small
-            }
-
-            // Remove the planar inliers, extract the rest
-            extract.setNegative(true);
-            extract.filter(*cloud_f);
-            *cloud = *cloud_f;
-        }*/
-
         // Creating the KdTree object for the search method of the extraction
         pcl::search::KdTree<PointType>::Ptr tree(
             new pcl::search::KdTree<PointType>);
@@ -549,7 +499,7 @@ class PointcloudProcessor {
         ec.setInputCloud(cloud);
         ec.extract(cluster_indices);
 
-        int j = 1;
+        int j = 1;  // for debugging
         for (std::vector<pcl::PointIndices>::const_iterator it =
                  cluster_indices.begin();
              it != cluster_indices.end(); ++it) {
@@ -570,7 +520,8 @@ class PointcloudProcessor {
             //          << std::endl;
 
             result->points.push_back(is_buck_or_pole(cloud_cluster));
-            /*
+
+            /* // for debugging
             int r = j & 0b1;
             int g = j & 0b10;
             int b = j & 0b100;
@@ -580,9 +531,8 @@ class PointcloudProcessor {
             for (auto& p : cloud_cluster->points) p.rgb = rgb;
 
             *result += *cloud_cluster;
-            */
-
             j++;
+            */
         }
 
         // Set header information
@@ -598,6 +548,10 @@ class PointcloudProcessor {
 
         auto start_time = std::chrono::high_resolution_clock::now();
 
+        // *********************************************
+        // Prepare pointcloud for object recognition
+        // *********************************************
+
         // Reduce nuber of points in the pointcloud
         voxel_grid_filter_m(cloud, pointcloud_temp2, 0.015, 5);
 
@@ -609,15 +563,36 @@ class PointcloudProcessor {
         planar_segmentation(pointcloud_temp2, pointcloud_floor,
                             pointcloud_not_floor);
 
-        // save_cloud_to_file(pointcloud_not_floor,
-        //"/home/cnc/Desktop/Hockey/PCL-cluster-segmentation-tests/not-floor2.pcd"
-        //);
+        // *********************************************
+        // Puck and Pole recognition
+        // *********************************************
 
         // Remove outliers
         radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02, 3);
 
         // Find pucks and poles from not floor pointcoud
         recognized_objects = get_bucks_and_poles(pointcloud_temp2);
+
+        // *********************************************
+        // Goal recognition
+        // *********************************************
+
+        edit_z_to(pointcloud_floor, 0); // z = 0
+
+        // Filter region by color:
+        // Blue goals
+        color_filter(pointcloud_floor, pointcloud_temp, 0, 0, 255);
+        // Yellow goals
+        color_filter(pointcloud_floor, pointcloud_temp2, 255, 255, 0);
+
+        // Remove outliers
+        radius_outlier_removal(pointcloud_temp, pointcloud_floor_blue, 0.2, 25);
+        radius_outlier_removal(pointcloud_temp2, pointcloud_floor_yellow, 0.2, 25);
+
+        recognized_objects->points.clear();
+        *recognized_objects += *pointcloud_floor_blue;
+        *recognized_objects += *pointcloud_floor_yellow;
+
 
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
@@ -628,11 +603,9 @@ class PointcloudProcessor {
         return;  //----------------------------------------------------
         // Testing stuff:
 
-        // Filter region by color:
-        // Blue goals
-        color_filter(pointcloud_floor, pointcloud_floor_blue, 0, 0, 255);
-        // Yellow goals
-        color_filter(pointcloud_floor, pointcloud_floor_yellow, 255, 255, 0);
+        // save_cloud_to_file(pointcloud_not_floor,
+        //"/home/cnc/Desktop/Hockey/PCL-cluster-segmentation-tests/not-floor2.pcd"
+        //);
 
         // Remove outliers from filtered pointclouds
         std::vector<int> indices;
@@ -642,26 +615,16 @@ class PointcloudProcessor {
             radius_outlier_removal(pointcloud_temp, pointcloud_not_floor_blue);
         }
 
-
-        edit_z_to(pointcloud_floor, 0);
-        edit_z_to(pointcloud_not_floor_green, 0.2);
-        edit_z_to(pointcloud_not_floor_yellow, 0.2);
-
+        
         pointcloud_temp->points.clear();
         *pointcloud_temp += *pointcloud_not_floor_blue;
         *pointcloud_temp += *pointcloud_not_floor_green;
         *pointcloud_temp += *pointcloud_not_floor_yellow;
-
-        // Find goals from floor pointclouds
-        // TODO
-
-        // Return found objects to pointcloud_node
-        // TODO
     }
 
     PointCloudPtr& get_floor_pointcloud() { return pointcloud_floor; }
     PointCloudPtr& get_not_floor_pointcloud() { return pointcloud_not_floor; }
-    PointCloudPtr& get_recognized_objects() { return recognized_objects;}
+    PointCloudPtr& get_recognized_objects() { return recognized_objects; }
 
    private:
     pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
@@ -684,6 +647,6 @@ class PointcloudProcessor {
 
     PointCloudPtr recognized_objects;
 
-    //PointCloudPtr pointcloud_puck_model;
-    //PointCloudPtr pointcloud_pole_model;
+    // PointCloudPtr pointcloud_puck_model;
+    // PointCloudPtr pointcloud_pole_model;
 };

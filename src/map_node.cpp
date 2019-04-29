@@ -9,6 +9,7 @@
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/radius_outlier_removal.h>
+#include <pcl/common/centroid.h>
 
 // Clustering
 #include <pcl/ModelCoefficients.h>
@@ -68,7 +69,6 @@ class PlayNode {
     }
 
     // Get points with an alpha value smaller than given alpha
-
     void alpha_filter(PointCloudPtr &cloud, uint8_t max_alpha) {
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
@@ -89,9 +89,9 @@ class PlayNode {
 
     void set_alpha(PointCloudPtr &cloud, int alpha) {
         for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
-            uint8_t alpha = alpha;
+            uint8_t alpha2 = alpha;
             uint32_t rgb = (pt->rgba & 0xffffff);
-            pt->rgba = ((alpha << 24) | rgb);
+            pt->rgba = ((alpha2 << 24) | rgb);
         }
     }
 
@@ -110,7 +110,7 @@ class PlayNode {
         // This method takes as input a pointcloud of a suspected pole or puck
         // locations. Returns a point containing information (x,y,z,r,g,b) of
         // the object if it fulfills the requirements. If requirement are not
-        // fulfilled, a black point will be returned.
+        // fulfilled, a black point in origo will be returned.
 
         int color_threshold = 3;  // min number of points in main color
         PointType result_point = PointType();
@@ -118,13 +118,15 @@ class PlayNode {
         result_point.y = 0;
         result_point.z = 0.2;
 
+        // Calculate metrics of the pointcloud
         PointType min_point;
         PointType max_point;
+        PointType centroid;
         pcl::getMinMax3D(*cloud, min_point, max_point);
+        pcl::computeCentroid(*cloud, centroid);
 
-        // Calculate metrics of the pointcloud
-        double average_x = 0.5 * (max_point.x + min_point.x);
-        double average_y = 0.5 * (max_point.y + min_point.y);
+        double average_x = centroid.x;
+        double average_y = centroid.y;
         double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
                                   pow(max_point.x - min_point.x, 2));
 
@@ -246,7 +248,7 @@ class PlayNode {
 
             PointType point = is_buck_or_pole(cloud_cluster);
             if (*reinterpret_cast<int *>(&point.rgb) != 0) {
-                // Add only succesfull detections
+                // Add only succesfull detections (== not black points)
                 result->points.push_back(point);
             }
             // j++;
@@ -298,7 +300,7 @@ class PlayNode {
         increase_timestamp_by_one(map_cloud);
 
 
-        // Create estimate of the environment
+        // Create an estimate of the environment
         *temp_cloud = *map_cloud;  // copy
         to_environment(temp_cloud);
 
@@ -309,7 +311,7 @@ class PlayNode {
         // Publish raw map
         *temp_cloud = *map_cloud;  // copy
         set_alpha(temp_cloud, 0xff);
-        pub_pointcloud(*temp_cloud, map_raw_pub);
+        pub_pointcloud(*temp_cloud, map_raw_pub); // raw map for debugging
 
         got_detected_objects = false;  // reset
     }
