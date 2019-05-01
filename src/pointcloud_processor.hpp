@@ -543,6 +543,66 @@ class PointcloudProcessor {
         return result;
     }
 
+    void extract_edge_points(PointCloudPtr& cloud, uint8_t r, uint8_t g,
+                                   uint8_t b) {
+        // Edits pointcloud so that it contains edges points bewteen differently
+        // colored regions
+
+        const float COLOR_DIFF_MAX =
+            0.08;  // 1/(100%) maximun distance from 50 % //0.15
+        const int NEIGHBORHS_MIN = 2;  // 2
+        float radius = 0.04;           // 0.035
+
+
+        pcl::KdTreeFLANN<PointType> kdtree;
+        kdtree.setInputCloud(cloud);
+        PointType searchPoint;
+
+        // Neighbors within radius search - edge extraction
+        std::vector<int> pointIdxRadiusSearch;
+        std::vector<float> pointRadiusSquaredDistance;
+
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::ExtractIndices<PointType> extract;
+        for (int i = 0; i < (*cloud).size(); i++) {
+            searchPoint.x = cloud->points[i].x;
+            searchPoint.y = cloud->points[i].y;
+            searchPoint.z = 0;
+
+            int number_of_color = 0;
+            int nuber_of_not_color = 0;
+
+            if (kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch,
+                                    pointRadiusSquaredDistance) > 0) {
+                for (size_t i = 0; i < pointIdxRadiusSearch.size(); ++i) {
+                    uint32_t rgb = *reinterpret_cast<int*>(
+                        &cloud->points[pointIdxRadiusSearch[i]].rgb);
+                    uint8_t rp = (rgb >> 16) & 0x0000ff;
+                    uint8_t gp = (rgb >> 8) & 0x0000ff;
+                    uint8_t bp = (rgb)&0x0000ff;
+
+                    if (r == rp && g == gp && b == bp) {
+                        number_of_color++;
+                    } else {
+                        nuber_of_not_color++;
+                    }
+                }
+            }
+
+            float ratio =
+                (float)number_of_color / (number_of_color + nuber_of_not_color);
+            if (ratio > 0.5 - COLOR_DIFF_MAX && ratio < 0.5 + COLOR_DIFF_MAX &&
+                (number_of_color + nuber_of_not_color) > NEIGHBORHS_MIN) {
+                // These points are on an edge
+                inliers->indices.push_back(i);
+            }
+        }
+
+        extract.setInputCloud(cloud);
+        extract.setIndices(inliers);
+        extract.filter(*cloud);
+    }
+
     void process_pointcloud(PointCloudPtr& cloud) {
         // Processes a new point cloud and extracts useful information
 
@@ -577,28 +637,33 @@ class PointcloudProcessor {
         // Goal recognition
         // *********************************************
 
-        edit_z_to(pointcloud_floor, 0); // z = 0
+        edit_z_to(pointcloud_floor, 0);  // z = 0
 
-        // Filter region by color:
-        // Blue goals
-        color_filter(pointcloud_floor, pointcloud_temp, 0, 0, 255);
-        // Yellow goals
-        color_filter(pointcloud_floor, pointcloud_temp2, 255, 255, 0);
+        // Extract edge points based on color
+        *pointcloud_temp = *pointcloud_floor;
+        extract_edge_points(pointcloud_temp, 0, 0, 255); // blue
+        *pointcloud_temp2 = *pointcloud_floor;
+        extract_edge_points(pointcloud_temp2, 255, 255, 0); // yellow
 
-        // Remove outliers
-        radius_outlier_removal(pointcloud_temp, pointcloud_floor_blue, 0.2, 25);
-        radius_outlier_removal(pointcloud_temp2, pointcloud_floor_yellow, 0.2, 25);
+        // Create mat image from edge pointclouds
 
-        recognized_objects->points.clear();
-        *recognized_objects += *pointcloud_floor_blue;
-        *recognized_objects += *pointcloud_floor_yellow;
 
+        // Calculate hough transform
+
+
+        // For testing
+        //recognized_objects->points.clear();
+        //*recognized_objects += *pointcloud_temp;
+        //*recognized_objects += *pointcloud_temp2;
 
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
         auto delta_time = end_time - start_time;
         std::cout << "Took " << delta_time / std::chrono::milliseconds(1)
                   << "ms to run.\n";
+
+        save_cloud_to_file(pointcloud_floor,
+                           "/home/cnc/Desktop/Hockey/floor1.pcd");
 
         return;  //----------------------------------------------------
         // Testing stuff:
@@ -607,19 +672,28 @@ class PointcloudProcessor {
         //"/home/cnc/Desktop/Hockey/PCL-cluster-segmentation-tests/not-floor2.pcd"
         //);
 
-        // Remove outliers from filtered pointclouds
-        std::vector<int> indices;
-        pcl::removeNaNFromPointCloud(*pointcloud_not_floor_blue,
-                                     *pointcloud_temp, indices);
-        if (pointcloud_not_floor_blue->points.size() > 0) {
-            radius_outlier_removal(pointcloud_temp, pointcloud_not_floor_blue);
-        }
+        // Filter region by color:
+        // Blue goals
+        //color_filter(pointcloud_floor, pointcloud_temp, 0, 0, 255);
+        // Yellow goals
+        //color_filter(pointcloud_floor, pointcloud_temp2, 255, 255, 0);
 
-        
-        pointcloud_temp->points.clear();
-        *pointcloud_temp += *pointcloud_not_floor_blue;
-        *pointcloud_temp += *pointcloud_not_floor_green;
-        *pointcloud_temp += *pointcloud_not_floor_yellow;
+        // Remove outliers
+        //radius_outlier_removal(pointcloud_temp, pointcloud_floor_blue, 0.2, 25);
+        //radius_outlier_removal(pointcloud_temp2, pointcloud_floor_yellow, 0.2,25);
+
+        // Remove outliers from filtered pointclouds
+        //std::vector<int> indices;
+        //pcl::removeNaNFromPointCloud(*pointcloud_not_floor_blue,
+        //                             *pointcloud_temp, indices);
+        //if (pointcloud_not_floor_blue->points.size() > 0) {
+        //    radius_outlier_removal(pointcloud_temp, pointcloud_not_floor_blue);
+        //}
+
+        //pointcloud_temp->points.clear();
+        //*pointcloud_temp += *pointcloud_not_floor_blue;
+        //*pointcloud_temp += *pointcloud_not_floor_green;
+        //*pointcloud_temp += *pointcloud_not_floor_yellow;
     }
 
     PointCloudPtr& get_floor_pointcloud() { return pointcloud_floor; }

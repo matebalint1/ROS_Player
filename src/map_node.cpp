@@ -299,7 +299,6 @@ class PlayNode {
         // Edit timestamps of all points
         increase_timestamp_by_one(map_cloud);
 
-
         // Create an estimate of the environment
         *temp_cloud = *map_cloud;  // copy
         to_environment(temp_cloud);
