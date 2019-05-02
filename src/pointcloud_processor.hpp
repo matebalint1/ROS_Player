@@ -24,6 +24,7 @@
 
 #include <pcl/io/pcd_io.h>
 #include <chrono>
+#include "opencv2/opencv.hpp"
 
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::PointCloud<PointType> PointCloud;
@@ -544,7 +545,7 @@ class PointcloudProcessor {
     }
 
     void extract_edge_points(PointCloudPtr& cloud, uint8_t r, uint8_t g,
-                                   uint8_t b) {
+                             uint8_t b) {
         // Edits pointcloud so that it contains edges points bewteen differently
         // colored regions
 
@@ -552,7 +553,6 @@ class PointcloudProcessor {
             0.08;  // 1/(100%) maximun distance from 50 % //0.15
         const int NEIGHBORHS_MIN = 2;  // 2
         float radius = 0.04;           // 0.035
-
 
         pcl::KdTreeFLANN<PointType> kdtree;
         kdtree.setInputCloud(cloud);
@@ -603,6 +603,110 @@ class PointcloudProcessor {
         extract.filter(*cloud);
     }
 
+    PointCloudPtr get_goal_corners(PointCloudPtr& cloud, int r, int g, int b) {
+        // Calculate corners
+
+        pcl::PointCloud<PointType>::Ptr cloud_corners(
+            new pcl::PointCloud<PointType>);
+            
+        if(cloud->points.size()< 5){
+            return cloud_corners;
+        }
+        // Parameters
+        PointType max_point;
+        PointType min_point;
+        pcl::getMinMax3D(*cloud, min_point, max_point);
+        double x_offset = min_point.x;  // origo of image is here
+        double y_offset = min_point.y;
+        double h = fabs(max_point.y - min_point.y);
+        double w = fabs(max_point.x - min_point.x);
+        double pixel_size = 0.01;  // m
+
+        if(h <= 0 || w <= 0){
+            return cloud_corners;
+        }
+
+        int marginal = 10;                                      // pix
+        int h_pix = (int)round(h / pixel_size) + 2 * marginal;  // pix
+        int w_pix = (int)round(w / pixel_size) + 2 * marginal;  // pix
+
+        // Create image from pointcloud
+        cv::Mat floor_image = cv::Mat::zeros(h_pix, w_pix, CV_8UC1);
+        for (int i = 0; i < (*cloud).size(); i++) {
+            int x = (int)round((cloud->points[i].x - x_offset) / pixel_size) +
+                    marginal;
+            int y = (int)round((cloud->points[i].y - y_offset) / pixel_size) +
+                    marginal;
+
+            if (x < w_pix && y < h_pix && x >= 0 && y >= 0) {
+                floor_image.at<uint8_t>(y, x, 0) = 255;
+            }
+        }
+
+        // Apply Hough Transform wiht opencv
+        int line_detection_thresh = 14;  // min number of intersecting points
+        int resolution_of_r = 1;         // pix
+        double resolution_of_angle = CV_PI / 180;  // deg
+
+        std::vector<cv::Vec2f> lines;  // will hold the results of the detection
+        cv::HoughLines(floor_image, lines, resolution_of_r, resolution_of_angle,
+                       line_detection_thresh);
+
+        // Calculate corner points
+        double max_deviation_from_90_deg = 1.5 * CV_PI / 180;  // rad
+        for (size_t i = 0; i < lines.size(); i++) {
+            for (size_t j = i; j < lines.size(); j++) {
+                float p1_rho = lines[i][0];
+                float p1_theta = lines[i][1];
+
+                float p2_rho = lines[j][0];
+                float p2_theta = lines[j][1];
+
+                float angle = fabs(p1_theta - p2_theta);
+                // std::cout << angle << std::endl;
+                if (angle < CV_PI / 2 + max_deviation_from_90_deg &&
+                    angle > CV_PI / 2 - max_deviation_from_90_deg) {
+                    // Two lines are roughly at 90 deg angle
+                    // Calculate the coordinates of the crossing
+                    double x;
+                    double y;
+                    /*
+                    double d2 = (cos(p1_theta) * cos(p2_theta) * p2_rho
+                                + sin(p1_theta) * sin(p2_theta) * p2_rho -
+                    p1_rho/ (cos(p1_theta) * sin(p2_theta) - sin(p1_theta) *
+                    cos(p2_theta)));
+
+                    x = p2_rho * cos(p2_theta) + d2 * cos(p2_theta + CV_PI/2);
+                    y = p2_rho * sin(p2_theta) + d2 * sin(p2_theta + CV_PI/2);
+                    */
+                    double a1 = cos(p1_theta);
+                    double b1 = sin(p1_theta);
+                    double a2 = cos(p2_theta);
+                    double b2 = sin(p2_theta);
+                    double det = a1 * b2 - b1 * a2;
+                    if (det != 0 && p1_rho != 0 && p2_rho != 0 && a1 != 0 &&
+                        a2 != 0 && b1 != 0 && b2 != 0) {
+                        x = (b1 * p2_rho - p1_rho * b2) / (-det);
+                        y = -a1 / b1 * x + p1_rho / b1;
+
+                        PointType point;
+                        point.x = x_offset + (x - marginal) * pixel_size;
+                        point.y = y_offset + (y - marginal) * pixel_size;
+                        point.z = 0;
+
+                        uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 |
+                                        (uint32_t)b);
+                        point.rgb = *reinterpret_cast<float*>(&rgb);
+
+                        cloud_corners->points.push_back(point);
+                    }
+                }
+            }
+        }
+
+        return cloud_corners;
+    }
+
     void process_pointcloud(PointCloudPtr& cloud) {
         // Processes a new point cloud and extracts useful information
 
@@ -641,18 +745,18 @@ class PointcloudProcessor {
 
         // Extract edge points based on color
         *pointcloud_temp = *pointcloud_floor;
-        extract_edge_points(pointcloud_temp, 0, 0, 255); // blue
+        extract_edge_points(pointcloud_temp, 0, 0, 255);  // blue
         *pointcloud_temp2 = *pointcloud_floor;
-        extract_edge_points(pointcloud_temp2, 255, 255, 0); // yellow
+        extract_edge_points(pointcloud_temp2, 255, 255, 0);  // yellow
 
-        // Create mat image from edge pointclouds
-
-
-        // Calculate hough transform
-
+        // Get corners
+        *recognized_objects +=
+            *(get_goal_corners(pointcloud_temp, 0, 255, 255));  // blue -> cyan
+        *recognized_objects +=
+            *(get_goal_corners(pointcloud_temp2, 255, 140, 0));  // yellow -> orange
 
         // For testing
-        //recognized_objects->points.clear();
+        // recognized_objects->points.clear();
         //*recognized_objects += *pointcloud_temp;
         //*recognized_objects += *pointcloud_temp2;
 
@@ -674,23 +778,25 @@ class PointcloudProcessor {
 
         // Filter region by color:
         // Blue goals
-        //color_filter(pointcloud_floor, pointcloud_temp, 0, 0, 255);
+        // color_filter(pointcloud_floor, pointcloud_temp, 0, 0, 255);
         // Yellow goals
-        //color_filter(pointcloud_floor, pointcloud_temp2, 255, 255, 0);
+        // color_filter(pointcloud_floor, pointcloud_temp2, 255, 255, 0);
 
         // Remove outliers
-        //radius_outlier_removal(pointcloud_temp, pointcloud_floor_blue, 0.2, 25);
-        //radius_outlier_removal(pointcloud_temp2, pointcloud_floor_yellow, 0.2,25);
+        // radius_outlier_removal(pointcloud_temp, pointcloud_floor_blue, 0.2,
+        // 25); radius_outlier_removal(pointcloud_temp2,
+        // pointcloud_floor_yellow, 0.2,25);
 
         // Remove outliers from filtered pointclouds
-        //std::vector<int> indices;
-        //pcl::removeNaNFromPointCloud(*pointcloud_not_floor_blue,
+        // std::vector<int> indices;
+        // pcl::removeNaNFromPointCloud(*pointcloud_not_floor_blue,
         //                             *pointcloud_temp, indices);
-        //if (pointcloud_not_floor_blue->points.size() > 0) {
-        //    radius_outlier_removal(pointcloud_temp, pointcloud_not_floor_blue);
+        // if (pointcloud_not_floor_blue->points.size() > 0) {
+        //    radius_outlier_removal(pointcloud_temp,
+        //    pointcloud_not_floor_blue);
         //}
 
-        //pointcloud_temp->points.clear();
+        // pointcloud_temp->points.clear();
         //*pointcloud_temp += *pointcloud_not_floor_blue;
         //*pointcloud_temp += *pointcloud_not_floor_green;
         //*pointcloud_temp += *pointcloud_not_floor_yellow;

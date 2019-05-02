@@ -6,10 +6,10 @@
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <pcl/common/centroid.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/radius_outlier_removal.h>
-#include <pcl/common/centroid.h>
 
 // Clustering
 #include <pcl/ModelCoefficients.h>
@@ -56,7 +56,7 @@ class PlayNode {
         got_detected_objects = true;
     }
 
-    void pub_pointcloud(PointCloud &cloud, ros::Publisher& pub) {
+    void pub_pointcloud(PointCloud &cloud, ros::Publisher &pub) {
         PointCloudPtr msg(new PointCloud);
         msg->header.frame_id = "robot1/odom";
 
@@ -150,15 +150,23 @@ class PlayNode {
         float c_green = *reinterpret_cast<float *>(&rgb);
         rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
         float c_black = *reinterpret_cast<float *>(&rgb);
+        rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)255);
+        float c_cyan = *reinterpret_cast<float *>(&rgb);
+        rgb = ((uint32_t)0xff << 16 | (uint32_t)0x8c << 8 | (uint32_t)0);
+        float c_orange = *reinterpret_cast<float *>(&rgb);
 
         uint32_t yellow = 0xffff00;
         uint32_t blue = 0x0000ff;
         uint32_t green = 0x00ff00;
+        uint32_t cyan = 0x00ffff;
+        uint32_t orange = 0xFF8C00;
 
         // Calculate color frequencies
         int blue_points = 0;
         int green_points = 0;
         int yellow_points = 0;
+        int cyan_points = 0;    // blue goals
+        int orange_points = 0;  // yellow goals
         for (auto pt = cloud->begin(); pt < cloud->end(); pt++) {
             uint32_t pt_rgb = *reinterpret_cast<int *>(&pt->rgba) & 0xffffff;
             // std::cout << std::hex << pt_rgb << std::endl;
@@ -168,35 +176,46 @@ class PlayNode {
                 green_points++;
             } else if (pt_rgb == blue) {
                 blue_points++;
+            } else if (pt_rgb == cyan) {
+                cyan_points++;
+            } else if (pt_rgb == orange) {
+                orange_points++;
+            }
+        }
+        std::vector<int> colors{blue_points, green_points, yellow_points,
+                                cyan_points, orange_points};
+        // Determine to which catecory the object belongs to
+        float choosen_color = c_black;
+        int max_frequency_index = std::max_element(colors.begin(), colors.end()) - colors.begin();
+        int num_of_max_color = *std::max_element(colors.begin(), colors.end());
+        //std::cout << max_frequency_index << "  " << num_of_max_color << std::endl;
+        if (num_of_max_color > color_threshold) {
+            if (max_frequency_index == 0) {
+                // Blue
+                choosen_color = c_blue;
+            } else if (max_frequency_index == 1) {
+                // Green
+                choosen_color = c_green;
+            } else if (max_frequency_index == 2) {
+                // Yellow
+                choosen_color = c_yellow;
+            } else if (max_frequency_index == 3) {
+                // Blue goal
+                choosen_color = c_cyan;
+            } else if (max_frequency_index == 4) {
+                // Yellow goal
+                choosen_color = c_orange;
+                std::cout << "  yellow"  << std::endl;
+            } else {
+                // Put unknown objects to origo
+                average_x = 0;
+                average_y = 0;
+                // std::cout << "unkown cloud" << std::endl;
             }
         }
 
-        // Determine to which catecory the object belongs to
-        float choosen_color = c_black;
-        if (blue_points > green_points && blue_points > yellow_points &&
-            blue_points > color_threshold) {
-            // Blue
-            choosen_color = c_blue;
-
-        } else if (green_points > blue_points && green_points > yellow_points &&
-                   green_points > color_threshold) {
-            // Green
-            choosen_color = c_green;
-
-        } else if (yellow_points > green_points &&
-                   yellow_points > blue_points &&
-                   yellow_points > color_threshold) {
-            // Yellow
-            choosen_color = c_yellow;
-        } else {
-            // Put unknown objects to origo
-            average_x = 0;
-            average_y = 0;
-            // std::cout << "unkown cloud" << std::endl;
-        }
-
-        // Return point, color represents point type: green -> buck, blue or
-        // yellow -> pole.
+        // Return point, color represents point type: green -> buck,
+        // blue or yellow -> pole.
         result_point.rgb = choosen_color;
         result_point.x = average_x;
         result_point.y = average_y;
@@ -205,14 +224,15 @@ class PlayNode {
     }
 
     PointCloudPtr combine_measurements(PointCloudPtr &cloud) {
-        // This algorithm uses Euclidean Cluster Extraction to segment the cloud
-        // into regions. After segmentation objects are filtered by size (min
-        // and max xy coordinates). Finally, the objects are detectect by the
-        // highlighted colors.
+        // This algorithm uses Euclidean Cluster Extraction to segment
+        // the cloud into regions. After segmentation objects are
+        // filtered by size (min and max xy coordinates). Finally, the
+        // objects are detectect by the highlighted colors.
 
         PointCloudPtr result(new PointCloud);
 
-        // Creating the KdTree object for the search method of the extraction
+        // Creating the KdTree object for the search method of the
+        // extraction
         pcl::search::KdTree<PointType>::Ptr tree(
             new pcl::search::KdTree<PointType>);
         tree->setInputCloud(cloud);
@@ -243,7 +263,8 @@ class PlayNode {
             cloud_cluster->is_dense = true;
 
             // std::cout << "PointCloud representing the Cluster: "
-            //          << cloud_cluster->points.size() << " data points."
+            //          << cloud_cluster->points.size() << " data
+            //          points."
             //          << std::endl;
 
             PointType point = is_buck_or_pole(cloud_cluster);
@@ -263,9 +284,9 @@ class PlayNode {
     }
 
     void to_environment(PointCloudPtr &cloud) {
-        // This function takes the sum of detectect objets and based on that
-        // finds an estimate of the real buck and pole locations in the
-        // environment.
+        // This function takes the sum of detectect objets and based on
+        // that finds an estimate of the real buck and pole locations in
+        // the environment.
 
         // Filter outliers
         radius_outlier_removal(cloud, 0.03, 5);
@@ -274,7 +295,7 @@ class PlayNode {
         cloud = combine_measurements(cloud);
     }
 
-    void increase_timestamp_by_one(PointCloudPtr &cloud){
+    void increase_timestamp_by_one(PointCloudPtr &cloud) {
         // Update current map_cloud and remove old stuff
         if (alpha_counter >= INCREASE_ALPHA_AFTER_N_MESSAGES) {
             // Increase alpha by one
@@ -305,12 +326,14 @@ class PlayNode {
 
         // Publish final map
         set_alpha(temp_cloud, 0xff);
-        pub_pointcloud(*temp_cloud, map_pub);  // final map of the environment
+        pub_pointcloud(*temp_cloud,
+                       map_pub);  // final map of the environment
 
         // Publish raw map
         *temp_cloud = *map_cloud;  // copy
         set_alpha(temp_cloud, 0xff);
-        pub_pointcloud(*temp_cloud, map_raw_pub); // raw map for debugging
+        pub_pointcloud(*temp_cloud,
+                       map_raw_pub);  // raw map for debugging
 
         got_detected_objects = false;  // reset
     }
@@ -331,8 +354,8 @@ class PlayNode {
     // tf2_ros::TransformListener *tf_listener;
 
     PointCloud detected_objects_msg;
-    PointCloudPtr map_cloud; // contains points of individual detections
-    PointCloudPtr temp_cloud; // temorary
+    PointCloudPtr map_cloud;   // contains points of individual detections
+    PointCloudPtr temp_cloud;  // temorary
 };
 
 int main(int argc, char **argv) {
