@@ -74,8 +74,8 @@ class PointcloudProcessor {
         }
 
         // Blue pucks
-        if (r >= 82 && r <= 240 && r >= -0.9 * b + 280 &&
-            g >= 0.9 * b + 0.2 * r - 33 && g <= 0.9 * b + 45 && b >= r + 20 &&
+        if (r >= 82 && r <= 240 && r >= -2 * b + 450 &&
+            g >= 0.9 * b + 0.2 * r - 33 && g <= 0.9 * b + 45 && b >= r + 48 &&
             b <= 0.1 * r + 240) {
             return 3;
         }
@@ -550,7 +550,7 @@ class PointcloudProcessor {
         // colored regions
 
         const float COLOR_DIFF_MAX =
-            0.08;  // 1/(100%) maximun distance from 50 % //0.15
+            0.15;  // 1/(100%) maximun distance from 50 % //0.15
         const int NEIGHBORHS_MIN = 2;  // 2
         float radius = 0.04;           // 0.035
 
@@ -766,8 +766,8 @@ class PointcloudProcessor {
         std::cout << "Took " << delta_time / std::chrono::milliseconds(1)
                   << "ms to run.\n";
 
-        save_cloud_to_file(pointcloud_floor,
-                           "/home/cnc/Desktop/Hockey/floor1.pcd");
+        //save_cloud_to_file(pointcloud_floor,
+        //                   "/home/cnc/Desktop/Hockey/floor1.pcd");
 
         return;  //----------------------------------------------------
         // Testing stuff:

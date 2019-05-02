@@ -205,7 +205,6 @@ class PlayNode {
             } else if (max_frequency_index == 4) {
                 // Yellow goal
                 choosen_color = c_orange;
-                std::cout << "  yellow"  << std::endl;
             } else {
                 // Put unknown objects to origo
                 average_x = 0;
