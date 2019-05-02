@@ -544,13 +544,14 @@ class PointcloudProcessor {
         return result;
     }
 
-    void extract_edge_points(PointCloudPtr& cloud, uint8_t r, uint8_t g,
-                             uint8_t b) {
+    void extract_edge_points(PointCloudPtr& cloud,
+                             PointCloudPtr& cloud_blue_out,
+                             PointCloudPtr& cloud_yellow_out) {
         // Edits pointcloud so that it contains edges points bewteen differently
         // colored regions
 
         const float COLOR_DIFF_MAX =
-            0.15;  // 1/(100%) maximun distance from 50 % //0.15
+            0.10;  // 1/(100%) maximun distance from 50 % //0.15
         const int NEIGHBORHS_MIN = 2;  // 2
         float radius = 0.04;           // 0.035
 
@@ -562,14 +563,16 @@ class PointcloudProcessor {
         std::vector<int> pointIdxRadiusSearch;
         std::vector<float> pointRadiusSquaredDistance;
 
-        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::PointIndices::Ptr inliers_blue(new pcl::PointIndices());
+        pcl::PointIndices::Ptr inliers_yellow(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
         for (int i = 0; i < (*cloud).size(); i++) {
             searchPoint.x = cloud->points[i].x;
             searchPoint.y = cloud->points[i].y;
             searchPoint.z = 0;
 
-            int number_of_color = 0;
+            int number_of_blue_color = 0;
+            int number_of_yellow_color = 0;
             int nuber_of_not_color = 0;
 
             if (kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch,
@@ -581,35 +584,52 @@ class PointcloudProcessor {
                     uint8_t gp = (rgb >> 8) & 0x0000ff;
                     uint8_t bp = (rgb)&0x0000ff;
 
-                    if (r == rp && g == gp && b == bp) {
-                        number_of_color++;
+                    if (0 == rp && 0 == gp && 255 == bp) {
+                        number_of_blue_color++;
+                    } else if (255 == rp && 255 == gp && 0 == bp) {
+                        number_of_yellow_color++;
                     } else {
                         nuber_of_not_color++;
                     }
                 }
             }
 
-            float ratio =
-                (float)number_of_color / (number_of_color + nuber_of_not_color);
-            if (ratio > 0.5 - COLOR_DIFF_MAX && ratio < 0.5 + COLOR_DIFF_MAX &&
-                (number_of_color + nuber_of_not_color) > NEIGHBORHS_MIN) {
-                // These points are on an edge
-                inliers->indices.push_back(i);
+            int sum_of_points = (number_of_blue_color + number_of_yellow_color +
+                                 nuber_of_not_color);
+
+            float ratio_blue = (float)number_of_blue_color / sum_of_points;
+            float ratio_yellow = (float)number_of_yellow_color / sum_of_points;
+
+            if (ratio_blue > 0.5 - COLOR_DIFF_MAX &&
+                ratio_blue < 0.5 + COLOR_DIFF_MAX &&
+                sum_of_points > NEIGHBORHS_MIN) {
+                // These points are on an edge and belog to a blue goal
+                inliers_blue->indices.push_back(i);
+            } else if (ratio_yellow > 0.5 - COLOR_DIFF_MAX &&
+                       ratio_yellow < 0.5 + COLOR_DIFF_MAX &&
+                       sum_of_points > NEIGHBORHS_MIN) {
+                // These points are on an edge and belong to a yellow goal
+                inliers_yellow->indices.push_back(i);
             }
         }
 
         extract.setInputCloud(cloud);
-        extract.setIndices(inliers);
-        extract.filter(*cloud);
+
+        extract.setIndices(inliers_blue);
+        extract.filter(*cloud_blue_out);
+
+        extract.setIndices(inliers_yellow);
+        extract.filter(*cloud_yellow_out);
     }
 
     PointCloudPtr get_goal_corners(PointCloudPtr& cloud, int r, int g, int b) {
-        // Calculate corners
+        // Calculate corners of cloud, returns cloud containing the corners
+        // marked with a point (its color is based on the input rgb values).
 
         pcl::PointCloud<PointType>::Ptr cloud_corners(
             new pcl::PointCloud<PointType>);
-            
-        if(cloud->points.size()< 5){
+
+        if (cloud->points.size() < 5) {
             return cloud_corners;
         }
         // Parameters
@@ -622,7 +642,7 @@ class PointcloudProcessor {
         double w = fabs(max_point.x - min_point.x);
         double pixel_size = 0.01;  // m
 
-        if(h <= 0 || w <= 0){
+        if (h <= 0 || w <= 0) {
             return cloud_corners;
         }
 
@@ -644,7 +664,7 @@ class PointcloudProcessor {
         }
 
         // Apply Hough Transform wiht opencv
-        int line_detection_thresh = 14;  // min number of intersecting points
+        int line_detection_thresh = 14;  // min number of intersecting points //14 works
         int resolution_of_r = 1;         // pix
         double resolution_of_angle = CV_PI / 180;  // deg
 
@@ -653,7 +673,7 @@ class PointcloudProcessor {
                        line_detection_thresh);
 
         // Calculate corner points
-        double max_deviation_from_90_deg = 1.5 * CV_PI / 180;  // rad
+        double max_deviation_from_90_deg = 1 * CV_PI / 180;  // rad
         for (size_t i = 0; i < lines.size(); i++) {
             for (size_t j = i; j < lines.size(); j++) {
                 float p1_rho = lines[i][0];
@@ -663,7 +683,7 @@ class PointcloudProcessor {
                 float p2_theta = lines[j][1];
 
                 float angle = fabs(p1_theta - p2_theta);
-                // std::cout << angle << std::endl;
+
                 if (angle < CV_PI / 2 + max_deviation_from_90_deg &&
                     angle > CV_PI / 2 - max_deviation_from_90_deg) {
                     // Two lines are roughly at 90 deg angle
@@ -703,7 +723,6 @@ class PointcloudProcessor {
                 }
             }
         }
-
         return cloud_corners;
     }
 
@@ -744,16 +763,14 @@ class PointcloudProcessor {
         edit_z_to(pointcloud_floor, 0);  // z = 0
 
         // Extract edge points based on color
-        *pointcloud_temp = *pointcloud_floor;
-        extract_edge_points(pointcloud_temp, 0, 0, 255);  // blue
-        *pointcloud_temp2 = *pointcloud_floor;
-        extract_edge_points(pointcloud_temp2, 255, 255, 0);  // yellow
+        extract_edge_points(pointcloud_floor, pointcloud_temp,
+                            pointcloud_temp2);
 
         // Get corners
         *recognized_objects +=
             *(get_goal_corners(pointcloud_temp, 0, 255, 255));  // blue -> cyan
-        *recognized_objects +=
-            *(get_goal_corners(pointcloud_temp2, 255, 140, 0));  // yellow -> orange
+        *recognized_objects += *(get_goal_corners(pointcloud_temp2, 255, 140,
+                                                  0));  // yellow -> orange
 
         // For testing
         // recognized_objects->points.clear();
@@ -766,7 +783,7 @@ class PointcloudProcessor {
         std::cout << "Took " << delta_time / std::chrono::milliseconds(1)
                   << "ms to run.\n";
 
-        //save_cloud_to_file(pointcloud_floor,
+        // save_cloud_to_file(pointcloud_floor,
         //                   "/home/cnc/Desktop/Hockey/floor1.pcd");
 
         return;  //----------------------------------------------------

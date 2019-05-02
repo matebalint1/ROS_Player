@@ -239,7 +239,7 @@ class PlayNode {
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<PointType> ec;
         ec.setClusterTolerance(0.05);  // 5cm
-        ec.setMinClusterSize(5);
+        ec.setMinClusterSize(4); // 5 previously
         ec.setMaxClusterSize(500);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
@@ -302,11 +302,16 @@ class PlayNode {
                 uint8_t alpha = ((pt->rgba >> 24) & 0xff) + 1;
                 uint32_t rgb = (pt->rgba & 0xffffff);
                 pt->rgba = ((alpha << 24) | rgb);
+                //std::cout << (int)alpha << std::endl;
             }
 
             // Remove points with value 255
-            alpha_filter(cloud, 255);
-            alpha_counter = 0;
+            //int before = cloud->points.size() ;
+            alpha_filter(cloud, NUMBER_OF_MESSAGES_IN_POINT_CLOUD / INCREASE_ALPHA_AFTER_N_MESSAGES); 
+            //int after = cloud->points.size();
+            //std::cout << "Raw Map size diff: " << (after-before) << std::endl;
+            //std::cout << "Raw Map size now: " << cloud->points.size() << std::endl;
+            alpha_counter = 1;
         } else {
             alpha_counter++;
         }
@@ -314,7 +319,9 @@ class PlayNode {
 
     void process_messages() {
         // Add new detections to map_cloud
-        *map_cloud += detected_objects_msg;
+        *temp_cloud = detected_objects_msg;
+        set_alpha(temp_cloud, 0);
+        *map_cloud += *temp_cloud;
 
         // Edit timestamps of all points
         increase_timestamp_by_one(map_cloud);
@@ -334,6 +341,8 @@ class PlayNode {
         pub_pointcloud(*temp_cloud,
                        map_raw_pub);  // raw map for debugging
 
+        
+
         got_detected_objects = false;  // reset
     }
 
@@ -341,7 +350,10 @@ class PlayNode {
 
    private:
     bool got_detected_objects;
+    const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
     const int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
+    // !! NUMBER_OF_MESSAGES_IN_POINT_CLOUD/INCREASE_ALPHA_AFTER_N_MESSAGES <= 255 !!!
+
     int alpha_counter = 0;
 
     std::unique_ptr<ros::NodeHandle> n;
