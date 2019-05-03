@@ -521,8 +521,11 @@ class PointcloudProcessor {
         // and max xyz coordinates). Finally, the objects are detectect by the
         // highlighted colors.
 
-        PointCloudPtr cloud_f(new PointCloud);
         PointCloudPtr result(new PointCloud);
+
+        if(cloud->points.size() == 0){
+            return result;
+        }
 
         // Creating the KdTree object for the search method of the extraction
         pcl::search::KdTree<PointType>::Ptr tree(
@@ -538,7 +541,6 @@ class PointcloudProcessor {
         ec.setInputCloud(cloud);
         ec.extract(cluster_indices);
 
-        int j = 1;  // for debugging
         for (std::vector<pcl::PointIndices>::const_iterator it =
                  cluster_indices.begin();
              it != cluster_indices.end(); ++it) {
@@ -558,26 +560,11 @@ class PointcloudProcessor {
             //          << cloud_cluster->points.size() << " data points."
             //          << std::endl;
 
-            // result->points.push_back(is_buck_or_pole(cloud_cluster));
-
             PointType point = is_buck_or_pole(cloud_cluster);
             if (*reinterpret_cast<int*>(&point.rgb) != 0) {
                 // Add only succesfull detections (== not black points)
                 result->points.push_back(point);
             }
-
-            /* // for debugging
-            int r = j & 0b1;
-            int g = j & 0b10;
-            int b = j & 0b100;
-            int32_t rgb =
-                (static_cast<uint32_t>(r) << 16 |
-                 static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
-            for (auto& p : cloud_cluster->points) p.rgb = rgb;
-
-            *result += *cloud_cluster;
-            j++;
-            */
         }
 
         // Set header information
@@ -598,6 +585,10 @@ class PointcloudProcessor {
             0.10;  // 1/(100%) maximun distance from 50 % //0.15
         const int NEIGHBORHS_MIN = 2;  // 2
         float radius = 0.04;           // 0.035
+
+        if(cloud->points.size() == 0){
+            return;
+        }
 
         pcl::KdTreeFLANN<PointType> kdtree;
         kdtree.setInputCloud(cloud);
