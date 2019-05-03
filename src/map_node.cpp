@@ -76,9 +76,9 @@ class PlayNode {
         for (int i = 0; i < (*cloud_in).size(); i++) {
             uint32_t argb = cloud_in->points[i].rgba;
             uint8_t alpha = (argb >> 24) & 0xff;
-            uint8_t rp = (argb >> 0) & 0xff;
+            uint8_t bp = (argb >> 0) & 0xff;
             uint8_t gp = (argb >> 8) & 0xff;
-            uint8_t bp = (argb >> 16) & 0xff;
+            uint8_t rp = (argb >> 16) & 0xff;
 
             if (r == rp && g == gp && b == bp) {
                 // Use these points
@@ -310,9 +310,9 @@ class PlayNode {
         PointCloudPtr puck_and_pole_cloud = PointCloudPtr(new PointCloud);
         PointCloudPtr temp = PointCloudPtr(new PointCloud);
         
-        color_filter(cloud, temp, 0, 255, 255);  // Blue
+        color_filter(cloud, temp, 0, 255, 255);  //Cyan == Blue
         *goal_cloud = *temp;
-        color_filter(cloud, temp, 255, 140, 0);  // Yelllow
+        color_filter(cloud, temp, 255, 140, 0);  //Orange == Yelllow
         *goal_cloud += *temp;
 
         color_filter(cloud, temp, 0, 0, 255);  // Blue
