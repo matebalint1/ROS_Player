@@ -129,7 +129,7 @@ class PlayNode {
         outrem.filter(*cloud);
     }
 
-    PointType is_buck_or_pole(PointCloudPtr &cloud) {
+    PointType is_buck_or_pole_or_corner(PointCloudPtr &cloud) {
         // This method takes as input a pointcloud of a suspected pole or puck
         // locations. Returns a point containing information (x,y,z,r,g,b) of
         // the object if it fulfills the requirements. If requirement are not
@@ -255,6 +255,10 @@ class PlayNode {
 
         PointCloudPtr result(new PointCloud);
 
+        if(cloud->points.size() == 0){
+            return result;
+        }
+
         // Creating the KdTree object for the search method of the
         // extraction
         pcl::search::KdTree<PointType>::Ptr tree(
@@ -286,7 +290,7 @@ class PlayNode {
             cloud_cluster->height = 1;
             cloud_cluster->is_dense = true;
 
-            PointType point = is_buck_or_pole(cloud_cluster);
+            PointType point = is_buck_or_pole_or_corner(cloud_cluster);
             if (*reinterpret_cast<int *>(&point.rgb) != 0) {
                 // Add only succesfull detections (== not black points)
                 result->points.push_back(point);

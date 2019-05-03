@@ -673,6 +673,10 @@ class PointcloudProcessor {
 
         PointCloudPtr result(new PointCloud);
 
+        if(cloud->points.size() == 0){
+            return result;
+        }
+
         // Creating the KdTree object for the search method of the extraction
         pcl::search::KdTree<PointType>::Ptr tree(
             new pcl::search::KdTree<PointType>);
@@ -759,6 +763,8 @@ class PointcloudProcessor {
                 floor_image.at<uint8_t>(y, x, 0) = 255;
             }
         }
+
+        
 
         // Apply Hough Transform wiht opencv
         int line_detection_thresh =
