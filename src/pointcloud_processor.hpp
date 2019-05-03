@@ -558,10 +558,10 @@ class PointcloudProcessor {
             //          << cloud_cluster->points.size() << " data points."
             //          << std::endl;
 
-            //result->points.push_back(is_buck_or_pole(cloud_cluster));
+            // result->points.push_back(is_buck_or_pole(cloud_cluster));
 
             PointType point = is_buck_or_pole(cloud_cluster);
-            if (*reinterpret_cast<int *>(&point.rgb) != 0) {
+            if (*reinterpret_cast<int*>(&point.rgb) != 0) {
                 // Add only succesfull detections (== not black points)
                 result->points.push_back(point);
             }
@@ -668,7 +668,8 @@ class PointcloudProcessor {
 
     PointCloudPtr combine_close_points(PointCloudPtr cloud) {
         // This algorithm uses Euclidean Cluster Extraction to segment the cloud
-        // into regions. After segmentation the regions are saved as one cloud.
+        // into regions. After segmentation the regions are saved as one cloud
+        // to merge point clusters into points.
 
         PointCloudPtr result(new PointCloud);
 
@@ -701,10 +702,10 @@ class PointcloudProcessor {
             cloud_cluster->height = 1;
             cloud_cluster->is_dense = true;
 
-            //result->points.push_back(is_goal_corner(cloud_cluster));
+            // result->points.push_back(is_goal_corner(cloud_cluster));
 
             PointType point = is_goal_corner(cloud_cluster);
-            if (*reinterpret_cast<int *>(&point.rgb) != 0) {
+            if (*reinterpret_cast<int*>(&point.rgb) != 0) {
                 // Add only succesfull detections (== not black points)
                 result->points.push_back(point);
             }
@@ -864,12 +865,12 @@ class PointcloudProcessor {
                             pointcloud_temp2);
 
         // Get corners
-        
+
         *recognized_objects += *(combine_close_points(
             get_goal_corners(pointcloud_temp, 0, 255, 255)));  // blue -> cyan
         *recognized_objects +=
             *(combine_close_points(get_goal_corners(pointcloud_temp2, 255, 140,
-                                                   0)));  // yellow -> orange
+                                                    0)));  // yellow -> orange
 
         // For testing
         // recognized_objects->points.clear();
