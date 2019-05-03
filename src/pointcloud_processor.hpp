@@ -156,7 +156,7 @@ class PointcloudProcessor {
         conditional_filter.filter(*cloud_out);
     }*/
 
-    // Filters colors by a specific color
+    // Filters pointcloud by a specific color
     void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
                       int g, int b) {
         // Build the condition
@@ -558,7 +558,13 @@ class PointcloudProcessor {
             //          << cloud_cluster->points.size() << " data points."
             //          << std::endl;
 
-            result->points.push_back(is_buck_or_pole(cloud_cluster));
+            //result->points.push_back(is_buck_or_pole(cloud_cluster));
+
+            PointType point = is_buck_or_pole(cloud_cluster);
+            if (*reinterpret_cast<int *>(&point.rgb) != 0) {
+                // Add only succesfull detections (== not black points)
+                result->points.push_back(point);
+            }
 
             /* // for debugging
             int r = j & 0b1;
@@ -695,11 +701,13 @@ class PointcloudProcessor {
             cloud_cluster->height = 1;
             cloud_cluster->is_dense = true;
 
-            // std::cout << "PointCloud representing the Cluster: "
-            //          << cloud_cluster->points.size() << " data points."
-            //          << std::endl;
+            //result->points.push_back(is_goal_corner(cloud_cluster));
 
-            result->points.push_back(is_goal_corner(cloud_cluster));
+            PointType point = is_goal_corner(cloud_cluster);
+            if (*reinterpret_cast<int *>(&point.rgb) != 0) {
+                // Add only succesfull detections (== not black points)
+                result->points.push_back(point);
+            }
         }
 
         // Set header information
