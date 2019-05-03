@@ -477,6 +477,44 @@ class PointcloudProcessor {
         return result_point;
     }
 
+    PointType is_goal_corner(PointCloudPtr& cloud) {
+        // This method takes as input a pointcloud of a suspected goal corner.
+        // Returns a point containing information (x,y,z,r,g,b) of the object if
+        // it fulfills the requirements.
+
+        PointType result_point = PointType(0, 0, 0.2);
+
+        // Calculate metrics of the pointcloud
+        PointType min_point;
+        PointType max_point;
+        PointType centroid;
+        pcl::getMinMax3D(*cloud, min_point, max_point);
+        pcl::computeCentroid(*cloud, centroid);
+
+        double average_x = centroid.x;
+        double average_y = centroid.y;
+        double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
+                                  pow(max_point.x - min_point.x, 2));
+
+        // Check if size of the pointcloud is within the limits
+        if (!(diagonal_xy <= 0.3)) {
+            uint32_t rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
+            result_point.rgb = *reinterpret_cast<float*>(&rgb);
+            result_point.x = 0;
+            result_point.y = 0;
+
+            // size does not match -> return a black point in origo
+            return result_point;
+        }
+
+        // Returns same color as the orginal cloud
+        result_point.rgb = cloud->points[0].rgb;
+        result_point.x = average_x;
+        result_point.y = average_y;
+
+        return result_point;
+    }
+
     PointCloudPtr get_bucks_and_poles(PointCloudPtr& cloud) {
         // This algorithm uses Euclidean Cluster Extraction to segment the cloud
         // into regions. After segmentation objects are filtered by size (min
@@ -622,6 +660,56 @@ class PointcloudProcessor {
         extract.filter(*cloud_yellow_out);
     }
 
+    PointCloudPtr combine_close_points(PointCloudPtr cloud) {
+        // This algorithm uses Euclidean Cluster Extraction to segment the cloud
+        // into regions. After segmentation the regions are saved as one cloud.
+
+        PointCloudPtr result(new PointCloud);
+
+        // Creating the KdTree object for the search method of the extraction
+        pcl::search::KdTree<PointType>::Ptr tree(
+            new pcl::search::KdTree<PointType>);
+        tree->setInputCloud(cloud);
+
+        std::vector<pcl::PointIndices> cluster_indices;
+        pcl::EuclideanClusterExtraction<PointType> ec;
+        ec.setClusterTolerance(0.1);  // 2cm
+        ec.setMinClusterSize(1);
+        ec.setMaxClusterSize(100);
+        ec.setSearchMethod(tree);
+        ec.setInputCloud(cloud);
+        ec.extract(cluster_indices);
+
+        for (std::vector<pcl::PointIndices>::const_iterator it =
+                 cluster_indices.begin();
+             it != cluster_indices.end(); ++it) {
+            pcl::PointCloud<PointType>::Ptr cloud_cluster(
+                new pcl::PointCloud<PointType>);
+
+            for (std::vector<int>::const_iterator pit = it->indices.begin();
+                 pit != it->indices.end(); ++pit) {
+                cloud_cluster->points.push_back(cloud->points[*pit]);
+            }
+
+            cloud_cluster->width = cloud_cluster->points.size();
+            cloud_cluster->height = 1;
+            cloud_cluster->is_dense = true;
+
+            // std::cout << "PointCloud representing the Cluster: "
+            //          << cloud_cluster->points.size() << " data points."
+            //          << std::endl;
+
+            result->points.push_back(is_goal_corner(cloud_cluster));
+        }
+
+        // Set header information
+        result->is_dense = false;
+        result->width = 1;
+        result->height = result->points.size();
+
+        return result;
+    }
+
     PointCloudPtr get_goal_corners(PointCloudPtr& cloud, int r, int g, int b) {
         // Calculate corners of cloud, returns cloud containing the corners
         // marked with a point (its color is based on the input rgb values).
@@ -664,8 +752,9 @@ class PointcloudProcessor {
         }
 
         // Apply Hough Transform wiht opencv
-        int line_detection_thresh = 14;  // min number of intersecting points //14 works
-        int resolution_of_r = 1;         // pix
+        int line_detection_thresh =
+            14;  // min number of intersecting points //14 works
+        int resolution_of_r = 1;                   // pix
         double resolution_of_angle = CV_PI / 180;  // deg
 
         std::vector<cv::Vec2f> lines;  // will hold the results of the detection
@@ -767,10 +856,12 @@ class PointcloudProcessor {
                             pointcloud_temp2);
 
         // Get corners
+        
+        *recognized_objects += *(combine_close_points(
+            get_goal_corners(pointcloud_temp, 0, 255, 255)));  // blue -> cyan
         *recognized_objects +=
-            *(get_goal_corners(pointcloud_temp, 0, 255, 255));  // blue -> cyan
-        *recognized_objects += *(get_goal_corners(pointcloud_temp2, 255, 140,
-                                                  0));  // yellow -> orange
+            *(combine_close_points(get_goal_corners(pointcloud_temp2, 255, 140,
+                                                   0)));  // yellow -> orange
 
         // For testing
         // recognized_objects->points.clear();

@@ -239,7 +239,7 @@ class PlayNode {
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<PointType> ec;
         ec.setClusterTolerance(0.05);  // 5cm
-        ec.setMinClusterSize(4); // 5 previously
+        ec.setMinClusterSize(3); // 5 previously
         ec.setMaxClusterSize(500);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
@@ -288,7 +288,7 @@ class PlayNode {
         // the environment.
 
         // Filter outliers
-        radius_outlier_removal(cloud, 0.03, 5);
+        radius_outlier_removal(cloud, 0.03, 2); // 0.03, 5 works for pucks
 
         // Create clusters and get best estimate of object locations
         cloud = combine_measurements(cloud);
