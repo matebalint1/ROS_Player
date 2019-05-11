@@ -21,7 +21,7 @@
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
 
-const std::string IMAGE_WINDOW = "Camera image";
+//const std::string IMAGE_WINDOW = "Camera image";
 
 class PlayNode {
    public:

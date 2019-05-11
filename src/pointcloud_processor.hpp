@@ -30,6 +30,9 @@ typedef pcl::PointXYZRGB PointType;
 typedef pcl::PointCloud<PointType> PointCloud;
 typedef pcl::PointCloud<PointType>::Ptr PointCloudPtr;
 
+const std::string IMAGE_WINDOW = "Floor image";
+const std::string IMAGE_WINDOW2 = "Opencv image";
+
 class PointcloudProcessor {
    public:
     PointcloudProcessor() {
@@ -56,6 +59,10 @@ class PointcloudProcessor {
         conditional_filter = pcl::ConditionalRemoval<pcl::PointXYZRGB>();
         statistical_outlier_removal_filter =
             pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>();
+
+        cv::namedWindow(IMAGE_WINDOW);
+        cv::namedWindow(IMAGE_WINDOW2);
+        cv::moveWindow(IMAGE_WINDOW2, 200, 0);
     }
 
     ~PointcloudProcessor() {
@@ -523,7 +530,7 @@ class PointcloudProcessor {
 
         PointCloudPtr result(new PointCloud);
 
-        if(cloud->points.size() == 0){
+        if (cloud->points.size() == 0) {
             return result;
         }
 
@@ -586,7 +593,7 @@ class PointcloudProcessor {
         const int NEIGHBORHS_MIN = 2;  // 2
         float radius = 0.04;           // 0.035
 
-        if(cloud->points.size() == 0){
+        if (cloud->points.size() == 0) {
             return;
         }
 
@@ -601,7 +608,7 @@ class PointcloudProcessor {
         pcl::PointIndices::Ptr inliers_blue(new pcl::PointIndices());
         pcl::PointIndices::Ptr inliers_yellow(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
-        for (int i = 0; i < (*cloud).size(); i++) {
+        for (int i = 0; i < (*cloud).size(); i += 1) {
             searchPoint.x = cloud->points[i].x;
             searchPoint.y = cloud->points[i].y;
             searchPoint.z = 0;
@@ -657,6 +664,240 @@ class PointcloudProcessor {
         extract.filter(*cloud_yellow_out);
     }
 
+    void extract_edge_points_opencv(PointCloudPtr& cloud, double& x_offset,
+                                    double& y_offset, double pixel_size,
+                                    int marginal,
+                                    cv::Mat& floor_image_extracted_blue,
+                                    cv::Mat& floor_image_extracted_yellow) {
+        // Generate image where goal edges are extracted.
+        auto start_time = std::chrono::high_resolution_clock::now();
+
+        if (cloud->points.size() == 0) {
+            return;
+        }
+
+        // Parameters for filtering
+        const float COLOR_DIFF_MAX =
+            0.10;  // 1/(100%) maximun distance from 50 % //0.15
+        const int MAX_BLACK_PIX =
+            49;  // 17; // = sum_of_points * (0.5 - COLOR_DIFF_MAX) - 1
+        int search_radius = 3;                    // pix
+        int kernel_size = 2 * search_radius + 1;  // pix
+        int sum_of_points = kernel_size * kernel_size;
+
+        // Parameters for pointcloud -> 2D image
+        PointType max_point;
+        PointType min_point;
+        pcl::getMinMax3D(*cloud, min_point, max_point);
+        x_offset = min_point.x;  // origo of image is here
+        y_offset = min_point.y;
+        double h = fabs(max_point.y - min_point.y);
+        double w = fabs(max_point.x - min_point.x);
+        double pixel_size = 0.01;  // m
+        int marginal = 0;          // pix
+
+        if (h <= 0 || w <= 0) {
+            return;
+        }
+
+        // Image resolution
+        int h_pix = (int)round(h / pixel_size) + 2 * marginal;  // pix
+        int w_pix = (int)round(w / pixel_size) + 2 * marginal;  // pix
+
+        // Create image from pointcloud
+        cv::Mat floor_image = cv::Mat::zeros(h_pix, w_pix, CV_8UC3);
+        floor_image_extracted_blue = cv::Mat::zeros(h_pix, w_pix, CV_8UC1);
+        floor_image_extracted_yellow = cv::Mat::zeros(h_pix, w_pix, CV_8UC1);
+
+        for (int i = 0; i < (*cloud).size(); i++) {
+            int x = (int)round((cloud->points[i].x - x_offset) / pixel_size) +
+                    marginal;
+            int y = (int)round((cloud->points[i].y - y_offset) / pixel_size) +
+                    marginal;
+
+            if (x < w_pix && y < h_pix && x >= 0 && y >= 0) {
+                uint32_t rgb = *reinterpret_cast<int*>(&cloud->points[i].rgb);
+                uint8_t r = (rgb >> 16) & 0x0000ff;
+                uint8_t g = (rgb >> 8) & 0x0000ff;
+                uint8_t b = (rgb)&0x0000ff;
+                floor_image.at<cv::Vec3b>(y, x, 0) = cv::Vec3b(b, g, r);
+            }
+        }
+        // imwrite("/home/cnc/Desktop/ResultImage.png", floor_image);
+
+        // Extract edges
+        for (int x = 0; x < floor_image.cols - kernel_size; x++) {
+            for (int y = 0; y < floor_image.rows - kernel_size; y++) {
+                int number_of_blue_color = 0;
+                int number_of_yellow_color = 0;
+                int number_of_black = 0;
+
+                // Calculate frequencies of colors
+                for (int i = x; i < x + kernel_size; i++) {
+                    for (int j = y; j < y + kernel_size; j++) {
+                        int rp = floor_image.at<cv::Vec3b>(j, i)[2];
+                        int gp = floor_image.at<cv::Vec3b>(j, i)[1];
+                        int bp = floor_image.at<cv::Vec3b>(j, i)[0];
+
+                        if (0 == rp && 0 == gp && 255 == bp) {
+                            number_of_blue_color++;
+                        } else if (255 == rp && 255 == gp && 0 == bp) {
+                            number_of_yellow_color++;
+                        } else if (0 == rp && 0 == gp && 0 == bp) {
+                            number_of_black++;
+                        }
+                    }
+                }
+
+                float sum_of_valid_points = sum_of_points - number_of_black;
+                float ratio_blue =
+                    (float)number_of_blue_color / sum_of_valid_points;
+                float ratio_yellow =
+                    (float)number_of_yellow_color / sum_of_valid_points;
+
+                if (ratio_blue > 0.5 - COLOR_DIFF_MAX &&
+                    ratio_blue < 0.5 + COLOR_DIFF_MAX &&
+                    number_of_black < MAX_BLACK_PIX) {
+                    // These points are on an edge and belog to a blue goal
+                    floor_image_extracted_blue.at<uint8_t>(
+                        y + search_radius, x + search_radius, 0) = 255;
+
+                } else if (ratio_yellow > 0.5 - COLOR_DIFF_MAX &&
+                           ratio_yellow < 0.5 + COLOR_DIFF_MAX &&
+                           number_of_black < MAX_BLACK_PIX) {
+                    // These points are on an edge and belong to a yellow goal
+                    floor_image_extracted_yellow.at<uint8_t>(
+                        y + search_radius, x + search_radius, 0) = 255;
+                }
+            }
+        }
+        // Calculate used time
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto delta_time = end_time - start_time;
+        std::cout << "Took opencv " << delta_time / std::chrono::milliseconds(1)
+                  << "ms to run.\n";
+        // imwrite("/home/cnc/Desktop/edgesblue.png",
+        // floor_image_extracted_blue);
+        // imwrite("/home/cnc/Desktop/edgesyellow.png",
+        //        floor_image_extracted_yellow);
+
+        cv::Mat combined;
+        cv::Mat combined2;
+        cv::Mat rgb_blue;
+        cvtColor(floor_image_extracted_blue, rgb_blue, cv::COLOR_GRAY2RGB);
+        cv::Mat rgb_yellow;
+        cvtColor(floor_image_extracted_yellow, rgb_yellow, cv::COLOR_GRAY2RGB);
+
+        cv::hconcat(floor_image, rgb_blue, combined);
+        cv::hconcat(combined, rgb_yellow, combined2);
+        cv::imshow(IMAGE_WINDOW2, combined2);
+    }
+
+    PointCloudPtr get_goal_corners_opencv(cv::Mat& edge_image, double x_offset,
+                                          double y_offset, double pixel_size,
+                                          int marginal, int r, int g, int b) {
+        // Calculate corners of edge_image, returns cloud containing the
+        // corners marked with a point (its color is based on the input rgb
+        // values).
+
+        pcl::PointCloud<PointType>::Ptr cloud_corners(
+            new pcl::PointCloud<PointType>);
+        cv::Mat floor_result =
+            cv::Mat::zeros(edge_image.rows, edge_image.cols, CV_8UC1);
+
+        // Apply Hough Transform wiht opencv
+        int line_detection_thresh =
+            30;  // min number of intersecting points //14 works
+        int resolution_of_r = 1;                         // pix
+        double resolution_of_angle = CV_PI / 180 * 0.5;  // deg
+
+        std::vector<cv::Vec2f> lines;  // will hold the results of the detection
+        cv::HoughLines(edge_image, lines, resolution_of_r, resolution_of_angle,
+                       line_detection_thresh);
+
+        // Draw lines on the image
+        for (size_t i = 0; i < lines.size(); i++) {
+            // cv::Vec4i l = lines[i];
+            // line(floor_result, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]),
+            // cv::Scalar(255, 0, 0), 1, CV_AA);
+
+            float rho = lines[i][0], theta = lines[i][1];
+            cv::Point pt1, pt2;
+            double a = cos(theta), b = sin(theta);
+            double x0 = a * rho, y0 = b * rho;
+            pt1.x = cvRound(x0 + 1000 * (-b));
+            pt1.y = cvRound(y0 + 1000 * (a));
+            pt2.x = cvRound(x0 - 1000 * (-b));
+            pt2.y = cvRound(y0 - 1000 * (a));
+            line(floor_result, pt1, pt2, cv::Scalar(255, 0, 0), 1, CV_AA);
+        }
+
+        // Calculate corner points
+        double max_deviation_from_90_deg = 1 * CV_PI / 180;  // rad
+        for (size_t i = 0; i < lines.size(); i++) {
+            for (size_t j = i; j < lines.size(); j++) {
+                float p1_rho = lines[i][0];
+                float p1_theta = lines[i][1];
+
+                float p2_rho = lines[j][0];
+                float p2_theta = lines[j][1];
+
+                float angle = fabs(p1_theta - p2_theta);
+
+                if (angle < CV_PI / 2 + max_deviation_from_90_deg &&
+                    angle > CV_PI / 2 - max_deviation_from_90_deg) {
+                    // Two lines are roughly at 90 deg angle
+                    // Calculate the coordinates of the crossing
+                    double x;
+                    double y;
+                    /*
+                    double d2 = (cos(p1_theta) * cos(p2_theta) * p2_rho
+                                + sin(p1_theta) * sin(p2_theta) * p2_rho -
+                    p1_rho/ (cos(p1_theta) * sin(p2_theta) - sin(p1_theta) *
+                    cos(p2_theta)));
+
+                    x = p2_rho * cos(p2_theta) + d2 * cos(p2_theta + CV_PI/2);
+                    y = p2_rho * sin(p2_theta) + d2 * sin(p2_theta + CV_PI/2);
+                    */
+                    double a1 = cos(p1_theta);
+                    double b1 = sin(p1_theta);
+                    double a2 = cos(p2_theta);
+                    double b2 = sin(p2_theta);
+                    double det = a1 * b2 - b1 * a2;
+                    if (det != 0 && p1_rho != 0 && p2_rho != 0 && a1 != 0 &&
+                        a2 != 0 && b1 != 0 && b2 != 0) {
+                        x = (b1 * p2_rho - p1_rho * b2) / (-det);
+                        y = -a1 / b1 * x + p1_rho / b1;
+
+                        // Debugging:
+                        cv::Point pt1;
+                        pt1.x = cvRound(x);
+                        pt1.y = cvRound(y);
+                        circle(floor_result, pt1, 10, cv::Scalar(255, 0, 0), 1);
+
+                        PointType point;
+                        point.x = x_offset + (x - marginal) * pixel_size;
+                        point.y = y_offset + (y - marginal) * pixel_size;
+                        point.z = 0;
+
+                        uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 |
+                                        (uint32_t)b);
+                        point.rgb = *reinterpret_cast<float*>(&rgb);
+
+                        cloud_corners->points.push_back(point);
+                    }
+                }
+            }
+        }
+        cv::Mat combined;
+        cv::hconcat(edge_image, floor_result, combined);
+        cv::imshow(IMAGE_WINDOW, combined);
+        // cv::imshow(IMAGE_WINDOW2, floor_result);
+        cv::waitKey(1);
+
+        return cloud_corners;
+    }
+
     PointCloudPtr combine_close_points(PointCloudPtr cloud) {
         // This algorithm uses Euclidean Cluster Extraction to segment the cloud
         // into regions. After segmentation the regions are saved as one cloud
@@ -664,7 +905,7 @@ class PointcloudProcessor {
 
         PointCloudPtr result(new PointCloud);
 
-        if(cloud->points.size() == 0){
+        if (cloud->points.size() == 0) {
             return result;
         }
 
@@ -732,7 +973,7 @@ class PointcloudProcessor {
         double y_offset = min_point.y;
         double h = fabs(max_point.y - min_point.y);
         double w = fabs(max_point.x - min_point.x);
-        double pixel_size = 0.01;  // m
+        double pixel_size = 0.01;  // m // 0.01 works
 
         if (h <= 0 || w <= 0) {
             return cloud_corners;
@@ -744,6 +985,7 @@ class PointcloudProcessor {
 
         // Create image from pointcloud
         cv::Mat floor_image = cv::Mat::zeros(h_pix, w_pix, CV_8UC1);
+        cv::Mat floor_result = cv::Mat::zeros(h_pix, w_pix, CV_8UC1);
         for (int i = 0; i < (*cloud).size(); i++) {
             int x = (int)round((cloud->points[i].x - x_offset) / pixel_size) +
                     marginal;
@@ -755,17 +997,32 @@ class PointcloudProcessor {
             }
         }
 
-        
-
         // Apply Hough Transform wiht opencv
         int line_detection_thresh =
-            14;  // min number of intersecting points //14 works
-        int resolution_of_r = 1;                   // pix
-        double resolution_of_angle = CV_PI / 180;  // deg
+            30;  // min number of intersecting points //14 works
+        int resolution_of_r = 1;                         // pix
+        double resolution_of_angle = CV_PI / 180 * 0.5;  // deg
 
         std::vector<cv::Vec2f> lines;  // will hold the results of the detection
         cv::HoughLines(floor_image, lines, resolution_of_r, resolution_of_angle,
                        line_detection_thresh);
+
+        // Draw lines on the image
+        for (size_t i = 0; i < lines.size(); i++) {
+            // cv::Vec4i l = lines[i];
+            // line(floor_result, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]),
+            // cv::Scalar(255, 0, 0), 1, CV_AA);
+
+            float rho = lines[i][0], theta = lines[i][1];
+            cv::Point pt1, pt2;
+            double a = cos(theta), b = sin(theta);
+            double x0 = a * rho, y0 = b * rho;
+            pt1.x = cvRound(x0 + 1000 * (-b));
+            pt1.y = cvRound(y0 + 1000 * (a));
+            pt2.x = cvRound(x0 - 1000 * (-b));
+            pt2.y = cvRound(y0 - 1000 * (a));
+            line(floor_result, pt1, pt2, cv::Scalar(255, 0, 0), 1, CV_AA);
+        }
 
         // Calculate corner points
         double max_deviation_from_90_deg = 1 * CV_PI / 180;  // rad
@@ -804,6 +1061,12 @@ class PointcloudProcessor {
                         x = (b1 * p2_rho - p1_rho * b2) / (-det);
                         y = -a1 / b1 * x + p1_rho / b1;
 
+                        // Debugging:
+                        cv::Point pt1;
+                        pt1.x = cvRound(x);
+                        pt1.y = cvRound(y);
+                        circle(floor_result, pt1, 10, cv::Scalar(255, 0, 0), 1);
+
                         PointType point;
                         point.x = x_offset + (x - marginal) * pixel_size;
                         point.y = y_offset + (y - marginal) * pixel_size;
@@ -818,6 +1081,12 @@ class PointcloudProcessor {
                 }
             }
         }
+        cv::Mat combined;
+        cv::hconcat(floor_image, floor_result, combined);
+        cv::imshow(IMAGE_WINDOW, combined);
+        // cv::imshow(IMAGE_WINDOW2, floor_result);
+        cv::waitKey(1);
+
         return cloud_corners;
     }
 
@@ -831,15 +1100,25 @@ class PointcloudProcessor {
         // *********************************************
 
         // Reduce nuber of points in the pointcloud
-        voxel_grid_filter_m(cloud, pointcloud_temp2, 0.015, 5);
+        // voxel_grid_filter_m(cloud, pointcloud_temp2, 0.015, 5);
 
         // Find interesting colors in the cloud (maps specific color regions to
         // a specific color value for filtering the points later)
-        edit_colors_of_pointcloud(pointcloud_temp2);
+        // edit_colors_of_pointcloud(pointcloud_temp2);
 
         // Segment cloud into floor and not floor
-        planar_segmentation(pointcloud_temp2, pointcloud_floor,
+        // planar_segmentation(pointcloud_temp2, pointcloud_floor,
+        //                    pointcloud_not_floor);
+
+        voxel_grid_filter_m(cloud, pointcloud_temp, 0.01, 0);
+
+        planar_segmentation(pointcloud_temp, pointcloud_floor,
                             pointcloud_not_floor);
+        // voxel_grid_filter_m(pointcloud_temp2, pointcloud_not_floor, 0.015,
+        // 1);//5
+
+        edit_colors_of_pointcloud(pointcloud_floor);
+        edit_colors_of_pointcloud(pointcloud_not_floor);
 
         // *********************************************
         // Puck and Pole recognition
@@ -861,24 +1140,35 @@ class PointcloudProcessor {
         extract_edge_points(pointcloud_floor, pointcloud_temp,
                             pointcloud_temp2);
 
-        // Get corners
+        double x_offset = 0;
+        double y_offset = 0;
+        double pixel_size = 0.01;  // m
+        int marginal = 0;          // pix
+        cv::Mat floor_blue_edges;
+        cv::Mat floor_Yellow_edges;
+        extract_edge_points_opencv(pointcloud_floor, x_offset, y_offset,
+                                   pixel_size, marginal, floor_blue_edges,
+                                   floor_Yellow_edges);
 
+        get_goal_corners_opencv(floor_blue_edges, );
+
+        // Get corners
         *recognized_objects += *(combine_close_points(
             get_goal_corners(pointcloud_temp, 0, 255, 255)));  // blue -> cyan
         *recognized_objects +=
             *(combine_close_points(get_goal_corners(pointcloud_temp2, 255, 140,
                                                     0)));  // yellow -> orange
 
+        // Calculate used time
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto delta_time = end_time - start_time;
+        std::cout << "Took total " << delta_time / std::chrono::milliseconds(1)
+                  << "ms to run.\n";
+
         // For testing
         // recognized_objects->points.clear();
         //*recognized_objects += *pointcloud_temp;
         //*recognized_objects += *pointcloud_temp2;
-
-        // Calculate used time
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto delta_time = end_time - start_time;
-        std::cout << "Took " << delta_time / std::chrono::milliseconds(1)
-                  << "ms to run.\n";
 
         // save_cloud_to_file(pointcloud_floor,
         //                   "/home/cnc/Desktop/Hockey/floor1.pcd");
