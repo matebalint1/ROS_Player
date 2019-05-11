@@ -31,7 +31,7 @@ typedef pcl::PointCloud<PointType> PointCloud;
 typedef pcl::PointCloud<PointType>::Ptr PointCloudPtr;
 
 const std::string IMAGE_WINDOW = "Floor image";
-const std::string IMAGE_WINDOW2 = "Opencv image";
+const std::string IMAGE_WINDOW2 = "Opencv edge image";
 
 class PointcloudProcessor {
    public:
@@ -48,11 +48,6 @@ class PointcloudProcessor {
         pointcloud_not_floor_green = PointCloudPtr(new PointCloud);
         pointcloud_not_floor_blue = PointCloudPtr(new PointCloud);
         pointcloud_not_floor_yellow = PointCloudPtr(new PointCloud);
-
-        // pointcloud_puck_model = PointCloudPtr(new PointCloud);
-        // pointcloud_pole_model = PointCloudPtr(new PointCloud);
-        // generate_puck_pointcloud(pointcloud_puck_model);
-        // generate_pole_pointcloud(pointcloud_pole_model);
 
         pass_through_filter = pcl::PassThrough<pcl::PointXYZRGB>();
         voxel_grid_filter = pcl::VoxelGrid<pcl::PointXYZRGB>();
@@ -71,29 +66,30 @@ class PointcloudProcessor {
 
     int get_color_group(uint8_t r, uint8_t g, uint8_t b) {
         // This method determines if a pixel belongs to a green, a yellow or a
-        // blue buck or goal.
+        // blue buck or goal. The 3D regions in RGB space are determined
+        // manually from sample images using a python script for visualising.
 
-        // Green pucks
+        // Green poles
         if (r >= -0.15 * b + 62 && r <= 0.15 * b + 100 &&
             g >= 1.1 * b + 0.3 * r - 15 && g <= 0.48 * b + 147 &&
             b >= 0.4 * r + 25 && b <= -0.2 * r + 210) {
             return 2;
         }
 
-        // Blue pucks
+        // Blue pucks and goals
         if (r >= 82 && r <= 240 && r >= -2 * b + 450 &&
             g >= 0.9 * b + 0.2 * r - 33 && g <= 0.9 * b + 45 && b >= r + 48 &&
             b <= 0.1 * r + 240) {
             return 3;
         }
 
-        // Yellow pucks
+        // Yellow pucks and goals
         if (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
             g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235) {
             return 1;
         }
 
-        // Reserved values for filtering colors
+        // Reserved values for filtering colors (highlighting)
         if ((r == 255 && g == 255 && b == 0) ||
             (r == 0 && g == 255 && b == 0) || (r == 0 && g == 00 && b == 255)) {
             return 4;
@@ -160,6 +156,10 @@ class PointcloudProcessor {
     }
 
     void edit_colors_of_pointcloud(PointCloudPtr& cloud) {
+        // This function highlight intereseting colors of the pointcloud. For
+        // example, all yellow colors that belong to yellow pucks and goals are
+        // mapper to a RGB value of (255,255,0).
+
         for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
             uint32_t rgb = *reinterpret_cast<int*>(&pt->rgb);
             uint8_t r = (rgb >> 16) & 0x0000ff;
@@ -204,7 +204,8 @@ class PointcloudProcessor {
     void planar_segmentation(PointCloudPtr& cloud_in,
                              PointCloudPtr& cloud_inliers_out,
                              PointCloudPtr& cloud_outliers_out) {
-        // Used to find planar surfaces from a point cloud
+        // Used to find planar surfaces from a point cloud. Useful for removing
+        // floor from pointcloud.
 
         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
@@ -343,6 +344,7 @@ class PointcloudProcessor {
     }
 
     void edit_z_to(PointCloudPtr& cloud, double z) {
+        // Set z value of all points to a specific value.
         for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
             pt->z = z;
         }
@@ -541,8 +543,7 @@ class PointcloudProcessor {
     void extract_edge_points(PointCloudPtr& cloud,
                              PointCloudPtr& cloud_blue_out,
                              PointCloudPtr& cloud_yellow_out) {
-        // Edits pointcloud so that it contains edges points bewteen differently
-        // colored regions
+        // This function extracts edge points of the goals. Quite slow.
 
         const float COLOR_DIFF_MAX =
             0.10;  // 1/(100%) maximun distance from 50 % //0.15
@@ -625,7 +626,9 @@ class PointcloudProcessor {
                                     int marginal,
                                     cv::Mat& floor_image_extracted_blue,
                                     cv::Mat& floor_image_extracted_yellow) {
-        // This function extracts goal edges to corresponding images
+        // This function extracts goal edges to corresponding images. A bit
+        // faster than the pcl version.
+
         // auto start_time = std::chrono::high_resolution_clock::now();
 
         if (cloud->points.size() == 0) {
@@ -736,7 +739,7 @@ class PointcloudProcessor {
         // imwrite("/home/cnc/Desktop/edgesyellow.png",
         //        floor_image_extracted_yellow);
 
-        /*
+        /* // Visualisation for debugging
                 cv::Mat combined;
                 cv::Mat combined2;
                 cv::Mat rgb_blue;
@@ -768,21 +771,22 @@ class PointcloudProcessor {
         cv::Mat floor_result =
             cv::Mat::zeros(edge_image.rows, edge_image.cols, CV_8UC1);
 
-        // Apply Hough Transform wiht opencv
+        // Apply Hough Transform with opencv
 
-        // Parameters hough transform
+        // Parameters of the hough transform
         int line_detection_thresh =
             25;  // min number of intersecting points //30 works
         int resolution_of_r = 1;                         // pix
         double resolution_of_angle = CV_PI / 180 * 0.5;  // rad
         double max_deviation_from_90_deg =
-            1 * CV_PI / 180;  // rad, for corner detection
+            1 * CV_PI / 180;  // rad, for 90 deg corner detection
 
         std::vector<cv::Vec2f> lines;  // will hold the results of the detection
         cv::HoughLines(edge_image, lines, resolution_of_r, resolution_of_angle,
                        line_detection_thresh);
 
-        // Draw lines on the image
+        /*
+        // Draw lines on the image for visualisation and debugging
         for (size_t i = 0; i < lines.size(); i++) {
             float rho = lines[i][0], theta = lines[i][1];
             cv::Point pt1, pt2;
@@ -793,7 +797,7 @@ class PointcloudProcessor {
             pt2.x = cvRound(x0 - 1000 * (-b));
             pt2.y = cvRound(y0 - 1000 * (a));
             line(floor_result, pt1, pt2, cv::Scalar(255, 0, 0), 1, CV_AA);
-        }
+        }*/
 
         // Calculate corner points
         for (size_t i = 0; i < lines.size(); i++) {
@@ -978,10 +982,6 @@ class PointcloudProcessor {
 
         // Draw lines on the image
         for (size_t i = 0; i < lines.size(); i++) {
-            // cv::Vec4i l = lines[i];
-            // line(floor_result, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]),
-            // cv::Scalar(255, 0, 0), 1, CV_AA);
-
             float rho = lines[i][0], theta = lines[i][1];
             cv::Point pt1, pt2;
             double a = cos(theta), b = sin(theta);
@@ -1104,7 +1104,7 @@ class PointcloudProcessor {
         // Goal recognition
         // *********************************************
 
-        // OpenCV:*******************************************
+        // OpenCV goals ~250 ms:*******************************************
         double x_offset = 0;
         double y_offset = 0;
         double pixel_size = 0.01;  // m
@@ -1125,7 +1125,7 @@ class PointcloudProcessor {
                                     pixel_size, marginal, 255, 140, 0),
             is_goal_corner, 0.1, 1, 100));
 
-        // PCL:***********************************************
+        // PCL goals ~300 ms:***********************************************
         /*
         edit_z_to(pointcloud_floor, 0);  // z = 0
 
@@ -1146,14 +1146,6 @@ class PointcloudProcessor {
         auto delta_time = end_time - start_time;
         std::cout << "Took total " << delta_time / std::chrono::milliseconds(1)
                   << "ms to run.\n";
-
-        // For testing
-        // recognized_objects->points.clear();
-        //*recognized_objects += *pointcloud_temp;
-        //*recognized_objects += *pointcloud_temp2;
-
-        // save_cloud_to_file(pointcloud_floor,
-        //                   "/home/cnc/Desktop/Hockey/floor1.pcd");
 
         return;  //----------------------------------------------------
         // Testing stuff:
@@ -1212,7 +1204,4 @@ class PointcloudProcessor {
     PointCloudPtr pointcloud_not_floor_yellow;
 
     PointCloudPtr recognized_objects;
-
-    // PointCloudPtr pointcloud_puck_model;
-    // PointCloudPtr pointcloud_pole_model;
 };

@@ -21,8 +21,6 @@
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
 
-//const std::string IMAGE_WINDOW = "Camera image";
-
 class PlayNode {
    public:
     PlayNode(int argc, char **argv) {
@@ -108,14 +106,6 @@ class PlayNode {
 
         msg->height = cloud.height;
         msg->width = cloud.width;
-
-        /*
-        pcl::PointXYZRGB p (1.0, 2.0, 3.0);
-        uint8_t r = 255, g = 255, b = 0;    // Example: Red color
-        uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
-        p.rgb = *reinterpret_cast<float*>(&rgb);
-        msg->points.push_back (p);
-        */
         msg->points = cloud.points;
 
         kinect_pub.publish(msg);
@@ -204,16 +194,14 @@ class PlayNode {
 
 int main(int argc, char **argv) {
     PlayNode playNode(argc, argv);
-    // cv::namedWindow(IMAGE_WINDOW);
 
-    // 20 Hz loop
-    ros::Rate r(20);
+    // 30 Hz loop
+    ros::Rate r(30);
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
 
         if (playNode.got_messages()) {
             playNode.process_messages();
-            // playNode.show_image();
         }
 
         // Need to run spinOnce to get the callback functions to run. This

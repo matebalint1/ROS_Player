@@ -37,9 +37,6 @@ class PlayNode {
         map_cloud = PointCloudPtr(new PointCloud);
         temp_cloud = PointCloudPtr(new PointCloud);
 
-        // tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
-        // tf_listener = new tf2_ros::TransformListener(*tfBuffer);
-
         ROS_INFO("Waiting for pointcloud_node/detected_objects");
         ros::topic::waitForMessage<PointCloud>(
             "pointcloud_node/detected_objects");
@@ -68,9 +65,9 @@ class PlayNode {
         pub.publish(msg);
     }
 
-    // Filters pointcloud by a specific color
     void color_filter(PointCloudPtr &cloud_in, PointCloudPtr &cloud_out, int r,
                       int g, int b) {
+        // Filters pointcloud by a specific color
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
         for (int i = 0; i < (*cloud_in).size(); i++) {
@@ -87,14 +84,16 @@ class PlayNode {
         }
         extract.setInputCloud(cloud_in);
         extract.setIndices(inliers);
-        // extract.setNegative(true);
         extract.filter(*cloud_out);
     }
 
-    // Get points with an alpha value smaller than given alpha
     void alpha_filter(PointCloudPtr &cloud, uint8_t max_alpha) {
+        // Get points with an alpha value smaller than given alpha = removes too
+        // large alpha values.
+
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
+
         for (int i = 0; i < (*cloud).size(); i++) {
             uint32_t argb = cloud->points[i].rgba;
             uint8_t alpha = (argb >> 24) & 0xff;
@@ -111,6 +110,7 @@ class PlayNode {
     }
 
     void set_alpha(PointCloudPtr &cloud, int alpha) {
+        // Set alpha value to a specific value
         for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
             uint8_t alpha2 = alpha;
             uint32_t rgb = (pt->rgba & 0xffffff);
@@ -131,10 +131,10 @@ class PlayNode {
 
     PointType is_buck_or_pole_or_corner(PointCloudPtr &cloud) {
         // This method takes as input a pointcloud of a suspected pole or puck
-        // locations. Returns a point containing information (x,y,z,r,g,b) of
-        // the object if it fulfills the requirements. If requirement are not
-        // fulfilled, a black point in origo will be returned.
-
+        // or corner locations. Returns a point containing information
+        // (x,y,z,r,g,b) of the object if it fulfills the requirements. If
+        // requirement are not fulfilled, a black point will be
+        // returned.
 
         PointType result_point = PointType();
         result_point.x = 0;
@@ -179,8 +179,7 @@ class PlayNode {
                                        int max_cluster_size = 1000) {
         // This algorithm uses Euclidean Cluster Extraction to segment
         // the cloud into regions. After segmentation objects are
-        // filtered by size (min and max xy coordinates). Finally, the
-        // objects are detectect by the highlighted colors.
+        // classified with the is_buck_or_pole_or_corner function.
 
         PointCloudPtr result(new PointCloud);
 
@@ -196,14 +195,13 @@ class PlayNode {
 
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<PointType> ec;
-        ec.setClusterTolerance(cluster_tolerance);  // 5cm
-        ec.setMinClusterSize(min_cluster_size);     // 5 previously
+        ec.setClusterTolerance(cluster_tolerance);
+        ec.setMinClusterSize(min_cluster_size);
         ec.setMaxClusterSize(max_cluster_size);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
         ec.extract(cluster_indices);
 
-        // int j = 1;
         for (std::vector<pcl::PointIndices>::const_iterator it =
                  cluster_indices.begin();
              it != cluster_indices.end(); ++it) {
@@ -271,7 +269,7 @@ class PlayNode {
         *cloud += *combine_measurements(puck_and_pole_cloud);
     }*/
 
-    void increase_timestamp_by_one(PointCloudPtr &cloud) {
+    /*void increase_timestamp_by_one(PointCloudPtr &cloud) {
         // Update current map_cloud and remove old stuff
         if (alpha_counter >= INCREASE_ALPHA_AFTER_N_MESSAGES) {
             // Increase alpha by one
@@ -279,7 +277,6 @@ class PlayNode {
                 uint8_t alpha = ((pt->rgba >> 24) & 0xff) + 1;
                 uint32_t rgb = (pt->rgba & 0xffffff);
                 pt->rgba = ((alpha << 24) | rgb);
-                // std::cout << (int)alpha << std::endl;
             }
 
             // Remove points with value 255
@@ -294,9 +291,12 @@ class PlayNode {
         } else {
             alpha_counter++;
         }
-    }
+    }*/
 
     float get_main_rgb_value(PointCloudPtr &cloud, int color_threshold = 1) {
+        // This function retruns the most common color in the point cloud. Only
+        // 5 different highlighted colors are counted.
+
         // Calculate values for colors
         uint32_t rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
         float c_yellow = *reinterpret_cast<float *>(&rgb);
@@ -323,9 +323,10 @@ class PlayNode {
         int yellow_points = 0;
         int cyan_points = 0;    // blue goals
         int orange_points = 0;  // yellow goals
+
         for (auto pt = cloud->begin(); pt < cloud->end(); pt++) {
             uint32_t pt_rgb = *reinterpret_cast<int *>(&pt->rgba) & 0xffffff;
-            // std::cout << std::hex << pt_rgb << std::endl;
+
             if (pt_rgb == yellow) {
                 yellow_points++;
             } else if (pt_rgb == green) {
@@ -338,15 +339,17 @@ class PlayNode {
                 orange_points++;
             }
         }
+
+        // A vector is used for finding the max value
         std::vector<int> colors{blue_points, green_points, yellow_points,
                                 cyan_points, orange_points};
 
         // Determine to which catecory the object belongs to
-        float choosen_color = c_black;
         int max_frequency_index =
             std::max_element(colors.begin(), colors.end()) - colors.begin();
         int num_of_max_color = *std::max_element(colors.begin(), colors.end());
 
+        float choosen_color = c_black;
         if (num_of_max_color > color_threshold) {
             if (max_frequency_index == 0) {
                 // Blue
@@ -364,16 +367,20 @@ class PlayNode {
                 // Yellow goal
                 choosen_color = c_orange;
             } else {
-                // Put unknown objects
+                // Unknown objects
             }
         }
         return choosen_color;
     }
 
-    void repair_map(PointCloudPtr &cloud, double cluster_tolerance = 0.05,
+    void update_map(PointCloudPtr &cloud, double cluster_tolerance = 0.05,
                     int min_cluster_size = 3, int max_cluster_size = 1000) {
-        // This algorithm uses Euclidean Cluster Extraction to segment
-        // the cloud into regions. After segmentation objects ???
+        // This function updates the current map_cloud it uses Euclidean Cluster
+        // Extraction to segment the cloud into cluster. Too big clusters are
+        // removed and replaced with a single point. Clusters with only one
+        // point are time stamped (alpha value) and on each call their time
+        // stamp is increased by one (eventually they will be removed if no
+        // other detections nearby occur).
 
         PointCloudPtr new_points(new PointCloud);
         pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());
@@ -433,7 +440,7 @@ class PlayNode {
                 cloud->points[index].rgba = argb;
 
             } else if (diagonal_xy > 0.2 || cluster_size > 20) {
-                // Remove these cluster points and add one point indstead
+                // Remove these cluster points and replace it with a single point
                 PointType new_point;
                 new_point.x = average_x;
                 new_point.y = average_y;
@@ -469,6 +476,7 @@ class PlayNode {
         // -------------------------------------------------------
         // Update and add new data to map_cloud
         // -------------------------------------------------------
+
         // Add new detections to map_cloud
         *temp_cloud = detected_objects_msg;
         set_alpha(temp_cloud, 0);
@@ -479,9 +487,9 @@ class PlayNode {
         PointCloudPtr puck_and_pole_cloud = PointCloudPtr(new PointCloud);
         PointCloudPtr temp = PointCloudPtr(new PointCloud);
 
-        color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue
+        color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
         *goal_cloud = *temp;
-        color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow
+        color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow goal
         *goal_cloud += *temp;
 
         color_filter(map_cloud, temp, 0, 0, 255);  // Blue
@@ -492,8 +500,8 @@ class PlayNode {
         *puck_and_pole_cloud += *temp;
 
         // Remove big clusters from and update time stamp of individual points
-        repair_map(puck_and_pole_cloud, 0.1, 1, 10000);
-        repair_map(goal_cloud, 0.1, 1, 10000);
+        update_map(puck_and_pole_cloud, 0.1, 1, 10000);
+        update_map(goal_cloud, 0.1, 1, 10000);
 
         // Remove old points
         alpha_filter(puck_and_pole_cloud, 255);
@@ -507,7 +515,7 @@ class PlayNode {
         temp_cloud = combine_measurements(goal_cloud, 0.1, 1, 1000);
 
         // Pucks and Poles:
-        *temp_cloud += *combine_measurements(puck_and_pole_cloud, 0.1, 1, 1000);
+        *temp_cloud += *combine_measurements(puck_and_pole_cloud, 0.1, 2, 1000);
 
         // -------------------------------------------------------
         // Publish and prepare for next iteration
@@ -535,20 +543,17 @@ class PlayNode {
 
    private:
     bool got_detected_objects;
-    const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
-    const int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
+    //const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
+    //onst int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
     // !! NUMBER_OF_MESSAGES_IN_POINT_CLOUD/INCREASE_ALPHA_AFTER_N_MESSAGES <=
     // 255 !!!
 
-    int alpha_counter = 0;
+    //int alpha_counter = 0;
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber detected_objects;
     ros::Publisher map_pub;
     ros::Publisher map_raw_pub;
-
-    // tf2_ros::Buffer *tfBuffer;
-    // tf2_ros::TransformListener *tf_listener;
 
     PointCloud detected_objects_msg;
     PointCloudPtr map_cloud;   // contains points of individual detections
@@ -558,8 +563,8 @@ class PlayNode {
 int main(int argc, char **argv) {
     PlayNode playNode(argc, argv);
 
-    // 20 Hz loop
-    ros::Rate r(20);
+    // 30 Hz loop
+    ros::Rate r(30);
     while (ros::ok()) {
         if (playNode.got_messages()) {
             playNode.process_messages();
