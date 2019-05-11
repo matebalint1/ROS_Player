@@ -60,9 +60,9 @@ class PointcloudProcessor {
         statistical_outlier_removal_filter =
             pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>();
 
-        cv::namedWindow(IMAGE_WINDOW);
-        cv::namedWindow(IMAGE_WINDOW2);
-        cv::moveWindow(IMAGE_WINDOW2, 200, 0);
+        // cv::namedWindow(IMAGE_WINDOW);
+        // cv::namedWindow(IMAGE_WINDOW2);
+        // cv::moveWindow(IMAGE_WINDOW2, 200, 0);
     }
 
     ~PointcloudProcessor() {
@@ -118,50 +118,6 @@ class PointcloudProcessor {
         voxel_grid_filter.setMinimumPointsNumberPerVoxel(min_n_points);
         voxel_grid_filter.filter(*cloud_out);
     }
-    /*
-    // Filters colors by range
-    void color_filter_range(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
-                            int min_r, int max_r, int min_g, int max_g,
-                            int min_b, int max_b) {
-        // Build the conditions
-        pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr color_condition(
-            new pcl::ConditionAnd<pcl::PointXYZRGB>());
-
-        color_condition->addComparison(
-            pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                new pcl::PackedRGBComparison<pcl::PointXYZRGB>(
-                    "r", pcl::ComparisonOps::GT, min_r)));
-        color_condition->addComparison(
-            pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                new pcl::PackedRGBComparison<pcl::PointXYZRGB>(
-                    "r", pcl::ComparisonOps::LT, max_r)));
-
-        color_condition->addComparison(
-            pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                new pcl::PackedRGBComparison<pcl::PointXYZRGB>(
-                    "g", pcl::ComparisonOps::GT, min_g)));
-        color_condition->addComparison(
-            pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                new pcl::PackedRGBComparison<pcl::PointXYZRGB>(
-                    "g", pcl::ComparisonOps::LT, max_g)));
-
-        color_condition->addComparison(
-            pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                new pcl::PackedRGBComparison<pcl::PointXYZRGB>(
-                    "b", pcl::ComparisonOps::GT, min_b)));
-        color_condition->addComparison(
-            pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                new pcl::PackedRGBComparison<pcl::PointXYZRGB>(
-                    "b", pcl::ComparisonOps::LT, max_b)));
-
-        // Build the filter
-        conditional_filter.setCondition(color_condition);
-        conditional_filter.setInputCloud(cloud_in);
-        conditional_filter.setKeepOrganized(true);
-
-        // Apply filter
-        conditional_filter.filter(*cloud_out);
-    }*/
 
     // Filters pointcloud by a specific color
     void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
@@ -392,7 +348,7 @@ class PointcloudProcessor {
         }
     }
 
-    PointType is_buck_or_pole(PointCloudPtr& cloud) {
+    static PointType is_buck_or_pole(PointCloudPtr& cloud) {
         // This method takes as input a pointcloud of a suspected pole or puck.
         // Returns a point containing information (x,y,z,r,g,b) of the object if
         // it fulfills the requirements. If the cloud has wrong size a black
@@ -484,7 +440,7 @@ class PointcloudProcessor {
         return result_point;
     }
 
-    PointType is_goal_corner(PointCloudPtr& cloud) {
+    static PointType is_goal_corner(PointCloudPtr& cloud) {
         // This method takes as input a pointcloud of a suspected goal corner.
         // Returns a point containing information (x,y,z,r,g,b) of the object if
         // it fulfills the requirements.
@@ -522,7 +478,7 @@ class PointcloudProcessor {
         return result_point;
     }
 
-    PointCloudPtr get_bucks_and_poles(PointCloudPtr& cloud) {
+    /*PointCloudPtr get_bucks_and_poles(PointCloudPtr& cloud) {
         // This algorithm uses Euclidean Cluster Extraction to segment the cloud
         // into regions. After segmentation objects are filtered by size (min
         // and max xyz coordinates). Finally, the objects are detectect by the
@@ -580,7 +536,7 @@ class PointcloudProcessor {
         result->height = result->points.size();
 
         return result;
-    }
+    }*/
 
     void extract_edge_points(PointCloudPtr& cloud,
                              PointCloudPtr& cloud_blue_out,
@@ -669,8 +625,8 @@ class PointcloudProcessor {
                                     int marginal,
                                     cv::Mat& floor_image_extracted_blue,
                                     cv::Mat& floor_image_extracted_yellow) {
-        // Generate image where goal edges are extracted.
-        auto start_time = std::chrono::high_resolution_clock::now();
+        // This function extracts goal edges to corresponding images
+        // auto start_time = std::chrono::high_resolution_clock::now();
 
         if (cloud->points.size() == 0) {
             return;
@@ -680,8 +636,8 @@ class PointcloudProcessor {
         const float COLOR_DIFF_MAX =
             0.10;  // 1/(100%) maximun distance from 50 % //0.15
         const int MAX_BLACK_PIX =
-            49;  // 17; // = sum_of_points * (0.5 - COLOR_DIFF_MAX) - 1
-        int search_radius = 3;                    // pix
+            17;                 // = sum_of_points * (0.5 - COLOR_DIFF_MAX) - 1
+        int search_radius = 3;  // pix
         int kernel_size = 2 * search_radius + 1;  // pix
         int sum_of_points = kernel_size * kernel_size;
 
@@ -693,8 +649,6 @@ class PointcloudProcessor {
         y_offset = min_point.y;
         double h = fabs(max_point.y - min_point.y);
         double w = fabs(max_point.x - min_point.x);
-        double pixel_size = 0.01;  // m
-        int marginal = 0;          // pix
 
         if (h <= 0 || w <= 0) {
             return;
@@ -772,25 +726,28 @@ class PointcloudProcessor {
             }
         }
         // Calculate used time
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto delta_time = end_time - start_time;
-        std::cout << "Took opencv " << delta_time / std::chrono::milliseconds(1)
-                  << "ms to run.\n";
+        // auto end_time = std::chrono::high_resolution_clock::now();
+        // auto delta_time = end_time - start_time;
+        // std::cout << "Took opencv " << delta_time /
+        // std::chrono::milliseconds(1)
+        //          << "ms to run.\n";
         // imwrite("/home/cnc/Desktop/edgesblue.png",
         // floor_image_extracted_blue);
         // imwrite("/home/cnc/Desktop/edgesyellow.png",
         //        floor_image_extracted_yellow);
 
-        cv::Mat combined;
-        cv::Mat combined2;
-        cv::Mat rgb_blue;
-        cvtColor(floor_image_extracted_blue, rgb_blue, cv::COLOR_GRAY2RGB);
-        cv::Mat rgb_yellow;
-        cvtColor(floor_image_extracted_yellow, rgb_yellow, cv::COLOR_GRAY2RGB);
+        /*
+                cv::Mat combined;
+                cv::Mat combined2;
+                cv::Mat rgb_blue;
+                cvtColor(floor_image_extracted_blue, rgb_blue,
+           cv::COLOR_GRAY2RGB); cv::Mat rgb_yellow;
+                cvtColor(floor_image_extracted_yellow, rgb_yellow,
+           cv::COLOR_GRAY2RGB);
 
-        cv::hconcat(floor_image, rgb_blue, combined);
-        cv::hconcat(combined, rgb_yellow, combined2);
-        cv::imshow(IMAGE_WINDOW2, combined2);
+                cv::hconcat(floor_image, rgb_blue, combined);
+                cv::hconcat(combined, rgb_yellow, combined2);
+                cv::imshow(IMAGE_WINDOW2, combined2);*/
     }
 
     PointCloudPtr get_goal_corners_opencv(cv::Mat& edge_image, double x_offset,
@@ -802,14 +759,24 @@ class PointcloudProcessor {
 
         pcl::PointCloud<PointType>::Ptr cloud_corners(
             new pcl::PointCloud<PointType>);
+
+        if (edge_image.rows < 5) {
+            // Not enough data
+            return cloud_corners;
+        }
+
         cv::Mat floor_result =
             cv::Mat::zeros(edge_image.rows, edge_image.cols, CV_8UC1);
 
         // Apply Hough Transform wiht opencv
+
+        // Parameters hough transform
         int line_detection_thresh =
-            30;  // min number of intersecting points //14 works
+            25;  // min number of intersecting points //30 works
         int resolution_of_r = 1;                         // pix
-        double resolution_of_angle = CV_PI / 180 * 0.5;  // deg
+        double resolution_of_angle = CV_PI / 180 * 0.5;  // rad
+        double max_deviation_from_90_deg =
+            1 * CV_PI / 180;  // rad, for corner detection
 
         std::vector<cv::Vec2f> lines;  // will hold the results of the detection
         cv::HoughLines(edge_image, lines, resolution_of_r, resolution_of_angle,
@@ -817,10 +784,6 @@ class PointcloudProcessor {
 
         // Draw lines on the image
         for (size_t i = 0; i < lines.size(); i++) {
-            // cv::Vec4i l = lines[i];
-            // line(floor_result, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]),
-            // cv::Scalar(255, 0, 0), 1, CV_AA);
-
             float rho = lines[i][0], theta = lines[i][1];
             cv::Point pt1, pt2;
             double a = cos(theta), b = sin(theta);
@@ -833,7 +796,6 @@ class PointcloudProcessor {
         }
 
         // Calculate corner points
-        double max_deviation_from_90_deg = 1 * CV_PI / 180;  // rad
         for (size_t i = 0; i < lines.size(); i++) {
             for (size_t j = i; j < lines.size(); j++) {
                 float p1_rho = lines[i][0];
@@ -889,16 +851,22 @@ class PointcloudProcessor {
                 }
             }
         }
+        /*
+        // Visualisation
         cv::Mat combined;
         cv::hconcat(edge_image, floor_result, combined);
         cv::imshow(IMAGE_WINDOW, combined);
         // cv::imshow(IMAGE_WINDOW2, floor_result);
         cv::waitKey(1);
-
+        */
         return cloud_corners;
     }
 
-    PointCloudPtr combine_close_points(PointCloudPtr cloud) {
+    PointCloudPtr combine_close_points(PointCloudPtr cloud,
+                                       PointType (*classify)(PointCloudPtr&),
+                                       double cluster_tolerance = 0.1,
+                                       int min_cluster_size = 1,
+                                       int max_cluster_size = 100) {
         // This algorithm uses Euclidean Cluster Extraction to segment the cloud
         // into regions. After segmentation the regions are saved as one cloud
         // to merge point clusters into points.
@@ -916,9 +884,9 @@ class PointcloudProcessor {
 
         std::vector<pcl::PointIndices> cluster_indices;
         pcl::EuclideanClusterExtraction<PointType> ec;
-        ec.setClusterTolerance(0.1);  // 2cm
-        ec.setMinClusterSize(1);
-        ec.setMaxClusterSize(100);
+        ec.setClusterTolerance(cluster_tolerance);
+        ec.setMinClusterSize(min_cluster_size);
+        ec.setMaxClusterSize(max_cluster_size);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
         ec.extract(cluster_indices);
@@ -940,7 +908,7 @@ class PointcloudProcessor {
 
             // result->points.push_back(is_goal_corner(cloud_cluster));
 
-            PointType point = is_goal_corner(cloud_cluster);
+            PointType point = classify(cloud_cluster);
             if (*reinterpret_cast<int*>(&point.rgb) != 0) {
                 // Add only succesfull detections (== not black points)
                 result->points.push_back(point);
@@ -958,6 +926,7 @@ class PointcloudProcessor {
     PointCloudPtr get_goal_corners(PointCloudPtr& cloud, int r, int g, int b) {
         // Calculate corners of cloud, returns cloud containing the corners
         // marked with a point (its color is based on the input rgb values).
+        // PCL approach
 
         pcl::PointCloud<PointType>::Ptr cloud_corners(
             new pcl::PointCloud<PointType>);
@@ -1128,29 +1097,41 @@ class PointcloudProcessor {
         radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02, 3);
 
         // Find pucks and poles from not floor pointcoud
-        recognized_objects = get_bucks_and_poles(pointcloud_temp2);
+        recognized_objects = combine_close_points(
+            pointcloud_temp2, is_buck_or_pole, 0.03, 16, 25000);
 
         // *********************************************
         // Goal recognition
         // *********************************************
 
-        edit_z_to(pointcloud_floor, 0);  // z = 0
-
-        // Extract edge points based on color
-        extract_edge_points(pointcloud_floor, pointcloud_temp,
-                            pointcloud_temp2);
-
+        // OpenCV:*******************************************
         double x_offset = 0;
         double y_offset = 0;
         double pixel_size = 0.01;  // m
         int marginal = 0;          // pix
         cv::Mat floor_blue_edges;
-        cv::Mat floor_Yellow_edges;
+        cv::Mat floor_yellow_edges;
         extract_edge_points_opencv(pointcloud_floor, x_offset, y_offset,
                                    pixel_size, marginal, floor_blue_edges,
-                                   floor_Yellow_edges);
+                                   floor_yellow_edges);
 
-        get_goal_corners_opencv(floor_blue_edges, );
+        *recognized_objects += *(combine_close_points(
+            get_goal_corners_opencv(floor_blue_edges, x_offset, y_offset,
+                                    pixel_size, marginal, 0, 255, 255),
+            is_goal_corner, 0.1, 1, 100));
+
+        *recognized_objects += *(combine_close_points(
+            get_goal_corners_opencv(floor_yellow_edges, x_offset, y_offset,
+                                    pixel_size, marginal, 255, 140, 0),
+            is_goal_corner, 0.1, 1, 100));
+
+        // PCL:***********************************************
+        /*
+        edit_z_to(pointcloud_floor, 0);  // z = 0
+
+        // Extract edge points based on color
+        extract_edge_points(pointcloud_floor, pointcloud_temp,
+                            pointcloud_temp2);
 
         // Get corners
         *recognized_objects += *(combine_close_points(
@@ -1158,6 +1139,7 @@ class PointcloudProcessor {
         *recognized_objects +=
             *(combine_close_points(get_goal_corners(pointcloud_temp2, 255, 140,
                                                     0)));  // yellow -> orange
+        */
 
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
