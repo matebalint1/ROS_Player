@@ -11,7 +11,6 @@
 #include "cv_bridge/cv_bridge.h"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/opencv.hpp"
-
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 
@@ -87,7 +86,7 @@ int main(int argc, char **argv){
       cv::Mat cur_img = image;
       //sensor_msgs::LaserScan cur_laser = laser_msg;
 
-      
+
 
       show_image();
     }
