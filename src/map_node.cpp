@@ -373,6 +373,34 @@ class PlayNode {
         return choosen_color;
     }
 
+    uint8_t increace_single_point_alpha_by_one(PointCloudPtr &cloud,
+                                               int index) {
+        uint32_t argb = cloud->points[index].rgba;
+        uint8_t alpha = (argb >> 24) + 1;
+        argb = (alpha << 24) | (argb & 0xffffff);
+        cloud->points[index].rgba = argb;
+        return alpha;
+    }
+
+    inline void remove_and_replace_cluster(
+        std::vector<pcl::PointIndices>::const_iterator &it,
+        PointCloudPtr &cloud_cluster, PointCloudPtr &new_points,
+        pcl::PointIndices::Ptr &points_to_be_removed, double average_x,
+        double average_y) {
+        PointType new_point;
+        new_point.x = average_x;
+        new_point.y = average_y;
+        new_point.z = 0;
+        new_point.rgba = 0;
+        new_point.rgb = get_main_rgb_value(cloud_cluster, 1);
+        new_points->points.push_back(new_point);
+
+        for (std::vector<int>::const_iterator pit = it->indices.begin();
+             pit != it->indices.end(); ++pit) {
+            points_to_be_removed->indices.push_back(*pit);
+        }
+    }
+
     void update_map(PointCloudPtr &cloud, double cluster_tolerance = 0.05,
                     int min_cluster_size = 3, int max_cluster_size = 1000) {
         // This function updates the current map_cloud it uses Euclidean Cluster
@@ -381,6 +409,10 @@ class PlayNode {
         // point are time stamped (alpha value) and on each call their time
         // stamp is increased by one (eventually they will be removed if no
         // other detections nearby occur).
+
+        // Parameters
+        const uint8_t MAX_AGE_SINGLE_POINT = 255;   // Larger -> longer life
+        const uint8_t MAX_AGE_CLUSTER_POINT = 255;  // Larger -> longer life
 
         PointCloudPtr new_points(new PointCloud);
         pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());
@@ -431,27 +463,48 @@ class PlayNode {
                                       pow(max_point.x - min_point.x, 2));
 
             if (cluster_size == 1) {
-                // Increase timestamp of this single point cluster by one
+                // Increase timestamp of this single point cluster by one and if
+                // max value is reached the point is removed.
                 pcl::PointIndices ind = *it;
                 int index = ind.indices[0];
-                uint32_t argb = cloud->points[index].rgba;
-                uint8_t alpha = (argb >> 24) + 1;
-                argb = (alpha << 24) | (argb & 0xffffff);
-                cloud->points[index].rgba = argb;
+                int new_alpha_value =
+                    increace_single_point_alpha_by_one(cloud, index);
+
+                if (new_alpha_value >= MAX_AGE_SINGLE_POINT) {
+                    // Remove single points with value 255
+                    points_to_be_removed->indices.push_back(index);
+                    //std::cout << "single point removal, too old" << std::endl;
+                }
 
             } else if (diagonal_xy > 0.2 || cluster_size > 20) {
-                // Remove these cluster points and replace it with a single point
-                PointType new_point;
-                new_point.x = average_x;
-                new_point.y = average_y;
-                new_point.z = 0;
-                new_point.rgba = 0;
-                new_point.rgb = get_main_rgb_value(cloud_cluster, 1);
-                new_points->points.push_back(new_point);
+                // A too big cluster -> remove these cluster points and replace
+                // it with a single point.
+                remove_and_replace_cluster(it, cloud_cluster, new_points,
+                                           points_to_be_removed, average_x,
+                                           average_y);
+            } else {
+                // A good cluster, increase the time stamp of one puck, if all
+                // puck have a time stamp of 255 -> replace cloud with a single
+                // point. This is needed to get rid of old detections that could
+                // exist otherwise forever.
 
                 for (std::vector<int>::const_iterator pit = it->indices.begin();
                      pit != it->indices.end(); ++pit) {
-                    points_to_be_removed->indices.push_back(*pit);
+                    if ((cloud->points[*pit].rgba >> 24) <
+                        MAX_AGE_CLUSTER_POINT) {
+                        // Increase alpha value of a single point and exit the
+                        // loop.
+                        increace_single_point_alpha_by_one(cloud, *pit);
+                        break;
+
+                    } else if (pit + 1 == it->indices.end()) {
+                        // Last point -> all points have an alpha value of 255
+                        // -> remove cluster and replace with a single point.
+                        //std::cout << "remove cluster, too old" << std::endl;
+                        remove_and_replace_cluster(
+                            it, cloud_cluster, new_points, points_to_be_removed,
+                            average_x, average_y);
+                    }
                 }
             }
         }
@@ -498,14 +551,14 @@ class PlayNode {
         *puck_and_pole_cloud += *temp;
         color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
         *puck_and_pole_cloud += *temp;
+        // color_filter(map_cloud, temp, 255, 0,
+        //             255);  // Magenta == unknow clolored puck or pole
+        //*puck_and_pole_cloud += *temp;
 
-        // Remove big clusters from and update time stamp of individual points
+        // Remove too big or too old (time stamp == alpha value) clusters,
+        // increase time stamp of single points and cluster.
         update_map(puck_and_pole_cloud, 0.1, 1, 10000);
         update_map(goal_cloud, 0.1, 1, 10000);
-
-        // Remove old points
-        alpha_filter(puck_and_pole_cloud, 255);
-        alpha_filter(goal_cloud, 255);
 
         // -------------------------------------------------------
         // Create estimate of the environment
@@ -543,12 +596,12 @@ class PlayNode {
 
    private:
     bool got_detected_objects;
-    //const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
-    //onst int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
+    // const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
+    // onst int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
     // !! NUMBER_OF_MESSAGES_IN_POINT_CLOUD/INCREASE_ALPHA_AFTER_N_MESSAGES <=
     // 255 !!!
 
-    //int alpha_counter = 0;
+    // int alpha_counter = 0;
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber detected_objects;

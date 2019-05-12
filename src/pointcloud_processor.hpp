@@ -358,7 +358,13 @@ class PointcloudProcessor {
         // not fulfilled a magenta point is returned at the position of the
         // object.
 
-        int color_threshold = 5;  // min number of points in main color
+        // Detection parameters
+        const int color_threshold = 5;  // min number of points in main color // 5 works
+        const double min_z_height = 0.1;
+        const double max_z_height = 0.52;
+        const double min_diagonal_size = 0.06;
+        const double max_diagonal_size = 0.16;
+
         PointType result_point = PointType(0, 0, 0.2);
 
         // Calculate metrics of the pointcloud
@@ -374,10 +380,10 @@ class PointcloudProcessor {
                                   pow(max_point.x - min_point.x, 2));
 
         // Check if size of the pointcloud is within the limits
-        if (!(max_point.z - min_point.z >= 0.1 &&
-              max_point.z - min_point.z <= 0.52 && diagonal_xy <= 0.16 &&
-              diagonal_xy >= 0.06)) {
-            // std::cout << "too big, diagonal: " << diagonal_xy<< std::endl;
+        if (!(max_point.z - min_point.z >= min_z_height &&
+              max_point.z - min_point.z <= max_z_height &&
+              diagonal_xy <= max_diagonal_size &&
+              diagonal_xy >= min_diagonal_size)) {
             uint32_t rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
             result_point.rgb = *reinterpret_cast<float*>(&rgb);
             result_point.x = 0;
@@ -1098,7 +1104,7 @@ class PointcloudProcessor {
 
         // Find pucks and poles from not floor pointcoud
         recognized_objects = combine_close_points(
-            pointcloud_temp2, is_buck_or_pole, 0.03, 16, 25000);
+            pointcloud_temp2, is_buck_or_pole, 0.03, 16, 2500);
 
         // *********************************************
         // Goal recognition
