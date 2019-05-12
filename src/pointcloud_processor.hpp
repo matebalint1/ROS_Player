@@ -359,7 +359,8 @@ class PointcloudProcessor {
         // object.
 
         // Detection parameters
-        const int color_threshold = 5;  // min number of points in main color // 5 works
+        const int color_threshold =
+            5;  // min number of points in main color // 5 works
         const double min_z_height = 0.1;
         const double max_z_height = 0.52;
         const double min_diagonal_size = 0.06;
@@ -1065,7 +1066,52 @@ class PointcloudProcessor {
         return cloud_corners;
     }
 
-    void process_pointcloud(PointCloudPtr& cloud) {
+    void remove_edge_detections(PointCloudPtr& recognized_objects,
+                                tf::Transform transform_odom_to_baselink) {
+        // This function removes puck and pole detecions that are close to the
+        // edge of the orginal input pointcloud. The idea is to reduce false
+        // detections that occur if colors of the puck/pole are projected on the
+        // wall.
+
+        // Parameters
+        const double KINECT_FIELD_OF_VIEW_HORIZONTAL_ON_FLOOR =
+            3.1415 / 180 * 51/2;                   // 2*rad
+        const double FILTER_ZONE_WIDTH = 0.12;  // m
+
+        // Transform pointcloud to base_link tf frame
+        pcl_ros::transformPointCloud(*recognized_objects, *pointcloud_temp2,
+                                     transform_odom_to_baselink);
+
+        pcl::PointIndices::Ptr to_be_removed(new pcl::PointIndices());
+        pcl::ExtractIndices<PointType> extract;
+
+        // Check all points if they are in the edge zone and if they need to be
+        // removed
+        for (int i = 0; i < (*pointcloud_temp2).size(); i++) {
+            double x = pointcloud_temp2->points[i].x;
+            double y = pointcloud_temp2->points[i].y;
+            double r = sqrt(x * x + y * y);
+            double beta = atan2(y, x);
+
+            double distance_to_left_zone =
+                r * sin(KINECT_FIELD_OF_VIEW_HORIZONTAL_ON_FLOOR - beta);
+            double distance_to_right_zone =
+                r * sin(KINECT_FIELD_OF_VIEW_HORIZONTAL_ON_FLOOR + beta);
+
+            if (distance_to_left_zone < FILTER_ZONE_WIDTH ||
+                distance_to_right_zone < FILTER_ZONE_WIDTH) {
+                // Delete these points from recognized_objects
+                to_be_removed->indices.push_back(i);
+            }
+        }
+        extract.setInputCloud(recognized_objects);
+        extract.setIndices(to_be_removed);
+        extract.setNegative(true);
+        extract.filter(*recognized_objects);
+    }
+
+    void process_pointcloud(PointCloudPtr& cloud,
+                            tf::Transform transform_odom_to_baselink) {
         // Processes a new point cloud and extracts useful information
 
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -1105,6 +1151,8 @@ class PointcloudProcessor {
         // Find pucks and poles from not floor pointcoud
         recognized_objects = combine_close_points(
             pointcloud_temp2, is_buck_or_pole, 0.03, 16, 2500);
+
+        remove_edge_detections(recognized_objects, transform_odom_to_baselink);
 
         // *********************************************
         // Goal recognition

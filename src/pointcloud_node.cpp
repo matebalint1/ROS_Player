@@ -32,7 +32,8 @@ class PlayNode {
 
         velocity_pub =
             n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
-        kinect_pub = n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
+        kinect_pub =
+            n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
 
         // ROS_INFO("Waiting for camera image");
         // ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
@@ -101,7 +102,7 @@ class PlayNode {
 
     void pub_pointcloud(PointCloud &cloud) {
         PointCloud::Ptr msg(new PointCloud);
-        //msg->header.frame_id = "robot1/base_link";
+        // msg->header.frame_id = "robot1/base_link";
         msg->header.frame_id = "robot1/odom";
 
         msg->height = cloud.height;
@@ -111,29 +112,16 @@ class PlayNode {
         kinect_pub.publish(msg);
     }
 
-    void process_messages() {
-        // Copy the laser and image. These change whenever the callbacks
-        // run, and we don't want the data changing in the middle of
-        // processing.
-        // cv::Mat cur_img = image;
-        // sensor_msgs::LaserScan cur_laser = laser_msg;
-
-        // Copy input cloud
-        PointCloudPrt cur_kinect_in(new PointCloud(kinect_msg));
-        // Temporary pointcloud for transformation
-        PointCloudPrt cur_kinect(new PointCloud);
-
-        // Find transformation to desired frame
-        tf::Transform transform;  //(/*tf::Quaternion(0,0,0,0)*/);
+    tf::Transform get_transform(std::string goal_frame,
+                                std::string current_frame) {
+        tf::Transform transform;
         geometry_msgs::TransformStamped transformStamped;
         try {
             // Find transformation for pointcloud from the buffer
             // (*cur_kinect_in).header.frame_id ==
             // "robot1/kinect_rgb_optical_frame"
             transformStamped = tfBuffer->lookupTransform(
-                //"robot1/base_link", "robot1/kinect_rgb_optical_frame",
-                "robot1/odom", "robot1/kinect_rgb_optical_frame",
-                ros::Time(0));
+                goal_frame, current_frame, ros::Time(0));
 
             // Convert TransformStamped to Transform
             tf::Vector3 vector(transformStamped.transform.translation.x,
@@ -151,16 +139,38 @@ class PlayNode {
             ROS_ERROR("%s", ex.what());
             ros::Duration(1.0).sleep();
         }
-        // Transform pointcloud to base_link tf frame
-        pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect, transform);
+        return transform;
+    }
+
+    void process_messages() {
+        // Copy the laser and image. These change whenever the callbacks
+        // run, and we don't want the data changing in the middle of
+        // processing.
+        // cv::Mat cur_img = image;
+        // sensor_msgs::LaserScan cur_laser = laser_msg;
+
+        // Copy input cloud
+        PointCloudPrt cur_kinect_in(new PointCloud(kinect_msg));
+        // Temporary pointcloud for transformation
+        PointCloudPrt cur_kinect(new PointCloud);
+
+        // Find transformation for desired frames
+        tf::Transform transform_kinect_to_odom =
+            get_transform("robot1/odom", "robot1/kinect_rgb_optical_frame");
+        tf::Transform transform_odom_to_baselink =
+            get_transform("robot1/base_link", "robot1/odom");
+
+        // Transform pointcloud to odom tf frame
+        pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect,
+                                     transform_kinect_to_odom);
 
         // Process pointcloud
-        pointcloud_processor.process_pointcloud(cur_kinect);
+        pointcloud_processor.process_pointcloud(cur_kinect, transform_odom_to_baselink);
 
         // Publish pointcloud
         pub_pointcloud(*pointcloud_processor.get_recognized_objects());
 
-        got_kinect = false; // reset
+        got_kinect = false;  // reset
     }
 
     bool got_messages() const {
