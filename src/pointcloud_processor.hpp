@@ -201,17 +201,20 @@ class PointcloudProcessor {
         };
     }
 
-    void planar_segmentation(PointCloudPtr& cloud_in,
-                             PointCloudPtr& cloud_inliers_out,
-                             PointCloudPtr& cloud_outliers_out) {
+    bool planar_segmentation(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
+                             pcl::ModelCoefficients::Ptr& coefficients,
+                             bool get_inliers) {
         // Used to find planar surfaces from a point cloud. Useful for removing
         // floor from pointcloud.
 
-        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+        if (cloud_in->points.size() == 0) {
+            return false;
+        }
+
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
 
         // Create the segmentation object
-        pcl::SACSegmentation<pcl::PointXYZRGB> seg;
+        pcl::SACSegmentation<PointType> seg;
         // Optional
         seg.setOptimizeCoefficients(true);
         // Mandatory
@@ -222,10 +225,10 @@ class PointcloudProcessor {
         seg.setInputCloud(cloud_in);
         seg.segment(*inliers, *coefficients);
         if (inliers->indices.size() == 0) {
-            std::cerr
+            std::cout
                 << "Could not estimate a planar model for the given dataset."
                 << std::endl;
-            return;
+            return false;
         }
 
         // std::cerr << "Model coefficients: " << coefficients->values[0] << " "
@@ -233,17 +236,53 @@ class PointcloudProcessor {
         //          << " " << coefficients->values[3] << std::endl;
 
         // Create the filtering object
-        pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+        pcl::ExtractIndices<PointType> extract;
         extract.setInputCloud(cloud_in);
         extract.setIndices(inliers);
 
         // Extract the inliers
-        extract.setNegative(false);
-        extract.filter(*cloud_inliers_out);
+        extract.setNegative(!get_inliers);
+        extract.filter(*cloud_out);
 
         // Extract the outliers
-        extract.setNegative(true);
-        extract.filter(*cloud_outliers_out);
+        // extract.setNegative(true);
+        // extract.filter(*cloud_outliers_out);
+        return true;
+    }
+
+    void plane_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
+                      pcl::ModelCoefficients::Ptr& coefficients,
+                      double z_offset) {
+        // This function filters away all points below the plane given by the
+        // coefficients.
+
+        // Coefficients
+        double a = coefficients->values[0];
+        double b = coefficients->values[1];
+        double c = coefficients->values[2];
+        double d = coefficients->values[3] + z_offset;
+
+        // std::cout << a << " " << b << " " << c << " " << d << " " <<
+        // std::endl;
+
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        for (int i = 0; i < (*cloud_in).size(); i++) {
+            double x = cloud_in->points[i].x;
+            double y = cloud_in->points[i].y;
+            double z = cloud_in->points[i].z;
+
+            double res = a * x + b * y + c * z + d;
+            if (res >= 0) {
+                // Keep these points
+                inliers->indices.push_back(i);
+            }
+        }
+
+        pcl::ExtractIndices<PointType> extract;
+        extract.setInputCloud(cloud_in);
+        extract.setIndices(inliers);
+        extract.setNegative(false);
+        extract.filter(*cloud_out);
     }
 
     void radius_outlier_removal(PointCloudPtr& cloud_in,
@@ -363,7 +402,7 @@ class PointcloudProcessor {
             5;  // min number of points in main color // 5 works
         const double min_z_height = 0.1;
         const double max_z_height = 0.52;
-        const double min_diagonal_size = 0.06;
+        const double min_diagonal_size = 0.05;
         const double max_diagonal_size = 0.16;
 
         PointType result_point = PointType(0, 0, 0.2);
@@ -1075,7 +1114,7 @@ class PointcloudProcessor {
 
         // Parameters
         const double KINECT_FIELD_OF_VIEW_HORIZONTAL_ON_FLOOR =
-            3.1415 / 180 * 51/2;                   // 2*rad
+            3.1415 / 180 * 51 / 2;              // 2*rad
         const double FILTER_ZONE_WIDTH = 0.12;  // m
 
         // Transform pointcloud to base_link tf frame
@@ -1120,37 +1159,53 @@ class PointcloudProcessor {
         // Prepare pointcloud for object recognition
         // *********************************************
 
-        // Reduce nuber of points in the pointcloud
-        // voxel_grid_filter_m(cloud, pointcloud_temp2, 0.015, 5);
+        // Different voxel filtering and planar segmentations are used for goals
+        // and pucks/poles, because otherwise too much information for detection
+        // is lost from one or another.
 
-        // Find interesting colors in the cloud (maps specific color regions to
-        // a specific color value for filtering the points later)
-        // edit_colors_of_pointcloud(pointcloud_temp2);
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
 
-        // Segment cloud into floor and not floor
-        // planar_segmentation(pointcloud_temp2, pointcloud_floor,
-        //                    pointcloud_not_floor);
-
+        // For goals
         voxel_grid_filter_m(cloud, pointcloud_temp, 0.01, 0);
+        bool success = planar_segmentation(pointcloud_temp, pointcloud_floor,
+                                           coefficients, true);
 
-        planar_segmentation(pointcloud_temp, pointcloud_floor,
-                            pointcloud_not_floor);
-        // voxel_grid_filter_m(pointcloud_temp2, pointcloud_not_floor, 0.015,
-        // 1);//5
+        // For pucks and poles
+        // if (success) {
+        voxel_grid_filter_m(cloud, pointcloud_temp, 0.015, 5);
+        planar_segmentation(pointcloud_temp, pointcloud_not_floor, coefficients,
+                            false);
+        // plane_filter(pointcloud_temp, pointcloud_not_floor, coefficients,
+        //             -0.02);
+        //}
 
         edit_colors_of_pointcloud(pointcloud_floor);
         edit_colors_of_pointcloud(pointcloud_not_floor);
+
+        // Calculate used time
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto delta_time = end_time - start_time;
+        std::cout << "Took for preparations "
+                  << delta_time / std::chrono::milliseconds(1)
+                  << "ms to run.\n";
 
         // *********************************************
         // Puck and Pole recognition
         // *********************************************
 
+        // std::cout << "not floor: " << pointcloud_not_floor->points.size()
+        //          << "  floor: " << pointcloud_floor->points.size() <<
+        //          std::endl;
+
         // Remove outliers
-        radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02, 3);
+        //radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02, 3);
+
+        save_cloud_to_file(pointcloud_not_floor,
+                           "/home/cnc/Desktop/Hockey/pucks_1.pcd");
 
         // Find pucks and poles from not floor pointcoud
         recognized_objects = combine_close_points(
-            pointcloud_temp2, is_buck_or_pole, 0.03, 16, 2500);
+            pointcloud_not_floor, is_buck_or_pole, 0.03, 16, 2500);
 
         remove_edge_detections(recognized_objects, transform_odom_to_baselink);
 
@@ -1196,8 +1251,8 @@ class PointcloudProcessor {
         */
 
         // Calculate used time
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto delta_time = end_time - start_time;
+        end_time = std::chrono::high_resolution_clock::now();
+        delta_time = end_time - start_time;
         std::cout << "Took total " << delta_time / std::chrono::milliseconds(1)
                   << "ms to run.\n";
 

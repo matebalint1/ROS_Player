@@ -557,8 +557,8 @@ class PlayNode {
 
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
-        update_map(puck_and_pole_cloud, 0.1, 1, 10000);
-        update_map(goal_cloud, 0.1, 1, 10000);
+        update_map(puck_and_pole_cloud, 0.15, 1, 10000);
+        update_map(goal_cloud, 0.15, 1, 10000);
 
         // -------------------------------------------------------
         // Create estimate of the environment
