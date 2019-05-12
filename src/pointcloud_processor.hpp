@@ -56,7 +56,7 @@ class PointcloudProcessor {
             pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>();
 
         // cv::namedWindow(IMAGE_WINDOW);
-        // cv::namedWindow(IMAGE_WINDOW2);
+        //cv::namedWindow(IMAGE_WINDOW2);
         // cv::moveWindow(IMAGE_WINDOW2, 200, 0);
     }
 
@@ -402,7 +402,7 @@ class PointcloudProcessor {
             5;  // min number of points in main color // 5 works
         const double min_z_height = 0.1;
         const double max_z_height = 0.52;
-        const double min_diagonal_size = 0.05;
+        const double min_diagonal_size = 0.06;
         const double max_diagonal_size = 0.16;
 
         PointType result_point = PointType(0, 0, 0.2);
@@ -682,13 +682,12 @@ class PointcloudProcessor {
         }
 
         // Parameters for filtering
-        const float COLOR_DIFF_MAX =
-            0.10;  // 1/(100%) maximun distance from 50 % //0.15
-        const int MAX_BLACK_PIX =
-            17;                 // = sum_of_points * (0.5 - COLOR_DIFF_MAX) - 1
-        int search_radius = 3;  // pix
+        int search_radius = 2;  // pix //3 works also but slower
         int kernel_size = 2 * search_radius + 1;  // pix
         int sum_of_points = kernel_size * kernel_size;
+        const float COLOR_DIFF_MAX =
+            0.13;  // 1/(100%) maximun distance from 50 % //0.15
+        const int MAX_BLACK_PIX = 16;  // = 0.6 * sum_of_points // 30 works also
 
         // Parameters for pointcloud -> 2D image
         PointType max_point;
@@ -785,18 +784,20 @@ class PointcloudProcessor {
         // imwrite("/home/cnc/Desktop/edgesyellow.png",
         //        floor_image_extracted_yellow);
 
-        /* // Visualisation for debugging
-                cv::Mat combined;
-                cv::Mat combined2;
-                cv::Mat rgb_blue;
-                cvtColor(floor_image_extracted_blue, rgb_blue,
-           cv::COLOR_GRAY2RGB); cv::Mat rgb_yellow;
-                cvtColor(floor_image_extracted_yellow, rgb_yellow,
-           cv::COLOR_GRAY2RGB);
+        /*
+        // Visualisation for debugging
+        cv::Mat combined;
+        cv::Mat combined2;
+        cv::Mat rgb_blue;
+        cvtColor(floor_image_extracted_blue, rgb_blue, cv::COLOR_GRAY2RGB);
+        cv::Mat rgb_yellow;
+        cvtColor(floor_image_extracted_yellow, rgb_yellow, cv::COLOR_GRAY2RGB);
 
-                cv::hconcat(floor_image, rgb_blue, combined);
-                cv::hconcat(combined, rgb_yellow, combined2);
-                cv::imshow(IMAGE_WINDOW2, combined2);*/
+        cv::hconcat(floor_image, rgb_blue, combined);
+        cv::hconcat(combined, rgb_yellow, combined2);
+        cv::imshow(IMAGE_WINDOW2, combined2);
+        cv::waitKey(1);
+        */
     }
 
     PointCloudPtr get_goal_corners_opencv(cv::Mat& edge_image, double x_offset,
@@ -814,19 +815,21 @@ class PointcloudProcessor {
             return cloud_corners;
         }
 
+        /*
+        // For debugging
         cv::Mat floor_result =
             cv::Mat::zeros(edge_image.rows, edge_image.cols, CV_8UC1);
-
-        // Apply Hough Transform with opencv
+        */
 
         // Parameters of the hough transform
         int line_detection_thresh =
-            25;  // min number of intersecting points //30 works
+            25;  // min number of intersecting points //25 works
         int resolution_of_r = 1;                         // pix
         double resolution_of_angle = CV_PI / 180 * 0.5;  // rad
         double max_deviation_from_90_deg =
-            1 * CV_PI / 180;  // rad, for 90 deg corner detection
+            1 * CV_PI / 180;  // rad, for 90 deg corner detection // 1 deg works
 
+        // Apply Hough Transform with opencv
         std::vector<cv::Vec2f> lines;  // will hold the results of the detection
         cv::HoughLines(edge_image, lines, resolution_of_r, resolution_of_angle,
                        line_detection_thresh);
@@ -843,7 +846,7 @@ class PointcloudProcessor {
             pt2.x = cvRound(x0 - 1000 * (-b));
             pt2.y = cvRound(y0 - 1000 * (a));
             line(floor_result, pt1, pt2, cv::Scalar(255, 0, 0), 1, CV_AA);
-        }*/
+        }  */
 
         // Calculate corner points
         for (size_t i = 0; i < lines.size(); i++) {
@@ -859,7 +862,7 @@ class PointcloudProcessor {
                 if (angle < CV_PI / 2 + max_deviation_from_90_deg &&
                     angle > CV_PI / 2 - max_deviation_from_90_deg) {
                     // Two lines are roughly at 90 deg angle
-                    // Calculate the coordinates of the crossing
+                    // Calculate the coordinates of the intersecting point
                     double x;
                     double y;
                     /*
@@ -881,12 +884,14 @@ class PointcloudProcessor {
                         x = (b1 * p2_rho - p1_rho * b2) / (-det);
                         y = -a1 / b1 * x + p1_rho / b1;
 
-                        // Debugging:
+                        /*/ Debugging:
                         cv::Point pt1;
                         pt1.x = cvRound(x);
                         pt1.y = cvRound(y);
                         circle(floor_result, pt1, 10, cv::Scalar(255, 0, 0), 1);
+                        */
 
+                        // Intersecting point to odom frame transformation
                         PointType point;
                         point.x = x_offset + (x - marginal) * pixel_size;
                         point.y = y_offset + (y - marginal) * pixel_size;
@@ -905,8 +910,7 @@ class PointcloudProcessor {
         // Visualisation
         cv::Mat combined;
         cv::hconcat(edge_image, floor_result, combined);
-        cv::imshow(IMAGE_WINDOW, combined);
-        // cv::imshow(IMAGE_WINDOW2, floor_result);
+        cv::imshow(IMAGE_WINDOW2, combined);
         cv::waitKey(1);
         */
         return cloud_corners;
@@ -1096,12 +1100,13 @@ class PointcloudProcessor {
                 }
             }
         }
+        /* // For debugging hough transform, visualisation
         cv::Mat combined;
         cv::hconcat(floor_image, floor_result, combined);
         cv::imshow(IMAGE_WINDOW, combined);
         // cv::imshow(IMAGE_WINDOW2, floor_result);
         cv::waitKey(1);
-
+        */
         return cloud_corners;
     }
 
@@ -1198,7 +1203,8 @@ class PointcloudProcessor {
         //          std::endl;
 
         // Remove outliers
-        //radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02, 3);
+        // radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02,
+        // 3);
 
         save_cloud_to_file(pointcloud_not_floor,
                            "/home/cnc/Desktop/Hockey/pucks_1.pcd");
