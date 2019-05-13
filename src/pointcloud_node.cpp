@@ -16,7 +16,10 @@
 
 #include "cv_bridge/cv_bridge.h"        // do not move up
 #include "opencv2/highgui/highgui.hpp"  // do not move up
-#include "opencv2/opencv.hpp"           // do not move up
+#include "opencv2/opencv.hpp"
+
+
+#inlude        // do not move up
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
@@ -81,7 +84,7 @@ class PlayNode {
         // ROS_INFO("Got new kinect");
         // printf ("Cloud: width = %d, height = %d\n", msg->width, msg->height);
 
-        // BOOST_FOREACH (const pcl::PointXYZRGB& pt, msg->points)
+        // BOOST_FOREACH (const pcl::pub_pointPointXYZRGB& pt, msg->points)
         //  printf ("\t(%f, %f, %d)\n", pt.x, pt.y, pt.r);
         kinect_msg = *msg;
         got_kinect = true;
@@ -101,7 +104,7 @@ class PlayNode {
     }
 
     void pub_pointcloud(PointCloud &cloud) {
-        PointCloud::Ptr msg(new PointCloud);
+        PointCloud::Ptr pcl_msg(new PointCloud);
         // msg->header.frame_id = "robot1/base_link";
         msg->header.frame_id = "robot1/odom";
 
@@ -109,7 +112,7 @@ class PlayNode {
         msg->width = cloud.width;
         msg->points = cloud.points;
 
-        kinect_pub.publish(msg);
+        kinect_pub.publish(pcl_msg);
     }
 
     tf::Transform get_transform(std::string goal_frame,
