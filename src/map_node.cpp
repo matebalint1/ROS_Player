@@ -20,7 +20,6 @@
 
 #include "pointcloud_helpers.hpp"
 
-
 class PlayNode {
    public:
     PlayNode(int argc, char **argv) {
@@ -60,8 +59,8 @@ class PlayNode {
         pub.publish(msg);
     }
 
-    void color_filter(PointCloudPtrRGBA &cloud_in, PointCloudPtrRGBA &cloud_out, int r,
-                      int g, int b) {
+    void color_filter(PointCloudPtrRGBA &cloud_in, PointCloudPtrRGBA &cloud_out,
+                      int r, int g, int b) {
         // Filters pointcloud by a specific color
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointTypeRGBA> extract;
@@ -169,9 +168,9 @@ class PlayNode {
     }
 
     PointCloudPtrRGBA combine_measurements(PointCloudPtrRGBA &cloud,
-                                       double cluster_tolerance = 0.05,
-                                       int min_cluster_size = 3,
-                                       int max_cluster_size = 1000) {
+                                           double cluster_tolerance = 0.05,
+                                           int min_cluster_size = 3,
+                                           int max_cluster_size = 1000) {
         // This algorithm uses Euclidean Cluster Extraction to segment
         // the cloud into regions. After segmentation objects are
         // classified with the is_buck_or_pole_or_corner function.
@@ -227,84 +226,18 @@ class PlayNode {
         return result;
     }
 
-    /*void to_environment(PointCloudPtrRGBA &cloud) {
-        // This function takes the sum of detectect objets and based on
-        // that finds an estimate of the real buck and pole locations in
-        // the environment.
-
-        PointCloudPtrRGBA goal_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
-        PointCloudPtrRGBA puck_and_pole_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
-        PointCloudPtrRGBA temp = PointCloudPtrRGBA(new PointCloudRGBA);
-
-        color_filter(cloud, temp, 0, 255, 255);  // Cyan == Blue
-        *goal_cloud = *temp;
-        color_filter(cloud, temp, 255, 140, 0);  // Orange == Yelllow
-        *goal_cloud += *temp;
-
-        color_filter(cloud, temp, 0, 0, 255);  // Blue
-        *puck_and_pole_cloud = *temp;
-        color_filter(cloud, temp, 0, 255, 0);  // Green
-        *puck_and_pole_cloud += *temp;
-        color_filter(cloud, temp, 255, 255, 0);  // Yelllow
-        *puck_and_pole_cloud += *temp;
-        // color_filter(
-        //    cloud, temp, 255, 0,
-        //    255);  // Magenta == unkown object similar as a buck or pole
-        //*puck_and_pole_cloud += *temp;
-
-        // Goals:
-        cloud = combine_measurements(goal_cloud, 0.1, 1, 1000);
-
-        // Pucks and Poles:
-        // Filter outliers
-        radius_outlier_removal(puck_and_pole_cloud, 0.03,
-                               4);  // 0.03, 5 works for pucks
-
-        // Create clusters and get best estimate of object locations
-        *cloud += *combine_measurements(puck_and_pole_cloud);
-    }*/
-
-    /*void increase_timestamp_by_one(PointCloudPtrRGBA &cloud) {
-        // Update current map_cloud and remove old stuff
-        if (alpha_counter >= INCREASE_ALPHA_AFTER_N_MESSAGES) {
-            // Increase alpha by one
-            for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
-                uint8_t alpha = ((pt->rgba >> 24) & 0xff) + 1;
-                uint32_t rgb = (pt->rgba & 0xffffff);
-                pt->rgba = ((alpha << 24) | rgb);
-            }
-
-            // Remove points with value 255
-            // int before = cloud->points.size() ;
-            alpha_filter(cloud, NUMBER_OF_MESSAGES_IN_POINT_CLOUD /
-                                    INCREASE_ALPHA_AFTER_N_MESSAGES);
-            // int after = cloud->points.size();
-            // std::cout << "Raw Map size diff: " << (after-before) <<
-            // std::endl; std::cout << "Raw Map size now: " <<
-            // cloud->points.size() << std::endl;
-            alpha_counter = 1;
-        } else {
-            alpha_counter++;
-        }
-    }*/
-
-    float get_main_rgb_value(PointCloudPtrRGBA &cloud, int color_threshold = 1) {
+    float get_main_rgb_value(PointCloudPtrRGBA &cloud,
+                             int color_threshold = 1) {
         // This function retruns the most common color in the point cloud. Only
         // 5 different highlighted colors are counted.
 
         // Calculate values for colors
-        uint32_t rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
-        float c_yellow = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
-        float c_blue = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
-        float c_green = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
-        float c_black = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)255);
-        float c_cyan = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0xff << 16 | (uint32_t)0x8c << 8 | (uint32_t)0);
-        float c_orange = *reinterpret_cast<float *>(&rgb);
+        float c_yellow = to_pcl_rgb(255,255,0);
+        float c_blue = to_pcl_rgb(0,0,255);
+        float c_green = to_pcl_rgb(0,255,0);
+        float c_black = to_pcl_rgb(0,0,0);
+        float c_cyan = to_pcl_rgb(0,255,255);
+        float c_orange = to_pcl_rgb(255,140,0);
 
         uint32_t yellow = 0xffff00;
         uint32_t blue = 0x0000ff;
@@ -468,7 +401,8 @@ class PlayNode {
                 if (new_alpha_value >= MAX_AGE_SINGLE_POINT) {
                     // Remove single points with value 255
                     points_to_be_removed->indices.push_back(index);
-                    //std::cout << "single point removal, too old" << std::endl;
+                    // std::cout << "single point removal, too old" <<
+                    // std::endl;
                 }
 
             } else if (diagonal_xy > 0.2 || cluster_size > 20) {
@@ -495,7 +429,7 @@ class PlayNode {
                     } else if (pit + 1 == it->indices.end()) {
                         // Last point -> all points have an alpha value of 255
                         // -> remove cluster and replace with a single point.
-                        //std::cout << "remove cluster, too old" << std::endl;
+                        // std::cout << "remove cluster, too old" << std::endl;
                         remove_and_replace_cluster(
                             it, cloud_cluster, new_points, points_to_be_removed,
                             average_x, average_y);
@@ -532,7 +466,8 @@ class PlayNode {
 
         // Divide map_cloud by object type into two clouds
         PointCloudPtrRGBA goal_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
-        PointCloudPtrRGBA puck_and_pole_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
+        PointCloudPtrRGBA puck_and_pole_cloud =
+            PointCloudPtrRGBA(new PointCloudRGBA);
         PointCloudPtrRGBA temp = PointCloudPtrRGBA(new PointCloudRGBA);
 
         color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
@@ -591,12 +526,6 @@ class PlayNode {
 
    private:
     bool got_detected_objects;
-    // const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
-    // onst int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
-    // !! NUMBER_OF_MESSAGES_IN_POINT_CLOUD/INCREASE_ALPHA_AFTER_N_MESSAGES <=
-    // 255 !!!
-
-    // int alpha_counter = 0;
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber detected_objects;

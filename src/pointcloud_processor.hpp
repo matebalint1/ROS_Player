@@ -22,12 +22,10 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-#include <pcl/io/pcd_io.h>
 #include <chrono>
 #include "opencv2/opencv.hpp"
 
 #include "pointcloud_helpers.hpp"
-
 
 const std::string IMAGE_WINDOW = "Floor image";
 const std::string IMAGE_WINDOW2 = "Opencv edge image";
@@ -55,7 +53,7 @@ class PointcloudProcessor {
             pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>();
 
         // cv::namedWindow(IMAGE_WINDOW);
-        //cv::namedWindow(IMAGE_WINDOW2);
+        // cv::namedWindow(IMAGE_WINDOW2);
         // cv::moveWindow(IMAGE_WINDOW2, 200, 0);
     }
 
@@ -194,9 +192,7 @@ class PointcloudProcessor {
                 // b = 0;
             }
 
-            // pack r/g/b into rgb
-            rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
-            pt->rgb = *reinterpret_cast<float*>(&rgb);
+            pt->rgb = to_pcl_rgb(r, g, b);
         };
     }
 
@@ -204,7 +200,7 @@ class PointcloudProcessor {
                              pcl::ModelCoefficients::Ptr& coefficients,
                              bool get_inliers) {
         // Used to find planar surfaces from a point cloud. Useful for removing
-        // floor from pointcloud.
+        // floor from pointcloud. Returns true if succesfull.
 
         if (cloud_in->points.size() == 0) {
             return false;
@@ -253,7 +249,7 @@ class PointcloudProcessor {
                       pcl::ModelCoefficients::Ptr& coefficients,
                       double z_offset) {
         // This function filters away all points below the plane given by the
-        // coefficients.
+        // coefficients. Roughly same speed as planar segmentation.
 
         // Coefficients
         double a = coefficients->values[0];
@@ -294,91 +290,6 @@ class PointcloudProcessor {
         outrem.setMinNeighborsInRadius(min_neighbors);
         // apply filter
         outrem.filter(*cloud_out);
-    }
-
-    /*
-    void generate_puck_pointcloud(PointCloudPtr& cloud) {
-        double radius = 0.05;  // m
-        double radius_second_part = 0.0325;
-        double radial_step = 0.002;
-        double height = 0.18;  // m
-        double height_second_part = 0.17;
-        double height_step = 0.002;
-        cloud->clear();
-
-        // Lower part
-        for (double h = 0; h <= height; h += height_step) {
-            for (double a = 0; a <= 2 * 3.14 / 3.0; a += radial_step / radius) {
-                double x = radius * cos(a);
-                double y = radius * sin(a);
-
-                pcl::PointXYZRGB point;
-                point.x = x;
-                point.y = y;
-                point.z = h;
-                uint32_t rgb =
-                    ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)255);
-                point.rgb = rgb;
-                cloud->points.push_back(point);
-            }
-        }
-
-        // Upper part
-        for (double h = height; h <= height + height_second_part;
-             h += height_step) {
-            for (double a = 0; a <= 2 * 3.14 / 3.0;
-                 a += radial_step / radius_second_part) {
-                double x = radius_second_part * cos(a);
-                double y = radius_second_part * sin(a);
-
-                pcl::PointXYZRGB point;
-                point.x = x;
-                point.y = y;
-                point.z = h;
-                uint32_t rgb =
-                    ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)255);
-                point.rgb = rgb;
-                cloud->points.push_back(point);
-            }
-        }
-        cloud->is_dense = false;
-        cloud->width = 1;
-        cloud->height = cloud->points.size();
-    }
-
-    void generate_pole_pointcloud(PointCloudPtr& cloud) {
-        double radius = 0.0425;  // m
-        double radial_step = 0.002;
-        double height = 0.5;  // m
-        double height_step = 0.002;
-        cloud->clear();
-
-        // Lower part
-        for (double h = 0; h <= height; h += height_step) {
-            for (double a = 0; a <= 2 * 3.14 / 3.0; a += radial_step / radius) {
-                double x = radius * cos(a);
-                double y = radius * sin(a);
-
-                pcl::PointXYZRGB point;
-                point.x = x;
-                point.y = y;
-                point.z = h;
-                uint32_t rgb =
-                    ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)255);
-                point.rgb = rgb;
-                cloud->points.push_back(point);
-            }
-        }
-        cloud->is_dense = false;
-        cloud->width = 1;
-        cloud->height = cloud->points.size();
-    }
-    */
-
-    void save_cloud_to_file(PointCloudPtr& cloud, std::string path_and_name) {
-        if (cloud->points.size() > 0) {
-            pcl::io::savePCDFileASCII(path_and_name, *cloud);
-        }
     }
 
     void edit_z_to(PointCloudPtr& cloud, double z) {
@@ -423,8 +334,7 @@ class PointcloudProcessor {
               max_point.z - min_point.z <= max_z_height &&
               diagonal_xy <= max_diagonal_size &&
               diagonal_xy >= min_diagonal_size)) {
-            uint32_t rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
-            result_point.rgb = *reinterpret_cast<float*>(&rgb);
+            result_point.rgb = to_pcl_rgb(0, 0, 0);
             result_point.x = 0;
             result_point.y = 0;
 
@@ -433,14 +343,10 @@ class PointcloudProcessor {
         }
 
         // Calculate values for colors
-        uint32_t rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
-        float yellow = *reinterpret_cast<float*>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
-        float blue = *reinterpret_cast<float*>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
-        float green = *reinterpret_cast<float*>(&rgb);
-        rgb = ((uint32_t)255 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
-        float magenta = *reinterpret_cast<float*>(&rgb);
+        float yellow = to_pcl_rgb(255, 255, 0);
+        float blue = to_pcl_rgb(0, 0, 255);
+        float green = to_pcl_rgb(0, 255, 0);
+        float magenta = to_pcl_rgb(255, 0, 255);
 
         // Calculate color frequencies
         int blue_points = 0;
@@ -508,8 +414,7 @@ class PointcloudProcessor {
 
         // Check if size of the pointcloud is within the limits
         if (!(diagonal_xy <= 0.3)) {
-            uint32_t rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
-            result_point.rgb = *reinterpret_cast<float*>(&rgb);
+            result_point.rgb = to_pcl_rgb(0, 0, 0);
             result_point.x = 0;
             result_point.y = 0;
 
@@ -588,7 +493,8 @@ class PointcloudProcessor {
     void extract_edge_points(PointCloudPtr& cloud,
                              PointCloudPtr& cloud_blue_out,
                              PointCloudPtr& cloud_yellow_out) {
-        // This function extracts edge points of the goals. Quite slow.
+        // This function extracts edge points of the goals using pcl. Quite
+        // slow.
 
         const float COLOR_DIFF_MAX =
             0.10;  // 1/(100%) maximun distance from 50 % //0.15
@@ -895,10 +801,7 @@ class PointcloudProcessor {
                         point.x = x_offset + (x - marginal) * pixel_size;
                         point.y = y_offset + (y - marginal) * pixel_size;
                         point.z = 0;
-
-                        uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 |
-                                        (uint32_t)b);
-                        point.rgb = *reinterpret_cast<float*>(&rgb);
+                        point.rgb = to_pcl_rgb(r, g, b);
 
                         cloud_corners->points.push_back(point);
                     }
@@ -1089,10 +992,7 @@ class PointcloudProcessor {
                         point.x = x_offset + (x - marginal) * pixel_size;
                         point.y = y_offset + (y - marginal) * pixel_size;
                         point.z = 0;
-
-                        uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 |
-                                        (uint32_t)b);
-                        point.rgb = *reinterpret_cast<float*>(&rgb);
+                        point.rgb = to_pcl_rgb(r, g, b);
 
                         cloud_corners->points.push_back(point);
                     }
@@ -1197,16 +1097,12 @@ class PointcloudProcessor {
         // Puck and Pole recognition
         // *********************************************
 
-        // std::cout << "not floor: " << pointcloud_not_floor->points.size()
-        //          << "  floor: " << pointcloud_floor->points.size() <<
-        //          std::endl;
-
         // Remove outliers
         // radius_outlier_removal(pointcloud_not_floor, pointcloud_temp2, 0.02,
         // 3);
 
-        save_cloud_to_file(pointcloud_not_floor,
-                           "/home/cnc/Desktop/Hockey/pucks_1.pcd");
+        // save_cloud_to_file(pointcloud_not_floor,
+        //                   "/home/cnc/Desktop/Hockey/pucks_1.pcd");
 
         // Find pucks and poles from not floor pointcoud
         recognized_objects = combine_close_points(
@@ -1287,11 +1183,6 @@ class PointcloudProcessor {
         //    radius_outlier_removal(pointcloud_temp,
         //    pointcloud_not_floor_blue);
         //}
-
-        // pointcloud_temp->points.clear();
-        //*pointcloud_temp += *pointcloud_not_floor_blue;
-        //*pointcloud_temp += *pointcloud_not_floor_green;
-        //*pointcloud_temp += *pointcloud_not_floor_yellow;
     }
 
     PointCloudPtr& get_floor_pointcloud() { return pointcloud_floor; }
@@ -1299,10 +1190,10 @@ class PointcloudProcessor {
     PointCloudPtr& get_recognized_objects() { return recognized_objects; }
 
    private:
-    pcl::PassThrough<pcl::PointXYZRGB> pass_through_filter;
-    pcl::VoxelGrid<pcl::PointXYZRGB> voxel_grid_filter;
-    pcl::ConditionalRemoval<pcl::PointXYZRGB> conditional_filter;
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>
+    pcl::PassThrough<PointType> pass_through_filter;
+    pcl::VoxelGrid<PointType> voxel_grid_filter;
+    pcl::ConditionalRemoval<PointType> conditional_filter;
+    pcl::StatisticalOutlierRemoval<PointType>
         statistical_outlier_removal_filter;
 
     PointCloudPtr pointcloud_temp;   // temporary
