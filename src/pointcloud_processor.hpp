@@ -26,9 +26,8 @@
 #include <chrono>
 #include "opencv2/opencv.hpp"
 
-typedef pcl::PointXYZRGB PointType;
-typedef pcl::PointCloud<PointType> PointCloud;
-typedef pcl::PointCloud<PointType>::Ptr PointCloudPtr;
+#include "pointcloud_helpers.hpp"
+
 
 const std::string IMAGE_WINDOW = "Floor image";
 const std::string IMAGE_WINDOW2 = "Opencv edge image";
