@@ -18,30 +18,21 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-typedef pcl::PointXYZRGBA PointType;
-typedef pcl::PointCloud<PointType> PointCloud;
-typedef pcl::PointCloud<PointType>::Ptr PointCloudPtr;
-
-typedef pcl::PointXYZRGB PointTypeRGB;
-typedef pcl::PointCloud<PointTypeRGB> PointCloudRGB;
-typedef pcl::PointCloud<PointTypeRGB>::Ptr PointCloudPtrRGB;
+#include "pointcloud_helpers.hpp"
 
 class PlayNode {
    public:
     PlayNode(int argc, char **argv) {
         ros::init(argc, argv, "map_node");
         n = std::make_unique<ros::NodeHandle>();
-        map_pub = n->advertise<PointCloudRGB>("map_node/map", 1);
-        map_raw_pub = n->advertise<PointCloudRGB>("map_node/map_raw", 1);
+        map_pub = n->advertise<PointCloud>("map_node/map", 1);
+        map_raw_pub = n->advertise<PointCloud>("map_node/map_raw", 1);
 
-        map_cloud = PointCloudPtr(new PointCloud);
-        temp_cloud = PointCloudPtr(new PointCloud);
-
-        // tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
-        // tf_listener = new tf2_ros::TransformListener(*tfBuffer);
+        map_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
+        temp_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
 
         ROS_INFO("Waiting for pointcloud_node/detected_objects");
-        ros::topic::waitForMessage<PointCloud>(
+        ros::topic::waitForMessage<PointCloudRGBA>(
             "pointcloud_node/detected_objects");
 
         detected_objects =
@@ -49,15 +40,15 @@ class PlayNode {
                          &PlayNode::detected_objects_callback, this);
     }
 
-    void detected_objects_callback(const PointCloud::ConstPtr &msg) {
+    void detected_objects_callback(const PointCloudRGBA::ConstPtr &msg) {
         // ROS_INFO("Got new detected objects");
 
         detected_objects_msg = *msg;
         got_detected_objects = true;
     }
 
-    void pub_pointcloud(PointCloud &cloud, ros::Publisher &pub) {
-        PointCloudPtr msg(new PointCloud);
+    void pub_pointcloud(PointCloudRGBA &cloud, ros::Publisher &pub) {
+        PointCloudPtrRGBA msg(new PointCloudRGBA);
         msg->header.frame_id = "robot1/odom";
 
         msg->height = cloud.height;
@@ -68,11 +59,11 @@ class PlayNode {
         pub.publish(msg);
     }
 
-    // Filters pointcloud by a specific color
-    void color_filter(PointCloudPtr &cloud_in, PointCloudPtr &cloud_out, int r,
-                      int g, int b) {
+    void color_filter(PointCloudPtrRGBA &cloud_in, PointCloudPtrRGBA &cloud_out,
+                      int r, int g, int b) {
+        // Filters pointcloud by a specific color
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-        pcl::ExtractIndices<PointType> extract;
+        pcl::ExtractIndices<PointTypeRGBA> extract;
         for (int i = 0; i < (*cloud_in).size(); i++) {
             uint32_t argb = cloud_in->points[i].rgba;
             uint8_t alpha = (argb >> 24) & 0xff;
@@ -87,14 +78,16 @@ class PlayNode {
         }
         extract.setInputCloud(cloud_in);
         extract.setIndices(inliers);
-        // extract.setNegative(true);
         extract.filter(*cloud_out);
     }
 
-    // Get points with an alpha value smaller than given alpha
-    void alpha_filter(PointCloudPtr &cloud, uint8_t max_alpha) {
+    void alpha_filter(PointCloudPtrRGBA &cloud, uint8_t max_alpha) {
+        // Get points with an alpha value smaller than given alpha = removes too
+        // large alpha values.
+
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-        pcl::ExtractIndices<PointType> extract;
+        pcl::ExtractIndices<PointTypeRGBA> extract;
+
         for (int i = 0; i < (*cloud).size(); i++) {
             uint32_t argb = cloud->points[i].rgba;
             uint8_t alpha = (argb >> 24) & 0xff;
@@ -110,7 +103,8 @@ class PlayNode {
         extract.filter(*cloud);
     }
 
-    void set_alpha(PointCloudPtr &cloud, int alpha) {
+    void set_alpha(PointCloudPtrRGBA &cloud, int alpha) {
+        // Set alpha value to a specific value
         for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
             uint8_t alpha2 = alpha;
             uint32_t rgb = (pt->rgba & 0xffffff);
@@ -118,9 +112,9 @@ class PlayNode {
         }
     }
 
-    void radius_outlier_removal(PointCloudPtr &cloud, double radius = 0.05,
+    void radius_outlier_removal(PointCloudPtrRGBA &cloud, double radius = 0.05,
                                 int min_neighbors = 5) {
-        pcl::RadiusOutlierRemoval<PointType> outrem;
+        pcl::RadiusOutlierRemoval<PointTypeRGBA> outrem;
         // build the filter
         outrem.setInputCloud(cloud);
         outrem.setRadiusSearch(radius);
@@ -129,22 +123,22 @@ class PlayNode {
         outrem.filter(*cloud);
     }
 
-    PointType is_buck_or_pole(PointCloudPtr &cloud) {
+    PointTypeRGBA is_buck_or_pole_or_corner(PointCloudPtrRGBA &cloud) {
         // This method takes as input a pointcloud of a suspected pole or puck
-        // locations. Returns a point containing information (x,y,z,r,g,b) of
-        // the object if it fulfills the requirements. If requirement are not
-        // fulfilled, a black point in origo will be returned.
+        // or corner locations. Returns a point containing information
+        // (x,y,z,r,g,b) of the object if it fulfills the requirements. If
+        // requirement are not fulfilled, a black point will be
+        // returned.
 
-        int color_threshold = 3;  // min number of points in main color
-        PointType result_point = PointType();
+        PointTypeRGBA result_point = PointTypeRGBA();
         result_point.x = 0;
         result_point.y = 0;
         result_point.z = 0.2;
 
         // Calculate metrics of the pointcloud
-        PointType min_point;
-        PointType max_point;
-        PointType centroid;
+        PointTypeRGBA min_point;
+        PointTypeRGBA max_point;
+        PointTypeRGBA centroid;
         pcl::getMinMax3D(*cloud, min_point, max_point);
         pcl::computeCentroid(*cloud, centroid);
 
@@ -164,19 +158,86 @@ class PlayNode {
             return result_point;
         }
 
+        // Return point, color represents point type: green -> buck,
+        // blue or yellow -> pole.
+        result_point.rgb = get_main_rgb_value(cloud);
+        result_point.x = average_x;
+        result_point.y = average_y;
+
+        return result_point;
+    }
+
+    PointCloudPtrRGBA combine_measurements(PointCloudPtrRGBA &cloud,
+                                           double cluster_tolerance = 0.05,
+                                           int min_cluster_size = 3,
+                                           int max_cluster_size = 1000) {
+        // This algorithm uses Euclidean Cluster Extraction to segment
+        // the cloud into regions. After segmentation objects are
+        // classified with the is_buck_or_pole_or_corner function.
+
+        PointCloudPtrRGBA result(new PointCloudRGBA);
+
+        if (cloud->points.size() == 0) {
+            return result;
+        }
+
+        // Creating the KdTree object for the search method of the
+        // extraction
+        pcl::search::KdTree<PointTypeRGBA>::Ptr tree(
+            new pcl::search::KdTree<PointTypeRGBA>);
+        tree->setInputCloud(cloud);
+
+        std::vector<pcl::PointIndices> cluster_indices;
+        pcl::EuclideanClusterExtraction<PointTypeRGBA> ec;
+        ec.setClusterTolerance(cluster_tolerance);
+        ec.setMinClusterSize(min_cluster_size);
+        ec.setMaxClusterSize(max_cluster_size);
+        ec.setSearchMethod(tree);
+        ec.setInputCloud(cloud);
+        ec.extract(cluster_indices);
+
+        for (std::vector<pcl::PointIndices>::const_iterator it =
+                 cluster_indices.begin();
+             it != cluster_indices.end(); ++it) {
+            pcl::PointCloud<PointTypeRGBA>::Ptr cloud_cluster(
+                new pcl::PointCloud<PointTypeRGBA>);
+
+            for (std::vector<int>::const_iterator pit = it->indices.begin();
+                 pit != it->indices.end(); ++pit) {
+                cloud_cluster->points.push_back(cloud->points[*pit]);
+            }
+
+            cloud_cluster->width = cloud_cluster->points.size();
+            cloud_cluster->height = 1;
+            cloud_cluster->is_dense = true;
+
+            PointTypeRGBA point = is_buck_or_pole_or_corner(cloud_cluster);
+            if (*reinterpret_cast<int *>(&point.rgb) != 0) {
+                // Add only succesfull detections (== not black points)
+                result->points.push_back(point);
+            }
+        }
+
+        // Set header information
+        result->is_dense = false;
+        result->width = 1;
+        result->height = result->points.size();
+
+        return result;
+    }
+
+    float get_main_rgb_value(PointCloudPtrRGBA &cloud,
+                             int color_threshold = 1) {
+        // This function retruns the most common color in the point cloud. Only
+        // 5 different highlighted colors are counted.
+
         // Calculate values for colors
-        uint32_t rgb = ((uint32_t)255 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
-        float c_yellow = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)255);
-        float c_blue = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)0);
-        float c_green = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)0 << 8 | (uint32_t)0);
-        float c_black = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0 << 16 | (uint32_t)255 << 8 | (uint32_t)255);
-        float c_cyan = *reinterpret_cast<float *>(&rgb);
-        rgb = ((uint32_t)0xff << 16 | (uint32_t)0x8c << 8 | (uint32_t)0);
-        float c_orange = *reinterpret_cast<float *>(&rgb);
+        float c_yellow = to_pcl_rgb(255,255,0);
+        float c_blue = to_pcl_rgb(0,0,255);
+        float c_green = to_pcl_rgb(0,255,0);
+        float c_black = to_pcl_rgb(0,0,0);
+        float c_cyan = to_pcl_rgb(0,255,255);
+        float c_orange = to_pcl_rgb(255,140,0);
 
         uint32_t yellow = 0xffff00;
         uint32_t blue = 0x0000ff;
@@ -190,9 +251,10 @@ class PlayNode {
         int yellow_points = 0;
         int cyan_points = 0;    // blue goals
         int orange_points = 0;  // yellow goals
+
         for (auto pt = cloud->begin(); pt < cloud->end(); pt++) {
             uint32_t pt_rgb = *reinterpret_cast<int *>(&pt->rgba) & 0xffffff;
-            // std::cout << std::hex << pt_rgb << std::endl;
+
             if (pt_rgb == yellow) {
                 yellow_points++;
             } else if (pt_rgb == green) {
@@ -205,15 +267,17 @@ class PlayNode {
                 orange_points++;
             }
         }
+
+        // A vector is used for finding the max value
         std::vector<int> colors{blue_points, green_points, yellow_points,
                                 cyan_points, orange_points};
+
         // Determine to which catecory the object belongs to
-        float choosen_color = c_black;
         int max_frequency_index =
             std::max_element(colors.begin(), colors.end()) - colors.begin();
         int num_of_max_color = *std::max_element(colors.begin(), colors.end());
-        // std::cout << max_frequency_index << "  " << num_of_max_color <<
-        // std::endl;
+
+        float choosen_color = c_black;
         if (num_of_max_color > color_threshold) {
             if (max_frequency_index == 0) {
                 // Blue
@@ -231,51 +295,80 @@ class PlayNode {
                 // Yellow goal
                 choosen_color = c_orange;
             } else {
-                // Put unknown objects to origo
-                average_x = 0;
-                average_y = 0;
-                // std::cout << "unkown cloud" << std::endl;
+                // Unknown objects
             }
         }
-
-        // Return point, color represents point type: green -> buck,
-        // blue or yellow -> pole.
-        result_point.rgb = choosen_color;
-        result_point.x = average_x;
-        result_point.y = average_y;
-
-        return result_point;
+        return choosen_color;
     }
 
-    PointCloudPtr combine_measurements(PointCloudPtr &cloud, double cluster_tolerance = 0.05, int min_cluster_size = 3, int max_cluster_size = 500) {
-        // This algorithm uses Euclidean Cluster Extraction to segment
-        // the cloud into regions. After segmentation objects are
-        // filtered by size (min and max xy coordinates). Finally, the
-        // objects are detectect by the highlighted colors.
+    uint8_t increace_single_point_alpha_by_one(PointCloudPtrRGBA &cloud,
+                                               int index) {
+        uint32_t argb = cloud->points[index].rgba;
+        uint8_t alpha = (argb >> 24) + 1;
+        argb = (alpha << 24) | (argb & 0xffffff);
+        cloud->points[index].rgba = argb;
+        return alpha;
+    }
 
-        PointCloudPtr result(new PointCloud);
+    inline void remove_and_replace_cluster(
+        std::vector<pcl::PointIndices>::const_iterator &it,
+        PointCloudPtrRGBA &cloud_cluster, PointCloudPtrRGBA &new_points,
+        pcl::PointIndices::Ptr &points_to_be_removed, double average_x,
+        double average_y) {
+        PointTypeRGBA new_point;
+        new_point.x = average_x;
+        new_point.y = average_y;
+        new_point.z = 0;
+        new_point.rgba = 0;
+        new_point.rgb = get_main_rgb_value(cloud_cluster, 1);
+        new_points->points.push_back(new_point);
+
+        for (std::vector<int>::const_iterator pit = it->indices.begin();
+             pit != it->indices.end(); ++pit) {
+            points_to_be_removed->indices.push_back(*pit);
+        }
+    }
+
+    void update_map(PointCloudPtrRGBA &cloud, double cluster_tolerance = 0.05,
+                    int min_cluster_size = 3, int max_cluster_size = 1000) {
+        // This function updates the current map_cloud it uses Euclidean Cluster
+        // Extraction to segment the cloud into cluster. Too big clusters are
+        // removed and replaced with a single point. Clusters with only one
+        // point are time stamped (alpha value) and on each call their time
+        // stamp is increased by one (eventually they will be removed if no
+        // other detections nearby occur).
+
+        // Parameters
+        const uint8_t MAX_AGE_SINGLE_POINT = 255;   // Larger -> longer life
+        const uint8_t MAX_AGE_CLUSTER_POINT = 255;  // Larger -> longer life
+
+        PointCloudPtrRGBA new_points(new PointCloudRGBA);
+        pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());
+
+        if (cloud->points.size() == 0) {
+            return;
+        }
 
         // Creating the KdTree object for the search method of the
         // extraction
-        pcl::search::KdTree<PointType>::Ptr tree(
-            new pcl::search::KdTree<PointType>);
+        pcl::search::KdTree<PointTypeRGBA>::Ptr tree(
+            new pcl::search::KdTree<PointTypeRGBA>);
         tree->setInputCloud(cloud);
 
         std::vector<pcl::PointIndices> cluster_indices;
-        pcl::EuclideanClusterExtraction<PointType> ec;
-        ec.setClusterTolerance(cluster_tolerance);  // 5cm
-        ec.setMinClusterSize(min_cluster_size);       // 5 previously
+        pcl::EuclideanClusterExtraction<PointTypeRGBA> ec;
+        ec.setClusterTolerance(cluster_tolerance);
+        ec.setMinClusterSize(min_cluster_size);
         ec.setMaxClusterSize(max_cluster_size);
         ec.setSearchMethod(tree);
         ec.setInputCloud(cloud);
         ec.extract(cluster_indices);
 
-        // int j = 1;
         for (std::vector<pcl::PointIndices>::const_iterator it =
                  cluster_indices.begin();
              it != cluster_indices.end(); ++it) {
-            pcl::PointCloud<PointType>::Ptr cloud_cluster(
-                new pcl::PointCloud<PointType>);
+            pcl::PointCloud<PointTypeRGBA>::Ptr cloud_cluster(
+                new pcl::PointCloud<PointTypeRGBA>);
 
             for (std::vector<int>::const_iterator pit = it->indices.begin();
                  pit != it->indices.end(); ++pit) {
@@ -286,92 +379,134 @@ class PlayNode {
             cloud_cluster->height = 1;
             cloud_cluster->is_dense = true;
 
-            PointType point = is_buck_or_pole(cloud_cluster);
-            if (*reinterpret_cast<int *>(&point.rgb) != 0) {
-                // Add only succesfull detections (== not black points)
-                result->points.push_back(point);
+            int cluster_size = cloud_cluster->points.size();
+            PointTypeRGBA min_point;
+            PointTypeRGBA max_point;
+            PointTypeRGBA centroid;
+            pcl::getMinMax3D(*cloud_cluster, min_point, max_point);
+            pcl::computeCentroid(*cloud_cluster, centroid);
+            double average_x = centroid.x;
+            double average_y = centroid.y;
+            double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
+                                      pow(max_point.x - min_point.x, 2));
+
+            if (cluster_size == 1) {
+                // Increase timestamp of this single point cluster by one and if
+                // max value is reached the point is removed.
+                pcl::PointIndices ind = *it;
+                int index = ind.indices[0];
+                int new_alpha_value =
+                    increace_single_point_alpha_by_one(cloud, index);
+
+                if (new_alpha_value >= MAX_AGE_SINGLE_POINT) {
+                    // Remove single points with value 255
+                    points_to_be_removed->indices.push_back(index);
+                    // std::cout << "single point removal, too old" <<
+                    // std::endl;
+                }
+
+            } else if (diagonal_xy > 0.2 || cluster_size > 20) {
+                // A too big cluster -> remove these cluster points and replace
+                // it with a single point.
+                remove_and_replace_cluster(it, cloud_cluster, new_points,
+                                           points_to_be_removed, average_x,
+                                           average_y);
+            } else {
+                // A good cluster, increase the time stamp of one puck, if all
+                // puck have a time stamp of 255 -> replace cloud with a single
+                // point. This is needed to get rid of old detections that could
+                // exist otherwise forever.
+
+                for (std::vector<int>::const_iterator pit = it->indices.begin();
+                     pit != it->indices.end(); ++pit) {
+                    if ((cloud->points[*pit].rgba >> 24) <
+                        MAX_AGE_CLUSTER_POINT) {
+                        // Increase alpha value of a single point and exit the
+                        // loop.
+                        increace_single_point_alpha_by_one(cloud, *pit);
+                        break;
+
+                    } else if (pit + 1 == it->indices.end()) {
+                        // Last point -> all points have an alpha value of 255
+                        // -> remove cluster and replace with a single point.
+                        // std::cout << "remove cluster, too old" << std::endl;
+                        remove_and_replace_cluster(
+                            it, cloud_cluster, new_points, points_to_be_removed,
+                            average_x, average_y);
+                    }
+                }
             }
         }
+
+        // Filter points to be removed
+        pcl::ExtractIndices<PointTypeRGBA> extract;
+        extract.setInputCloud(cloud);
+        extract.setIndices(points_to_be_removed);
+        extract.setNegative(true);
+        extract.filter(*cloud);
+
+        // Add new points
+        *cloud += *new_points;
 
         // Set header information
-        result->is_dense = false;
-        result->width = 1;
-        result->height = result->points.size();
-
-        return result;
-    }
-
-    void to_environment(PointCloudPtr &cloud) {
-        // This function takes the sum of detectect objets and based on
-        // that finds an estimate of the real buck and pole locations in
-        // the environment.
-
-        PointCloudPtr goal_cloud = PointCloudPtr(new PointCloud);
-        PointCloudPtr puck_and_pole_cloud = PointCloudPtr(new PointCloud);
-        PointCloudPtr temp = PointCloudPtr(new PointCloud);
-        
-        color_filter(cloud, temp, 0, 255, 255);  //Cyan == Blue
-        *goal_cloud = *temp;
-        color_filter(cloud, temp, 255, 140, 0);  //Orange == Yelllow
-        *goal_cloud += *temp;
-
-        color_filter(cloud, temp, 0, 0, 255);  // Blue
-        *puck_and_pole_cloud = *temp;
-        color_filter(cloud, temp, 0, 255, 0);  // Green
-        *puck_and_pole_cloud += *temp;
-        color_filter(cloud, temp, 255, 255, 0);  // Yelllow
-        *puck_and_pole_cloud += *temp;
-        color_filter(cloud, temp, 255, 0, 255);  // Magenta == unkown object similar as a buck or pole
-        *puck_and_pole_cloud += *temp;
-
-        // Goals:
-        cloud = combine_measurements(goal_cloud, 0.1, 1, 500);
-
-        // Pucks and Poles:
-        // Filter outliers
-        radius_outlier_removal(puck_and_pole_cloud, 0.03, 4);  // 0.03, 5 works for pucks
-
-        // Create clusters and get best estimate of object locations
-        *cloud += *combine_measurements(puck_and_pole_cloud);
-    }
-
-    void increase_timestamp_by_one(PointCloudPtr &cloud) {
-        // Update current map_cloud and remove old stuff
-        if (alpha_counter >= INCREASE_ALPHA_AFTER_N_MESSAGES) {
-            // Increase alpha by one
-            for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
-                uint8_t alpha = ((pt->rgba >> 24) & 0xff) + 1;
-                uint32_t rgb = (pt->rgba & 0xffffff);
-                pt->rgba = ((alpha << 24) | rgb);
-                // std::cout << (int)alpha << std::endl;
-            }
-
-            // Remove points with value 255
-            // int before = cloud->points.size() ;
-            alpha_filter(cloud, NUMBER_OF_MESSAGES_IN_POINT_CLOUD /
-                                    INCREASE_ALPHA_AFTER_N_MESSAGES);
-            // int after = cloud->points.size();
-            // std::cout << "Raw Map size diff: " << (after-before) <<
-            // std::endl; std::cout << "Raw Map size now: " <<
-            // cloud->points.size() << std::endl;
-            alpha_counter = 1;
-        } else {
-            alpha_counter++;
-        }
+        cloud->is_dense = false;
+        cloud->width = 1;
+        cloud->height = cloud->points.size();
     }
 
     void process_messages() {
+        // -------------------------------------------------------
+        // Update and add new data to map_cloud
+        // -------------------------------------------------------
+
         // Add new detections to map_cloud
         *temp_cloud = detected_objects_msg;
         set_alpha(temp_cloud, 0);
         *map_cloud += *temp_cloud;
 
-        // Edit timestamps of all points
-        increase_timestamp_by_one(map_cloud);
+        // Divide map_cloud by object type into two clouds
+        PointCloudPtrRGBA goal_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
+        PointCloudPtrRGBA puck_and_pole_cloud =
+            PointCloudPtrRGBA(new PointCloudRGBA);
+        PointCloudPtrRGBA temp = PointCloudPtrRGBA(new PointCloudRGBA);
 
-        // Create an estimate of the environment
-        *temp_cloud = *map_cloud;  // copy
-        to_environment(temp_cloud);
+        color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
+        *goal_cloud = *temp;
+        color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow goal
+        *goal_cloud += *temp;
+
+        color_filter(map_cloud, temp, 0, 0, 255);  // Blue
+        *puck_and_pole_cloud = *temp;
+        color_filter(map_cloud, temp, 0, 255, 0);  // Green
+        *puck_and_pole_cloud += *temp;
+        color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
+        *puck_and_pole_cloud += *temp;
+        // color_filter(map_cloud, temp, 255, 0,
+        //             255);  // Magenta == unknow clolored puck or pole
+        //*puck_and_pole_cloud += *temp;
+
+        // Remove too big or too old (time stamp == alpha value) clusters,
+        // increase time stamp of single points and cluster.
+        update_map(puck_and_pole_cloud, 0.15, 1, 10000);
+        update_map(goal_cloud, 0.15, 1, 10000);
+
+        // -------------------------------------------------------
+        // Create estimate of the environment
+        // -------------------------------------------------------
+
+        // Goals:
+        temp_cloud = combine_measurements(goal_cloud, 0.1, 1, 1000);
+
+        // Pucks and Poles:
+        *temp_cloud += *combine_measurements(puck_and_pole_cloud, 0.1, 2, 1000);
+
+        // -------------------------------------------------------
+        // Publish and prepare for next iteration
+        // -------------------------------------------------------
+
+        // Save clouds for next round
+        *map_cloud = *puck_and_pole_cloud;
+        *map_cloud += *goal_cloud;
 
         // Publish final map
         set_alpha(temp_cloud, 0xff);
@@ -391,31 +526,22 @@ class PlayNode {
 
    private:
     bool got_detected_objects;
-    const int NUMBER_OF_MESSAGES_IN_POINT_CLOUD = 400;
-    const int INCREASE_ALPHA_AFTER_N_MESSAGES = 2;
-    // !! NUMBER_OF_MESSAGES_IN_POINT_CLOUD/INCREASE_ALPHA_AFTER_N_MESSAGES <=
-    // 255 !!!
-
-    int alpha_counter = 0;
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber detected_objects;
     ros::Publisher map_pub;
     ros::Publisher map_raw_pub;
 
-    // tf2_ros::Buffer *tfBuffer;
-    // tf2_ros::TransformListener *tf_listener;
-
-    PointCloud detected_objects_msg;
-    PointCloudPtr map_cloud;   // contains points of individual detections
-    PointCloudPtr temp_cloud;  // temorary
+    PointCloudRGBA detected_objects_msg;
+    PointCloudPtrRGBA map_cloud;   // contains points of individual detections
+    PointCloudPtrRGBA temp_cloud;  // temorary
 };
 
 int main(int argc, char **argv) {
     PlayNode playNode(argc, argv);
 
-    // 20 Hz loop
-    ros::Rate r(20);
+    // 30 Hz loop
+    ros::Rate r(30);
     while (ros::ok()) {
         if (playNode.got_messages()) {
             playNode.process_messages();
