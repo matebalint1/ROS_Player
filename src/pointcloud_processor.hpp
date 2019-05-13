@@ -951,5 +951,5 @@ class PointcloudProcessor {
 =======
     // PointCloudPtr pointcloud_puck_model;
     // PointCloudPtr pointcloud_pole_model;
-};
+//};
 >>>>>>> 0fd8d06bba09781863b054199041c969f769d82e
