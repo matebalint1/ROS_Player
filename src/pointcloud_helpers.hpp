@@ -21,6 +21,12 @@ void save_cloud_to_file(PointCloudPtr cloud, std::string path_and_name) {
     }
 }
 
+void save_cloud_to_file(PointCloudPtrRGBA cloud, std::string path_and_name) {
+    if (cloud->points.size() > 0) {
+        pcl::io::savePCDFileASCII(path_and_name, *cloud);
+    }
+}
+
 PointCloudPtr get_ideal_field_cloud(double field_width, bool is_blue_team) {
     // This function generates an pointcloud of the hockey field based on the
     // given width. Different objects are representet with differently colored

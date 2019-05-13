@@ -232,12 +232,12 @@ class PlayNode {
         // 5 different highlighted colors are counted.
 
         // Calculate values for colors
-        float c_yellow = to_pcl_rgb(255,255,0);
-        float c_blue = to_pcl_rgb(0,0,255);
-        float c_green = to_pcl_rgb(0,255,0);
-        float c_black = to_pcl_rgb(0,0,0);
-        float c_cyan = to_pcl_rgb(0,255,255);
-        float c_orange = to_pcl_rgb(255,140,0);
+        float c_yellow = to_pcl_rgb(255, 255, 0);
+        float c_blue = to_pcl_rgb(0, 0, 255);
+        float c_green = to_pcl_rgb(0, 255, 0);
+        float c_black = to_pcl_rgb(0, 0, 0);
+        float c_cyan = to_pcl_rgb(0, 255, 255);
+        float c_orange = to_pcl_rgb(255, 140, 0);
 
         uint32_t yellow = 0xffff00;
         uint32_t blue = 0x0000ff;
@@ -512,6 +512,9 @@ class PlayNode {
         set_alpha(temp_cloud, 0xff);
         pub_pointcloud(*temp_cloud,
                        map_pub);  // final map of the environment
+
+        //save_cloud_to_file(temp_cloud,
+        //                   "/home/cnc/Desktop/Hockey/field_from_map_node.pcd");
 
         // Publish raw map
         *temp_cloud = *map_cloud;  // copy
