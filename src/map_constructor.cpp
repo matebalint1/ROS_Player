@@ -3,64 +3,88 @@ kinect_pub =
 
  #include "ros/ros.h"
  #include "std_msgs/String.h"
- #include <sstream>
- class Labeled_PCL
- {
-  private:
-     pcl::PointCloud<pcl::PointXYZRGB> pcl_RGB;
-     std::unique_ptr<int[]>labels_enum;
-
-  public:
-    Labeled_PCL (pcl::PointCloud<pcl::PointXYZRGB> inPut_pcl)
-    {
-      pcl_RGB = inPut_pcl;
-      labels_enum (new int[pcl_RGB.points.size]);
-    }
-
-  ~Labeled_PCL()
-  {
-    delete [] pcl_RGB;
-  }
+ #include <pcl_ros/point_cloud.h>
+ #include <pcl/point_types.h>
 
 
-  }
-
-
-
-
-
-
- class remapper
- {
  private:
    pcl::PointCloud<pcl::PointXYZRGB> pcl_detected_objects;
 
 
+
 public:
-
-
-
 
     void pcl_Callback(const PointCloud::ConstPtr &msg)
     {
       pcl_detected_objects = *msg;
+
     }
 
+pcl::PointCloud<pcl::PointXYZRGB>
 
 
- int main(int argc, char **argv)
+
+ pcl::PointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& recunstruct(
+   pcl::PointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out);
+
+ {
+
+   cloud_in->width    = 5;
+  cloud_in->height   = 1;
+  cloud_in->is_dense = false;
+  cloud_in->points.resize (cloud_in->width * cloud_in->height);
+  for (size_t i = 0; i < cloud_in->points.size (); ++i)
   {
+    cloud_in->points[i].x = 1024 * rand () / (RAND_MAX + 1.0f);
+    cloud_in->points[i].y = 1024 * rand () / (RAND_MAX + 1.0f);
+    cloud_in->points[i].z = 1024 * rand () / (RAND_MAX + 1.0f);
+  }
+  std::cout << "Saved " << cloud_in->points.size () << " data points to input:"
+      << std::endl;
+  for (size_t i = 0; i < cloud_in->points.size (); ++i) std::cout << "    " <<
+      cloud_in->points[i].x << " " << cloud_in->points[i].y << " " <<
+      cloud_in->points[i].z << std::endl;
+  *cloud_out = *cloud_in;
+  std::cout << "size:" << cloud_out->points.size() << std::endl;
+  for (size_t i = 0; i < cloud_in->points.size (); ++i)
+    cloud_out->points[i].x = cloud_in->points[i].x + 0.7f;
+  std::cout << "Transformed " << cloud_in->points.size () << " data points:"
+      << std::endl;
+  for (size_t i = 0; i < cloud_out->points.size (); ++i)
+    std::cout << "    " << cloud_out->points[i].x << " " <<
+      cloud_out->points[i].y << " " << cloud_out->points[i].z << std::endl;
+  pcl::IterativeClosestPoint<pcl::PointXYZRGB, pcl::PointXYZ> icp;
+  icp.setInputSource(cloud_in);
+  icp.setInputTarget(cloud_out);
+  pcl::PointCloud<pcl::PointXYZ> Final;
+  icp.align(Final);
+
+  return &icp;
 
 
-   ros::init(argc, argv, "remapper_node");
-   ros::NodeHandle n;
-   ros::Subscriber sub ("pointcloud_node/detected_objects", 1, pcl_Callback);
-   ros::Publisher remap_pub = n.advertise <pcl::PointCloud<pcl::PointXYZRGB>> ("remapper_node/out_map");
-   ros::Publisher remap_pub = n.advertise <pcl::PointCloud<pcl::PointXYZRGB>> ("remapper_node/differenceVector");
-
-
-   ros::spin();
+ }
 
 
 
-   }
+
+  int main(int argc, char **argv)
+   {
+
+
+    ros::init(argc, argv, "remapper_node");
+    ros::NodeHandle n;
+
+    ros::Subscriber sub ("pointcloud_node/detected_objects", 1, pcl_Callback);
+    ros::Publisher remap_pub = n.advertise <pcl::PointCloud<pcl::PointXYZRGB>> ("remapper_node/out_map");
+    ros::Publisher remap_pub = n.advertise <pcl::PointCloud<pcl::PointXYZRGB>> ("remapper_node/differenceVector");
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_map (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr ideal_map (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr reconstruced_map=
+      recunstruct(detected_map, ideal_map);
+
+    ros::spin();
+
+
+  }
