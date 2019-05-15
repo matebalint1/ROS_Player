@@ -309,7 +309,7 @@ class PointcloudProcessor {
 
         // Detection parameters
         const int color_threshold =
-            5;  // min number of points in main color // 5 works
+            15;  // min number of points in main color // 5 works
         const double min_z_height = 0.1;
         const double max_z_height = 0.52;
         const double min_diagonal_size = 0.06;
