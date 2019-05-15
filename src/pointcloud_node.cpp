@@ -13,13 +13,12 @@
 #include <tf2_ros/transform_listener.h>
 
 #include "pointcloud_processor.hpp"
+#include "pointcloud_helpers.hpp"
 
 #include "cv_bridge/cv_bridge.h"        // do not move up
 #include "opencv2/highgui/highgui.hpp"  // do not move up
 #include "opencv2/opencv.hpp"           // do not move up
 
-typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
-typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
 
 class PlayNode {
    public:
@@ -112,36 +111,6 @@ class PlayNode {
         kinect_pub.publish(msg);
     }
 
-    tf::Transform get_transform(std::string goal_frame,
-                                std::string current_frame) {
-        tf::Transform transform;
-        geometry_msgs::TransformStamped transformStamped;
-        try {
-            // Find transformation for pointcloud from the buffer
-            // (*cur_kinect_in).header.frame_id ==
-            // "robot1/kinect_rgb_optical_frame"
-            transformStamped = tfBuffer->lookupTransform(
-                goal_frame, current_frame, ros::Time(0));
-
-            // Convert TransformStamped to Transform
-            tf::Vector3 vector(transformStamped.transform.translation.x,
-                               transformStamped.transform.translation.y,
-                               transformStamped.transform.translation.z);
-
-            tf::Quaternion rotation(transformStamped.transform.rotation.x,
-                                    transformStamped.transform.rotation.y,
-                                    transformStamped.transform.rotation.z,
-                                    transformStamped.transform.rotation.w);
-
-            transform.setOrigin(vector);
-            transform.setRotation(rotation);
-        } catch (tf2::TransformException &ex) {
-            ROS_ERROR("%s", ex.what());
-            ros::Duration(1.0).sleep();
-        }
-        return transform;
-    }
-
     void process_messages() {
         // Copy the laser and image. These change whenever the callbacks
         // run, and we don't want the data changing in the middle of
@@ -150,22 +119,23 @@ class PlayNode {
         // sensor_msgs::LaserScan cur_laser = laser_msg;
 
         // Copy input cloud
-        PointCloudPrt cur_kinect_in(new PointCloud(kinect_msg));
+        PointCloudPtr cur_kinect_in(new PointCloud(kinect_msg));
         // Temporary pointcloud for transformation
-        PointCloudPrt cur_kinect(new PointCloud);
+        PointCloudPtr cur_kinect(new PointCloud);
 
         // Find transformation for desired frames
         tf::Transform transform_kinect_to_odom =
-            get_transform("robot1/odom", "robot1/kinect_rgb_optical_frame");
+            get_transform(tfBuffer, "robot1/odom", "robot1/kinect_rgb_optical_frame");
         tf::Transform transform_odom_to_baselink =
-            get_transform("robot1/base_link", "robot1/odom");
+            get_transform(tfBuffer, "robot1/base_link", "robot1/odom");
 
         // Transform pointcloud to odom tf frame
         pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect,
                                      transform_kinect_to_odom);
 
         // Process pointcloud
-        pointcloud_processor.process_pointcloud(cur_kinect, transform_odom_to_baselink);
+        pointcloud_processor.process_pointcloud(cur_kinect,
+                                                transform_odom_to_baselink);
 
         // Publish pointcloud
         pub_pointcloud(*pointcloud_processor.get_recognized_objects());
