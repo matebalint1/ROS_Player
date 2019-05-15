@@ -2,10 +2,16 @@ kinect_pub =
     n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
 
  #include "ros/ros.h"
- #include "std_msgs/String.h"
  #include <pcl_ros/point_cloud.h>
  #include <pcl/point_types.h>
  #include <vector>
+typedef  std::vector<std::vector<std::std::vector<float>> Coordinates_Matrix;
+typedef std::vector<std::vector<float>> Coordinates;
+ const std::vector<std::vector<std::std::vector<float>> {
+
+                            { { {0,0} {0,.5}, {0,1.25} , {0,2.5} , {0,3.75}, {0,4,5}, {0,5} },
+                            { {3,0} {3,.5}, {3,1.25} , {3,2.5} , {3,3.75}, {3,4,5}, {3,5} }  },
+                          } Real_Map_Vecor;
 
 
  private:
@@ -49,19 +55,24 @@ pcl::PointCloud<pcl::PointXYZRGB>
 
  {
 
+  std::vector<std::vector<float>> final_map_array;
   pcl::IterativeClosestPoint<pcl::PointXYZRGB, pcl::PointXYZ> icp;
+
   icp.setInputSource(cloud_in);
   icp.setInputTarget(cloud_out);
-  pcl::PointCloud<pcl::PointXYZ> Final;
+  pcl::PointCloud<pcl::PointXYZ> final;
   icp.align(Final);
 
-  return &Final;
+//  return &final;
+
+ copy_to_array(final, final_map_array )
+
 
 
  }
 
 
-std::vector<std::vector<int>> v;<float> copy_to_array (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in, std::vector<float> deteced_map_array  )
+void copy_to_array (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in, std::vector<float>& deteced_map_array  )
 
 {
     for (size_t i = 0; i < cloud_in->points.size (); ++i)
@@ -70,31 +81,56 @@ std::vector<std::vector<int>> v;<float> copy_to_array (pcl::PointCloud<pcl::Poin
         deteced_map_array[i][2] = cloud_in->points[i].y;
     }
 
-    return deteced_map_array;
+
 
 
 }
 
-std::vector<std::vector<float>> ideal_map_array ()
+
+Coordinates maximum_likelihood (Coordinates detected_position)
+{
+
+  std::vector<flat> likelihood_vector;
+  float distance;
+  
+  for (size_t i = 1; i<15; i++)
+  {
+
+
+  }
+
+}
+
+
+int get_label (Coordinates pole_position)
 
 {
-  // Full width is assumed to be 5 units;
-  vector<vector<float> > vect{
-                             { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-                             { 0, .5, 1.25, 2.5, 3.75, 4,5, 5, 0, .5, 1.25, 2.5, 3.75, 4,5, 5  },
-                             };
 
 
-    return ideal_map_array;
 
+  int label=0;
+
+
+
+
+   for (size_t i=1 ; i<15, i++ )
+   {
+     if (Real_Map_Vecor.i == maximum_likelihood(pole_position) )
+        {label=i;
+        break;}
+   }
+
+return label;
 
 }
+
+
 
 
 std::vector<float> localize (std::vector<std::vector<float> > ideal_map, std::vector<std::vector<float> > detected_map   )
 
 {
- for ( )
+ // for ( )
 
 }
 
