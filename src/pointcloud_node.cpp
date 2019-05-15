@@ -19,8 +19,6 @@
 #include "opencv2/opencv.hpp"
 
 
-#inlude        // do not move up
-
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZRGB>::Ptr PointCloudPrt;
 
@@ -106,11 +104,11 @@ class PlayNode {
     void pub_pointcloud(PointCloud &cloud) {
         PointCloud::Ptr pcl_msg(new PointCloud);
         // msg->header.frame_id = "robot1/base_link";
-        msg->header.frame_id = "robot1/odom";
+        pcl_msg->header.frame_id = "robot1/odom";
 
-        msg->height = cloud.height;
-        msg->width = cloud.width;
-        msg->points = cloud.points;
+        pcl_msg->height = cloud.height;
+        pcl_msg->width = cloud.width;
+        pcl_msg->points = cloud.points;
 
         kinect_pub.publish(pcl_msg);
     }
