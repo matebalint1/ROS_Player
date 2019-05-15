@@ -85,19 +85,33 @@ void copy_to_array (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in, std::vector<fl
 
 
 }
+Coordinates distance (Coordinates a, Coordinates b)
 
+{
+
+  a[1]=a[1]-b[1];
+  a[2]=a[2]-b[2]
+
+  return (sqrt(abs ((a[1]-b[1])²-(a[2]-b[2])²)));
+
+}
 
 Coordinates maximum_likelihood (Coordinates detected_position)
 {
 
   std::vector<flat> likelihood_vector;
-  float distance;
-  
+
+
   for (size_t i = 1; i<15; i++)
   {
+        distance_vector.i = distance(detected_position.i, Real_Map_Vecor.i)
 
 
   }
+
+  std::sort (distance_vector.begin(),distance_vector.end());
+  return distance_vector[1];
+
 
 }
 
@@ -106,7 +120,7 @@ int get_label (Coordinates pole_position)
 
 {
 
-
+-
 
   int label=0;
 
@@ -119,7 +133,6 @@ int get_label (Coordinates pole_position)
         {label=i;
         break;}
    }
-
 return label;
 
 }
