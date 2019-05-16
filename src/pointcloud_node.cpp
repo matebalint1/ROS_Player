@@ -100,7 +100,7 @@ class PlayNode {
     }
 
     void pub_pointcloud(PointCloud &cloud) {
-        PointCloud::Ptr msg(new PointCloud);
+        PointCloudPtr msg(new PointCloud);
         // msg->header.frame_id = "robot1/base_link";
         msg->header.frame_id = "robot1/odom";
 

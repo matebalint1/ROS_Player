@@ -93,6 +93,39 @@ class PlayNode {
         velocity_pub.publish(msg);
     }
 
+    void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
+                                            double pa2_x, double pa2_y,
+                                            double pb1_x, double pb1_y,
+                                            double pb2_x, double pb2_y, ) {
+        // Calculate intersection
+
+        double va_x = pa2_x - pa1_x;
+        double va_y = pa2_y - pa1_y;
+
+        double vb_x = pb2_x - pb1_x;
+        double vb_y = pb2_y - pb1_y;
+
+        double vab_x = pb2_x - pa1_x;
+        double vab_y = pb2_y - pa1_y;
+
+        double va_len = sqrt(va_x * va_x + va_y * va_y);
+        double vb_len = sqrt(vb_x * vb_x + vb_y * vb_y);
+
+        double det = -vb_y * va_x + vb_x * va_y;
+        if (det == 0) return;
+
+        double c1 = (-vab_y * va_x + va_y * vab_x) / det;
+        double c2 = (-vb_y * vab_x + vb_x * vab_y) / det;
+
+        double intersection_x = c2*
+    }
+
+    void get_closest_wall(double robot_map_x, double robot_map_y,
+                          double robot_map_yaw) {
+        // Calculate intersection points between clear zone rectangle and field
+        // borders
+    }
+
     void process_messages() {
         // Copy
         sensor_msgs::LaserScan cur_laser = laser_msg;
@@ -113,22 +146,41 @@ class PlayNode {
                   << transform_odom_to_map.getOrigin().getY() << " " << yaw
                   << std::endl;
 
+        // Robot position in map frame
+        double robot_map_x =
+            transform_odom_to_map.getOrigin().getX();  // m, in map frame
+        double robot_map_y =
+            transform_odom_to_map.getOrigin().getY();  // m, in map frame
+        double robot_map_yaw = yaw;                    // rad in map frame
+
+        // Navigation goal
+        double goal_map_x = 2;  // m, in map frame
+        double goal_map_y = 2;  // m, in map frame
+
         // Calculate closest object in laser message
 
         // Calculate closest object in map
 
         // Calculate closest wall of field
+        get_closest_wall(double robot_map_x, double robot_map_y,
+                         double robot_map_yaw);
 
         // Find closest obstacle of all
         double closest_obstacle_distance = 1;   // m, in base_link frame
         double closest_obstacle_direction = 0;  // rad, in base_link frame
 
-        double goal_x = 2;  // m, in map frame
-        double goal_y = 2;  // m, in map frame
-
         // Calculate desired speed and rotation
         double speed_linear = 0;
         double speed_rotational = 0;
+
+        double robot_yaw_error =
+            atan2(goal_map_y - robot_map_y, goal_map_x - robot_map_x);
+        double robot_distance_error =
+            sqrt((robot_map_x - goal_map_x) * (robot_map_x - goal_map_x) +
+                 (robot_map_y - goal_map_y) * (robot_map_y - goal_map_y));
+
+        std::cout << "yaw error: " << robot_yaw_error << std::endl;
+        std::cout << "distance error: " << robot_distance_error << std::endl;
 
         if (closest_obstacle_distance < 0.65) {
             speed_linear = 0;
@@ -137,6 +189,7 @@ class PlayNode {
                            (MAX_LINEAR_SPEED) /
                            (MAX_SPEED_DISTANCE - STOP_DISTANCE);
         } else {
+            // No obstacle in view
             speed_linear = MAX_LINEAR_SPEED;
         }
 
@@ -147,16 +200,19 @@ class PlayNode {
                 (closest_obstacle_distance - MAX_SPEED_DISTANCE) *
                 (MAX_ROTATIONAL_SPEEED) / (MAX_SPEED_DISTANCE - STOP_DISTANCE);
 
-            speed_rotational =
-                sign(closest_obstacle_direction) * abs(speed_rotational);
+            double sign_of_rotation = (closest_obstacle_direction >= 0) -
+                                      (closest_obstacle_direction < 0);
+
+            speed_rotational = sign_of_rotation * abs(speed_rotational);
         } else {
+            // No obstacle in view
             speed_rotational = 0;
         }
 
         // Publish speed commands
-        set_velocities(max(0, min(speed_linear, MAX_LINEAR_SPEED)),
-                       max(-MAX_ROTATIONAL_SPEEED,
-                           min(speed_rotational, MAX_ROTATIONAL_SPEEED)));
+        // set_velocities(max(0, min(speed_linear, MAX_LINEAR_SPEED)),
+        //               max(-MAX_ROTATIONAL_SPEEED,
+        //                   min(speed_rotational, MAX_ROTATIONAL_SPEEED)));
 
         got_map = false;
         got_laser = false;
