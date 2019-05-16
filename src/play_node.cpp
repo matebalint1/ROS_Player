@@ -96,7 +96,9 @@ class PlayNode {
     void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
                                             double pa2_x, double pa2_y,
                                             double pb1_x, double pb1_y,
-                                            double pb2_x, double pb2_y, ) {
+                                            double pb2_x, double pb2_y,
+                                            double& intersection_x,
+                                            double& intersection_y) {
         // Calculate intersection
 
         double va_x = pa2_x - pa1_x;
@@ -105,25 +107,140 @@ class PlayNode {
         double vb_x = pb2_x - pb1_x;
         double vb_y = pb2_y - pb1_y;
 
-        double vab_x = pb2_x - pa1_x;
-        double vab_y = pb2_y - pa1_y;
+        double vab_x = pb1_x - pa1_x;
+        double vab_y = pb1_y - pa1_y;
 
-        double va_len = sqrt(va_x * va_x + va_y * va_y);
-        double vb_len = sqrt(vb_x * vb_x + vb_y * vb_y);
+        // double va_len = sqrt(va_x * va_x + va_y * va_y);
+        // double vb_len = sqrt(vb_x * vb_x + vb_y * vb_y);
 
-        double det = -vb_y * va_x + vb_x * va_y;
-        if (det == 0) return;
+        double det = -vb_x * va_y + vb_y * va_x;
+        if (det == 0) {
+            // no intersection
+            intersection_x = -1;
+            intersection_y = -1;
+            return;
+        }
+        // double c1 = (-vab_y * va_x + va_y * vab_x) / det;
+        double c2 = (-vb_x * vab_y + vb_y * vab_x) / det;
+        if (c2 < 0) {
+            // intersection on wrong side
+            intersection_x = -1;
+            intersection_y = -1;
+            return;
+        }
 
-        double c1 = (-vab_y * va_x + va_y * vab_x) / det;
-        double c2 = (-vb_y * vab_x + vb_x * vab_y) / det;
+        intersection_x = pa1_x + c2 * va_x;
+        intersection_y = pa1_y + c2 * va_y;
+    }
 
-        double intersection_x = c2*
+    double distance_between_ponts(double p1_x, double p1_y, double p2_x,
+                                  double p2_y) {
+        return sqrt((p1_x - p2_x) * (p1_x - p2_x) +
+                    (p1_y - p2_y) * (p1_y - p2_y));
     }
 
     void get_closest_wall(double robot_map_x, double robot_map_y,
-                          double robot_map_yaw) {
+                          double robot_map_yaw, double& closest_intersection_x,
+                          double& closest_intersection_y) {
         // Calculate intersection points between clear zone rectangle and field
         // borders
+
+        closest_intersection_x = 100;  // outside of the field
+        closest_intersection_y = 100;
+
+        // Field corner points
+        double field_p1_x = 0;
+        double field_p1_y = 0;
+
+        double field_p2_x = 0;
+        double field_p2_y = field_length;
+
+        double field_p3_x = field_width;
+        double field_p3_y = field_length;
+
+        double field_p4_x = field_width;
+        double field_p4_y = 0;
+
+        std::vector<std::vector<double>> field_edge_vectors;
+        field_edge_vectors.push_back(std::vector<double>{
+            field_p1_x, field_p1_y, field_p2_x, field_p2_y});
+
+        field_edge_vectors.push_back(std::vector<double>{
+            field_p3_x, field_p3_y, field_p2_x, field_p2_y});
+
+        field_edge_vectors.push_back(std::vector<double>{
+            field_p3_x, field_p3_y, field_p4_x, field_p4_y});
+
+        field_edge_vectors.push_back(std::vector<double>{
+            field_p1_x, field_p1_y, field_p4_x, field_p4_y});
+
+        // Robot safe zone corner points
+        double safe_zone_pa1_x =
+            cos(robot_map_yaw) * 0 -
+            sin(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_x;
+        double safe_zone_pa1_y =
+            sin(robot_map_yaw) * 0 +
+            cos(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_y;
+
+        double safe_zone_pa2_x =
+            cos(robot_map_yaw) * ROBOT_SAFE_ZONE_LENGTH -
+            sin(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_x;
+        double safe_zone_pa2_y =
+            sin(robot_map_yaw) * ROBOT_SAFE_ZONE_LENGTH +
+            cos(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_y;
+
+        double safe_zone_pb1_x =
+            cos(robot_map_yaw) * 0 +
+            sin(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_x;
+        double safe_zone_pb1_y =
+            sin(robot_map_yaw) * 0 -
+            cos(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_y;
+
+        double safe_zone_pb2_x =
+            cos(robot_map_yaw) * ROBOT_SAFE_ZONE_LENGTH +
+            sin(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_x;
+        double safe_zone_pb2_y =
+            sin(robot_map_yaw) * ROBOT_SAFE_ZONE_LENGTH -
+            cos(robot_map_yaw) * ROBOT_SAFE_ZONE_WIDTH / 2 + robot_map_y;
+
+        std::vector<std::vector<double>> safe_zone_edge_vectors;
+
+        safe_zone_edge_vectors.push_back(
+            std::vector<double>{safe_zone_pa1_x, safe_zone_pa1_y,
+                                safe_zone_pa2_x, safe_zone_pa2_y});
+
+        safe_zone_edge_vectors.push_back(
+            std::vector<double>{safe_zone_pb1_x, safe_zone_pb1_y,
+                                safe_zone_pb2_x, safe_zone_pb2_y});
+
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 2; j++) {
+                double intersection_x = -1;
+                double intersection_y = -1;
+
+                get_intersection_beween_point_pair(
+                    safe_zone_edge_vectors[j][0], safe_zone_edge_vectors[j][1],
+                    safe_zone_edge_vectors[j][2], safe_zone_edge_vectors[j][3],
+                    field_edge_vectors[i][0], field_edge_vectors[i][1],
+                    field_edge_vectors[i][2], field_edge_vectors[i][3],
+                    intersection_x, intersection_y);
+
+                if (intersection_x != -1 && intersection_y != -1) {
+                    double new_distance =
+                        distance_between_ponts(intersection_x, intersection_y,
+                                               robot_map_x, robot_map_y);
+
+                    double current_distance = distance_between_ponts(
+                        closest_intersection_x, closest_intersection_y,
+                        robot_map_x, robot_map_y);
+
+                    if (new_distance < current_distance) {
+                        closest_intersection_x = intersection_x;
+                        closest_intersection_y = intersection_y;
+                    }
+                }
+            }
+        }
     }
 
     void process_messages() {
@@ -162,8 +279,13 @@ class PlayNode {
         // Calculate closest object in map
 
         // Calculate closest wall of field
-        get_closest_wall(double robot_map_x, double robot_map_y,
-                         double robot_map_yaw);
+        double closest_intersection_x;
+        double closest_intersection_y;
+        get_closest_wall(robot_map_x, robot_map_y, robot_map_yaw,
+                         closest_intersection_x, closest_intersection_y);
+
+        std::cout << "Closest wall x: " << closest_intersection_x
+                  << " y: " << closest_intersection_y << std::endl;
 
         // Find closest obstacle of all
         double closest_obstacle_distance = 1;   // m, in base_link frame
