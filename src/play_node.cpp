@@ -16,6 +16,8 @@
 #include <tf/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <algorithm>
+
 #include "pointcloud_helpers.hpp"
 
 class PlayNode {
@@ -27,7 +29,8 @@ class PlayNode {
         tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
         tf_listener = new tf2_ros::TransformListener(*tfBuffer);
 
-        velocity_pub = n->advertise<geometry_msgs::Twist>("cmd_vel", 1000);
+        velocity_pub =
+            n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
 
         ROS_INFO("Waiting for laser scan message");
         ros::topic::waitForMessage<sensor_msgs::LaserScan>(
@@ -243,13 +246,42 @@ class PlayNode {
         }
     }
 
-    void process_messages() {
-        // Copy
-        sensor_msgs::LaserScan cur_laser = laser_msg;
+    PointCloudPtr laser_msg_to_pointcloud(sensor_msgs::LaserScan& laser) {
+        pcl::PointCloud<PointType>::Ptr cloud(new pcl::PointCloud<PointType>);
 
+        // Parameters
+        const double MIN_DISTANCE = 0.05;  // m
+        const double MAX_DISTANCE = 6;     // m
+
+        double angle_min = laser.angle_min;
+        double angle_max = laser.angle_max;
+        double angle_increment = laser.angle_increment;
+
+        for (int i = 0; i < laser.ranges.size(); i++) {
+            double r = laser.ranges[i];
+            if (r > MIN_DISTANCE && r < MAX_DISTANCE) {
+                // Skip inf
+                double angle = angle_min + i * angle_increment;
+                PointType point;
+                point.x = r * cos(angle);
+                point.y = r * sin(angle);
+                point.z = 0;
+                point.rgb = to_pcl_rgb(255, 255, 255);
+            }
+        }
+        cloud->is_dense = false;
+        cloud->width = 1;
+        cloud->height = cloud->points.size();
+        return cloud;
+    }
+
+    void get_closest_object_in_laser(PointCloudPtr& cloud) {}
+
+    void process_messages() {
+  
         // Get required transformations
-        tf::Transform transform_laser_to_odom =
-            get_transform(tfBuffer, "robot1/odom", "robot1/front_laser");
+        tf::Transform transform_laser_to_baselink =
+            get_transform(tfBuffer, "robot1/front_laser", "robot1/base_link");
         tf::Transform transform_odom_to_baselink =
             get_transform(tfBuffer, "robot1/base_link", "robot1/odom");
         tf::Transform transform_odom_to_map =
@@ -263,7 +295,7 @@ class PlayNode {
                   << transform_odom_to_map.getOrigin().getY() << " " << yaw
                   << std::endl;
 
-        // Robot position in map frame
+        // Robot position in the map frame
         double robot_map_x =
             transform_odom_to_map.getOrigin().getX();  // m, in map frame
         double robot_map_y =
@@ -275,12 +307,17 @@ class PlayNode {
         double goal_map_y = 2;  // m, in map frame
 
         // Calculate closest object in laser message
+        sensor_msgs::LaserScan cur_laser = laser_msg;
+        PointCloudPtr laser_cloud = laser_msg_to_pointcloud(laser_msg);
+        pcl_ros::transformPointCloud(*laser_cloud, *laser_cloud,
+                                     transform_laser_to_baselink);
+        //get_closest_object_in_laser();
 
         // Calculate closest object in map
 
         // Calculate closest wall of field
-        double closest_intersection_x;
-        double closest_intersection_y;
+        double closest_intersection_x;  // in map frame
+        double closest_intersection_y;  // in map frame
         get_closest_wall(robot_map_x, robot_map_y, robot_map_yaw,
                          closest_intersection_x, closest_intersection_y);
 
@@ -288,8 +325,13 @@ class PlayNode {
                   << " y: " << closest_intersection_y << std::endl;
 
         // Find closest obstacle of all
-        double closest_obstacle_distance = 1;   // m, in base_link frame
-        double closest_obstacle_direction = 0;  // rad, in base_link frame
+        double closest_obstacle_distance = distance_between_ponts(
+            closest_intersection_x, closest_intersection_y, robot_map_x,
+            robot_map_y);  // m, in base_link frame
+        double closest_obstacle_direction =
+            atan2(closest_intersection_y - robot_map_y,
+                  closest_intersection_x - robot_map_x) -
+            robot_map_yaw;  // rad, in base_link frame
 
         // Calculate desired speed and rotation
         double speed_linear = 0;
@@ -301,12 +343,17 @@ class PlayNode {
             sqrt((robot_map_x - goal_map_x) * (robot_map_x - goal_map_x) +
                  (robot_map_y - goal_map_y) * (robot_map_y - goal_map_y));
 
-        std::cout << "yaw error: " << robot_yaw_error << std::endl;
-        std::cout << "distance error: " << robot_distance_error << std::endl;
+        // std::cout << "yaw error: " << robot_yaw_error << std::endl;
+        // std::cout << "distance error: " << robot_distance_error << std::endl;
 
-        if (closest_obstacle_distance < 0.65) {
+        std::cout << "yaw to obstacle: " << closest_obstacle_direction
+                  << std::endl;
+        std::cout << "distance to obstacle: " << closest_obstacle_distance
+                  << std::endl;
+
+        if (closest_obstacle_distance < STOP_DISTANCE) {
             speed_linear = 0;
-        } else if (closest_obstacle_distance < 1.3) {
+        } else if (closest_obstacle_distance < MAX_SPEED_DISTANCE) {
             speed_linear = (closest_obstacle_distance - STOP_DISTANCE) *
                            (MAX_LINEAR_SPEED) /
                            (MAX_SPEED_DISTANCE - STOP_DISTANCE);
@@ -315,26 +362,29 @@ class PlayNode {
             speed_linear = MAX_LINEAR_SPEED;
         }
 
-        if (closest_obstacle_distance < 0.65) {
+        if (closest_obstacle_distance < STOP_DISTANCE_ROT) {
             speed_rotational = MAX_ROTATIONAL_SPEEED;
-        } else if (closest_obstacle_distance < 1.3) {
+        } else if (closest_obstacle_distance < MAX_SPEED_DISTANCE_ROT) {
             speed_rotational =
-                (closest_obstacle_distance - MAX_SPEED_DISTANCE) *
-                (MAX_ROTATIONAL_SPEEED) / (MAX_SPEED_DISTANCE - STOP_DISTANCE);
+                (-closest_obstacle_distance + MAX_SPEED_DISTANCE_ROT) *
+                (MAX_ROTATIONAL_SPEEED) /
+                (MAX_SPEED_DISTANCE_ROT - STOP_DISTANCE_ROT);
 
             double sign_of_rotation = (closest_obstacle_direction >= 0) -
                                       (closest_obstacle_direction < 0);
 
-            speed_rotational = sign_of_rotation * abs(speed_rotational);
+            speed_rotational = -sign_of_rotation * fabs(speed_rotational);
         } else {
             // No obstacle in view
             speed_rotational = 0;
         }
-
+        std::cout << "rotational out: " << speed_rotational << std::endl;
+        std::cout << "linear out: " << speed_linear << " ************"
+                  << std::endl;
         // Publish speed commands
-        // set_velocities(max(0, min(speed_linear, MAX_LINEAR_SPEED)),
-        //               max(-MAX_ROTATIONAL_SPEEED,
-        //                   min(speed_rotational, MAX_ROTATIONAL_SPEEED)));
+        set_velocities(fmax(0, fmin(speed_linear, MAX_LINEAR_SPEED)),
+                       fmax(-MAX_ROTATIONAL_SPEEED,
+                            fmin(speed_rotational, MAX_ROTATIONAL_SPEEED)));
 
         got_map = false;
         got_laser = false;
@@ -367,10 +417,19 @@ class PlayNode {
 
     const double ROBOT_SAFE_ZONE_WIDTH = 0.5;   // m
     const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m
-    const double MAX_LINEAR_SPEED = 0.3;        // m/s
-    const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
-    const double STOP_DISTANCE = 0.65;          // m
-    const double MAX_SPEED_DISTANCE = 1.3;      // m
+
+    // const double MAX_LINEAR_SPEED = 0.3;        // m/s
+    // const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
+
+    // For debugging
+    const double MAX_LINEAR_SPEED = 0.6;       // m/s
+    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
+
+    const double STOP_DISTANCE = 0.65;      // m
+    const double MAX_SPEED_DISTANCE = 1.3;  // m
+
+    const double STOP_DISTANCE_ROT = 0.65 + 0.3;      // m
+    const double MAX_SPEED_DISTANCE_ROT = 1.3 + 0.3;  // m
 };
 
 int main(int argc, char** argv) {
@@ -388,6 +447,6 @@ int main(int argc, char** argv) {
         ros::spinOnce();
         r.sleep();
     }
-
+    playNode.set_velocities(0, 0);
     return 0;
 }
