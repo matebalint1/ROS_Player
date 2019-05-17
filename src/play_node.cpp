@@ -136,8 +136,8 @@ class PlayNode {
         intersection_y = pa1_y + c2 * va_y;
     }
 
-    double distance_between_ponts(double p1_x, double p1_y, double p2_x,
-                                  double p2_y) {
+    double distance_between_points(double p1_x, double p1_y, double p2_x,
+                                   double p2_y) {
         return sqrt((p1_x - p2_x) * (p1_x - p2_x) +
                     (p1_y - p2_y) * (p1_y - p2_y));
     }
@@ -230,10 +230,10 @@ class PlayNode {
 
                 if (intersection_x != -1 && intersection_y != -1) {
                     double new_distance =
-                        distance_between_ponts(intersection_x, intersection_y,
-                                               robot_map_x, robot_map_y);
+                        distance_between_points(intersection_x, intersection_y,
+                                                robot_map_x, robot_map_y);
 
-                    double current_distance = distance_between_ponts(
+                    double current_distance = distance_between_points(
                         closest_intersection_x, closest_intersection_y,
                         robot_map_x, robot_map_y);
 
@@ -248,17 +248,20 @@ class PlayNode {
 
     PointCloudPtr laser_msg_to_pointcloud(sensor_msgs::LaserScan& laser) {
         pcl::PointCloud<PointType>::Ptr cloud(new pcl::PointCloud<PointType>);
-
+std::cout<<"hello"<< std::endl;
         // Parameters
-        const double MIN_DISTANCE = 0.05;  // m
-        const double MAX_DISTANCE = 6;     // m
+        const double MIN_DISTANCE = 0.1;  // m
+        const double MAX_DISTANCE = 6;    // m
 
         double angle_min = laser.angle_min;
         double angle_max = laser.angle_max;
         double angle_increment = laser.angle_increment;
-
-        for (int i = 0; i < laser.ranges.size(); i++) {
+std::cout<<"hello2: "<<angle_max<< std::endl;
+        for (int i = 0; i < 360; i++) {
+            std::cout<<"helloi"<<i<< std::endl;
+             std::cout << laser.ranges[i] << std::endl;
             double r = laser.ranges[i];
+
             if (r > MIN_DISTANCE && r < MAX_DISTANCE) {
                 // Skip inf
                 double angle = angle_min + i * angle_increment;
@@ -267,6 +270,7 @@ class PlayNode {
                 point.y = r * sin(angle);
                 point.z = 0;
                 point.rgb = to_pcl_rgb(255, 255, 255);
+                cloud->points.push_back(point);
             }
         }
         cloud->is_dense = false;
@@ -275,11 +279,51 @@ class PlayNode {
         return cloud;
     }
 
-    void get_closest_object_in_laser(PointCloudPtr& cloud) {}
+    void get_closest_object_in_laser(PointCloudPtr& cloud,
+                                     double& closest_laser_x,
+                                     double& closest_laser_y) {
+        // Returns closest point to the robot that is within the safe zone of
+        // the robot, if no objects are close a large value is returned.
+
+        closest_laser_x = 100;
+        closest_laser_y = 100;
+        double last_distance = 100;  // reduces calculations
+
+        for (int i = 0; i < cloud->points.size(); i++) {
+            double p_x = cloud->points[i].x;
+            double p_y = cloud->points[i].y;
+
+            if (p_x <= ROBOT_SAFE_ZONE_WIDTH / 2 &&
+                p_x >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_y >= 0 &&
+                p_y <= ROBOT_SAFE_ZONE_LENGTH) {
+                // Inside safezone
+
+                // Calculate distance to origo
+                double distance = distance_between_points(p_x, p_y, 0, 0);
+                if (distance < last_distance) {
+                    closest_laser_x = p_x;
+                    closest_laser_y = p_y;
+                    last_distance = distance;
+                }
+            }
+        }
+    }
+
+    void to_polar(double p_in_x, double p_in_y, double& p_out_r,
+                  double& p_out_a, double origin_x = 0, double origin_y = 0,
+                  double origin_rotation = 0) {
+        // Transform (x,y) point to (r,angle) in relation to a origin point x,y
+        // and rotation of the origin frame around the z-axis.
+
+        p_out_r = distance_between_points(p_in_x, p_in_y, origin_x, origin_y);
+        p_out_a = atan2(p_in_y - origin_y, p_in_x - origin_x) - origin_rotation;
+    }
 
     void process_messages() {
-  
+        // -------------------------------------------------
         // Get required transformations
+        // -------------------------------------------------
+
         tf::Transform transform_laser_to_baselink =
             get_transform(tfBuffer, "robot1/front_laser", "robot1/base_link");
         tf::Transform transform_odom_to_baselink =
@@ -291,11 +335,14 @@ class PlayNode {
         double roll, pitch, yaw;
         rotation.getRPY(roll, pitch, yaw);
 
-        std::cout << transform_odom_to_map.getOrigin().getX() << " "
+        std::cout << "Robot position x,y,yaw "
+                  << transform_odom_to_map.getOrigin().getX() << " "
                   << transform_odom_to_map.getOrigin().getY() << " " << yaw
                   << std::endl;
 
+        // -------------------------------------------------
         // Robot position in the map frame
+        // -------------------------------------------------
         double robot_map_x =
             transform_odom_to_map.getOrigin().getX();  // m, in map frame
         double robot_map_y =
@@ -306,34 +353,73 @@ class PlayNode {
         double goal_map_x = 2;  // m, in map frame
         double goal_map_y = 2;  // m, in map frame
 
+        // -------------------------------------------------
         // Calculate closest object in laser message
+        // -------------------------------------------------
+std::cout<<"before"<< std::endl;
+        // Convert laser to pointcloud
         sensor_msgs::LaserScan cur_laser = laser_msg;
-        PointCloudPtr laser_cloud = laser_msg_to_pointcloud(laser_msg);
-        pcl_ros::transformPointCloud(*laser_cloud, *laser_cloud,
+        PointCloudPtr laser_cloud(new PointCloud);
+        PointCloudPtr temp = laser_msg_to_pointcloud(cur_laser);
+std::cout<<"after"<< std::endl;
+        // Transform cloud to base_link frame
+        pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                      transform_laser_to_baselink);
-        //get_closest_object_in_laser();
 
-        // Calculate closest object in map
+        // save_cloud_to_file(laser_cloud,
+        // "/home/cnc/Desktop/Hockey/laser.pcd");
 
+        // Get closest object
+        double closest_laser_x;  // in base_link frame
+        double closest_laser_y;  // in base_link frame
+        get_closest_object_in_laser(laser_cloud, closest_laser_x,
+                                    closest_laser_y);
+
+        // Transform point to distance,direction
+        double closest_laser_distance;   // in base_link frame
+        double closest_laser_direction;  // in base_link frame
+        to_polar(closest_laser_x, closest_laser_y, closest_laser_distance,
+                 closest_laser_direction);
+
+        std::cout << "Closest laser obstacle r: " << closest_laser_distance
+                  << " angle: " << closest_laser_direction << std::endl;
+
+        // -------------------------------------------------
         // Calculate closest wall of field
-        double closest_intersection_x;  // in map frame
-        double closest_intersection_y;  // in map frame
+        // -------------------------------------------------
+
+        // Get closest wall of the field intersecting the safe zone of the
+        // robot.
+        double closest_wall_x;  // in map frame
+        double closest_wall_y;  // in map frame
         get_closest_wall(robot_map_x, robot_map_y, robot_map_yaw,
-                         closest_intersection_x, closest_intersection_y);
+                         closest_wall_x, closest_wall_y);
 
-        std::cout << "Closest wall x: " << closest_intersection_x
-                  << " y: " << closest_intersection_y << std::endl;
+        std::cout << "Closest wall x: " << closest_wall_x
+                  << " y: " << closest_wall_y << std::endl;
 
-        // Find closest obstacle of all
-        double closest_obstacle_distance = distance_between_ponts(
-            closest_intersection_x, closest_intersection_y, robot_map_x,
-            robot_map_y);  // m, in base_link frame
-        double closest_obstacle_direction =
-            atan2(closest_intersection_y - robot_map_y,
-                  closest_intersection_x - robot_map_x) -
-            robot_map_yaw;  // rad, in base_link frame
+        // Get distance and angle of the wall in base_link frame.
+        double closest_wall_distance;
+        double closest_wall_direction;
+        to_polar(closest_wall_x, closest_wall_y, closest_wall_distance,
+                 closest_wall_direction, robot_map_x, robot_map_y,
+                 robot_map_yaw);
 
+        // -------------------------------------------------
+        // Calculate closest object in map
+        // -------------------------------------------------
+
+        // -------------------------------------------------
+        // Calculate closest obstacle of all
+        // -------------------------------------------------
+
+        double closest_obstacle_distance = closest_wall_distance;
+        double closest_obstacle_direction = closest_wall_direction;
+
+        // -------------------------------------------------
         // Calculate desired speed and rotation
+        // -------------------------------------------------
+
         double speed_linear = 0;
         double speed_rotational = 0;
 
@@ -381,7 +467,11 @@ class PlayNode {
         std::cout << "rotational out: " << speed_rotational << std::endl;
         std::cout << "linear out: " << speed_linear << " ************"
                   << std::endl;
+
+        // -------------------------------------------------
         // Publish speed commands
+        // -------------------------------------------------
+
         set_velocities(fmax(0, fmin(speed_linear, MAX_LINEAR_SPEED)),
                        fmax(-MAX_ROTATIONAL_SPEEED,
                             fmin(speed_rotational, MAX_ROTATIONAL_SPEEED)));
