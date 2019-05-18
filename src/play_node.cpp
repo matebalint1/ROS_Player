@@ -257,22 +257,25 @@ class PlayNode {
         double angle_max = laser.angle_max;
         double angle_increment = laser.angle_increment;
 
-        for (int i = 0; i < 360; i++) {
-            //std::cout<<"laser i"<<i<< std::endl;
-             //std::cout << laser.ranges[i] << std::endl;
-            double r = laser.ranges[i];
+        if (angle_max != 0) {  // Do not read empty messages
+            for (int i = 0; i < 360; i++) {
+                // std::cout<<"laser i"<<i<< std::endl;
+                // std::cout << laser.ranges[i] << std::endl;
+                double r = laser.ranges[i];
 
-            if (r > MIN_DISTANCE && r < MAX_DISTANCE) {
-                // Skip inf
-                double angle = angle_min + i * angle_increment;
-                PointType point;
-                point.x = r * cos(angle);
-                point.y = r * sin(angle);
-                point.z = 0;
-                point.rgb = to_pcl_rgb(255, 255, 255);
-                cloud->points.push_back(point);
+                if (r > MIN_DISTANCE && r < MAX_DISTANCE) {
+                    // Skip inf
+                    double angle = angle_min + i * angle_increment;
+                    PointType point;
+                    point.x = r * cos(angle);
+                    point.y = r * sin(angle);
+                    point.z = 0;
+                    point.rgb = to_pcl_rgb(255, 255, 255);
+                    cloud->points.push_back(point);
+                }
             }
         }
+
         cloud->is_dense = false;
         cloud->width = 1;
         cloud->height = cloud->points.size();
@@ -287,15 +290,15 @@ class PlayNode {
 
         closest_laser_x = 100;
         closest_laser_y = 100;
-        double last_distance = 100;  // reduces calculations
+        double last_distance = 140;  // reduces calculations
 
         for (int i = 0; i < cloud->points.size(); i++) {
             double p_x = cloud->points[i].x;
             double p_y = cloud->points[i].y;
 
-            if (p_x <= ROBOT_SAFE_ZONE_WIDTH / 2 &&
-                p_x >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_y >= 0 &&
-                p_y <= ROBOT_SAFE_ZONE_LENGTH) {
+            if (p_y <= ROBOT_SAFE_ZONE_WIDTH / 2 &&
+                p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= 0 &&
+                p_x <= ROBOT_SAFE_ZONE_LENGTH) {
                 // Inside safezone
 
                 // Calculate distance to origo
