@@ -248,7 +248,7 @@ class PlayNode {
 
     PointCloudPtr laser_msg_to_pointcloud(sensor_msgs::LaserScan& laser) {
         pcl::PointCloud<PointType>::Ptr cloud(new pcl::PointCloud<PointType>);
-std::cout<<"hello"<< std::endl;
+
         // Parameters
         const double MIN_DISTANCE = 0.1;  // m
         const double MAX_DISTANCE = 6;    // m
@@ -256,10 +256,10 @@ std::cout<<"hello"<< std::endl;
         double angle_min = laser.angle_min;
         double angle_max = laser.angle_max;
         double angle_increment = laser.angle_increment;
-std::cout<<"hello2: "<<angle_max<< std::endl;
+
         for (int i = 0; i < 360; i++) {
-            std::cout<<"helloi"<<i<< std::endl;
-             std::cout << laser.ranges[i] << std::endl;
+            //std::cout<<"laser i"<<i<< std::endl;
+             //std::cout << laser.ranges[i] << std::endl;
             double r = laser.ranges[i];
 
             if (r > MIN_DISTANCE && r < MAX_DISTANCE) {
@@ -343,6 +343,7 @@ std::cout<<"hello2: "<<angle_max<< std::endl;
         // -------------------------------------------------
         // Robot position in the map frame
         // -------------------------------------------------
+
         double robot_map_x =
             transform_odom_to_map.getOrigin().getX();  // m, in map frame
         double robot_map_y =
@@ -356,12 +357,12 @@ std::cout<<"hello2: "<<angle_max<< std::endl;
         // -------------------------------------------------
         // Calculate closest object in laser message
         // -------------------------------------------------
-std::cout<<"before"<< std::endl;
+
         // Convert laser to pointcloud
         sensor_msgs::LaserScan cur_laser = laser_msg;
         PointCloudPtr laser_cloud(new PointCloud);
         PointCloudPtr temp = laser_msg_to_pointcloud(cur_laser);
-std::cout<<"after"<< std::endl;
+
         // Transform cloud to base_link frame
         pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                      transform_laser_to_baselink);
@@ -385,7 +386,7 @@ std::cout<<"after"<< std::endl;
                   << " angle: " << closest_laser_direction << std::endl;
 
         // -------------------------------------------------
-        // Calculate closest wall of field
+        // Calculate closest wall to robot of the field
         // -------------------------------------------------
 
         // Get closest wall of the field intersecting the safe zone of the
