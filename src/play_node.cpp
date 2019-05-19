@@ -17,8 +17,9 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <algorithm>
-
 #include "pointcloud_helpers.hpp"
+
+enum Robot_state { drive_to, drive_random, stop };
 
 class PlayNode {
    public:
@@ -297,8 +298,8 @@ class PlayNode {
             double p_y = cloud->points[i].y;
 
             if (p_y <= ROBOT_SAFE_ZONE_WIDTH / 2 &&
-                p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= 0 &&
-                p_x <= ROBOT_SAFE_ZONE_LENGTH) {
+                p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= 0 /*&&
+                p_x <= ROBOT_SAFE_ZONE_LENGTH*/) {
                 // Inside safezone
 
                 // Calculate distance to origo
@@ -319,7 +320,80 @@ class PlayNode {
         // and rotation of the origin frame around the z-axis.
 
         p_out_r = distance_between_points(p_in_x, p_in_y, origin_x, origin_y);
+
+        // Calculate angle, make sure that angle is between [-pi,pi]
         p_out_a = atan2(p_in_y - origin_y, p_in_x - origin_x) - origin_rotation;
+        p_out_a = atan2(sin(p_out_a), cos(p_out_a));
+    }
+
+    void set_speeds(double& speed_linear, double& speed_rotational,
+                    double closest_obstacle_distance,
+                    double closest_obstacle_direction,
+                    double robot_distance_error, double robot_yaw_error) {
+        // Linear speed
+        if (closest_obstacle_distance < DISTANCE_LINEAR_STOP) {
+            speed_linear = 0;
+
+            std::cout << "Linear speed mode: COLLISION AVOIDANCE (min)"
+                      << std::endl;
+        } else if (closest_obstacle_distance < DISTANCE_LINEAR_FREE) {
+            speed_linear = (closest_obstacle_distance - DISTANCE_LINEAR_STOP) *
+                           (MAX_LINEAR_SPEED) /
+                           (DISTANCE_LINEAR_FREE - DISTANCE_LINEAR_STOP);
+
+            // Make robot move with a decet speed when close to stop distance
+            speed_linear = fmax(MIN_LINEAR_SPEED, speed_linear);
+
+            std::cout << "Linear speed mode: CONTROL" << std::endl;
+        } else {
+            // No obstacle in view
+            if (state == drive_to) {
+                speed_linear = fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED /
+                                                          DISTANCE_LINEAR_FREE *
+                                                          robot_distance_error);
+            } else {
+                // Random
+                speed_linear = MAX_LINEAR_SPEED;
+            }
+
+            std::cout << "Linear speed mode: FREE" << std::endl;
+        }
+
+        // Rotational speed
+        double sign_of_rotation = (closest_obstacle_direction >= 0) -
+                                  (closest_obstacle_direction < 0);
+        if (closest_obstacle_distance < DISTANCE_MAX_ROTATION) {
+            // Avoid rotational oscillations
+            if (speed_linear == 0) {
+                // Always same direction
+                speed_rotational = MAX_ROTATIONAL_SPEEED;
+            } else {
+                speed_rotational = -sign_of_rotation * MAX_ROTATIONAL_SPEEED;
+            }
+
+            std::cout << "Angular speed mode: COLLISION AVOIDANCE (max)"
+                      << std::endl;
+        } else if (closest_obstacle_distance < DISTANCE_FREE_ROTATION) {
+            speed_rotational =
+                (-closest_obstacle_distance + DISTANCE_FREE_ROTATION) *
+                (MAX_ROTATIONAL_SPEEED) /
+                (DISTANCE_FREE_ROTATION - DISTANCE_MAX_ROTATION);
+
+            speed_rotational = -sign_of_rotation * fabs(speed_rotational);
+
+            std::cout << "Angular speed mode: CONTROL" << std::endl;
+        } else {
+            // No obstacle in view
+            if (state == drive_to) {
+                speed_rotational = MAX_ROTATIONAL_SPEEED /
+                                   DISTANCE_FREE_ROTATION * robot_yaw_error;
+            } else {
+                // Random
+                speed_rotational = 0;
+            }
+
+            std::cout << "Angular speed mode: FREE" << std::endl;
+        }
     }
 
     void process_messages() {
@@ -339,8 +413,8 @@ class PlayNode {
         rotation.getRPY(roll, pitch, yaw);
 
         std::cout << "Robot position x,y,yaw "
-                  << transform_odom_to_map.getOrigin().getX() << " "
-                  << transform_odom_to_map.getOrigin().getY() << " " << yaw
+                  << transform_odom_to_map.getOrigin().getX() << "\t"
+                  << transform_odom_to_map.getOrigin().getY() << "\t" << yaw
                   << std::endl;
 
         // -------------------------------------------------
@@ -352,10 +426,6 @@ class PlayNode {
         double robot_map_y =
             transform_odom_to_map.getOrigin().getY();  // m, in map frame
         double robot_map_yaw = yaw;                    // rad in map frame
-
-        // Navigation goal
-        double goal_map_x = 2;  // m, in map frame
-        double goal_map_y = 2;  // m, in map frame
 
         // -------------------------------------------------
         // Calculate closest object in laser message
@@ -386,7 +456,7 @@ class PlayNode {
                  closest_laser_direction);
 
         std::cout << "Closest laser obstacle r: " << closest_laser_distance
-                  << " angle: " << closest_laser_direction << std::endl;
+                  << "\tangle: " << closest_laser_direction << std::endl;
 
         // -------------------------------------------------
         // Calculate closest wall to robot of the field
@@ -399,8 +469,8 @@ class PlayNode {
         get_closest_wall(robot_map_x, robot_map_y, robot_map_yaw,
                          closest_wall_x, closest_wall_y);
 
-        std::cout << "Closest wall x: " << closest_wall_x
-                  << " y: " << closest_wall_y << std::endl;
+        // std::cout << "Closest wall x: " << closest_wall_x
+        //          << " y: " << closest_wall_y << std::endl;
 
         // Get distance and angle of the wall in base_link frame.
         double closest_wall_distance;
@@ -409,6 +479,9 @@ class PlayNode {
                  closest_wall_direction, robot_map_x, robot_map_y,
                  robot_map_yaw);
 
+        std::cout << "Closest wall  obstacle r: " << closest_wall_distance
+                  << "\tangle: " << closest_wall_direction << std::endl;
+
         // -------------------------------------------------
         // Calculate closest object in map
         // -------------------------------------------------
@@ -416,9 +489,30 @@ class PlayNode {
         // -------------------------------------------------
         // Calculate closest obstacle of all
         // -------------------------------------------------
+        const double DETERMINE_ROTATION_DIRECTION_BASED_ON_WALL_DISTANCE =
+            DISTANCE_LINEAR_FREE;  // m
 
-        double closest_obstacle_distance = closest_wall_distance;
-        double closest_obstacle_direction = closest_wall_direction;
+        double closest_obstacle_distance = closest_laser_distance;
+        double closest_obstacle_direction = closest_laser_direction;
+        if (closest_wall_distance < closest_laser_distance) {
+            // Wall closer
+            closest_obstacle_distance = closest_wall_distance;
+            closest_obstacle_direction = closest_wall_direction;
+
+        } else {
+            // Obstacle closer
+            closest_obstacle_distance = closest_laser_distance;
+
+            if (closest_wall_distance <
+                DETERMINE_ROTATION_DIRECTION_BASED_ON_WALL_DISTANCE) {
+                // Even if laser obstacle is closer the direction ofrotation is
+                // determined by the wall if it is closer than the threshold
+                // distance.
+                closest_obstacle_direction = closest_wall_direction;
+            } else {
+                closest_obstacle_direction = closest_laser_direction;
+            }
+        }
 
         // -------------------------------------------------
         // Calculate desired speed and rotation
@@ -427,50 +521,61 @@ class PlayNode {
         double speed_linear = 0;
         double speed_rotational = 0;
 
-        double robot_yaw_error =
-            atan2(goal_map_y - robot_map_y, goal_map_x - robot_map_x);
-        double robot_distance_error =
-            sqrt((robot_map_x - goal_map_x) * (robot_map_x - goal_map_x) +
-                 (robot_map_y - goal_map_y) * (robot_map_y - goal_map_y));
+        // Robot distance and heading error to goal point
+        double robot_distance_error = 0;
+        double robot_yaw_error = 0;
 
-        // std::cout << "yaw error: " << robot_yaw_error << std::endl;
-        // std::cout << "distance error: " << robot_distance_error << std::endl;
+        // State and parameter update of robot
+        if (state == drive_random) {
+        } else if (state == drive_to) {
+            // Check if goal is valid or it has been reached already
+            if (goal_point_x > 0 && goal_point_y > 0 &&
+                goal_point_x < field_width && goal_point_y < field_length) {
+                // Valid goal, calculate errors
+                to_polar(goal_point_x, goal_point_y, robot_distance_error,
+                         robot_yaw_error, robot_map_x, robot_map_y,
+                         robot_map_yaw);
 
-        std::cout << "yaw to obstacle: " << closest_obstacle_direction
-                  << std::endl;
-        std::cout << "distance to obstacle: " << closest_obstacle_distance
-                  << std::endl;
+                if (robot_distance_error <= DISTANCE_GOAL_REACHED) {
+                    // Goal reached
+                    state = stop;
+                    goal_point_x = -1;
+                    goal_point_y = -1;
+                } else {
+                    // Goal not reached
+                    state = drive_to;
+                }
+            } else {
+                // No valid goal point change state to stop
+                state = stop;
+            }
 
-        if (closest_obstacle_distance < STOP_DISTANCE) {
-            speed_linear = 0;
-        } else if (closest_obstacle_distance < MAX_SPEED_DISTANCE) {
-            speed_linear = (closest_obstacle_distance - STOP_DISTANCE) *
-                           (MAX_LINEAR_SPEED) /
-                           (MAX_SPEED_DISTANCE - STOP_DISTANCE);
-        } else {
-            // No obstacle in view
-            speed_linear = MAX_LINEAR_SPEED;
+        } else if (state == stop) {
         }
 
-        if (closest_obstacle_distance < STOP_DISTANCE_ROT) {
-            speed_rotational = MAX_ROTATIONAL_SPEEED;
-        } else if (closest_obstacle_distance < MAX_SPEED_DISTANCE_ROT) {
-            speed_rotational =
-                (-closest_obstacle_distance + MAX_SPEED_DISTANCE_ROT) *
-                (MAX_ROTATIONAL_SPEEED) /
-                (MAX_SPEED_DISTANCE_ROT - STOP_DISTANCE_ROT);
-
-            double sign_of_rotation = (closest_obstacle_direction >= 0) -
-                                      (closest_obstacle_direction < 0);
-
-            speed_rotational = -sign_of_rotation * fabs(speed_rotational);
-        } else {
-            // No obstacle in view
+        // Calculate speeds based on calculated parameters and robot state
+        if (state == drive_random) {
+            set_speeds(speed_linear, speed_rotational,
+                       closest_obstacle_distance, closest_obstacle_direction,
+                       robot_distance_error, robot_yaw_error);
+        } else if (state == drive_to) {
+            set_speeds(speed_linear, speed_rotational,
+                       closest_obstacle_distance, closest_obstacle_direction,
+                       robot_distance_error, robot_yaw_error);
+        } else if (state == stop) {
+            speed_linear = 0;
             speed_rotational = 0;
         }
-        std::cout << "rotational out: " << speed_rotational << std::endl;
-        std::cout << "linear out: " << speed_linear << " ************"
-                  << std::endl;
+
+        // std::cout << "Yaw error: " << robot_yaw_error << std::endl;
+        // std::cout << "Distance error: " << robot_distance_error << std::endl;
+
+        std::cout << "Closest control obstacle r: " << closest_obstacle_distance
+                  << "\tangle: " << closest_obstacle_direction << std::endl;
+
+        std::cout << "Rotational out: " << speed_rotational << std::endl;
+        std::cout << "Linear out: " << speed_linear
+                  << "\n************************************" << std::endl;
 
         // -------------------------------------------------
         // Publish speed commands
@@ -480,6 +585,7 @@ class PlayNode {
                        fmax(-MAX_ROTATIONAL_SPEEED,
                             fmin(speed_rotational, MAX_ROTATIONAL_SPEEED)));
 
+        // Reset
         got_map = false;
         got_laser = false;
         got_odometry = false;
@@ -512,18 +618,28 @@ class PlayNode {
     const double ROBOT_SAFE_ZONE_WIDTH = 0.5;   // m
     const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m
 
+    // Real driving
     // const double MAX_LINEAR_SPEED = 0.3;        // m/s
     // const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
 
-    // For debugging
+    // For simulation
     const double MAX_LINEAR_SPEED = 0.6;       // m/s
     const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
+    const double MIN_LINEAR_SPEED = 0.1;       // m/s
 
-    const double STOP_DISTANCE = 0.65;      // m
-    const double MAX_SPEED_DISTANCE = 1.3;  // m
+    // Linear
+    const double DISTANCE_LINEAR_STOP = 0.5;  // m
+    const double DISTANCE_LINEAR_FREE = 1.2;  // m
 
-    const double STOP_DISTANCE_ROT = 0.65 + 0.3;      // m
-    const double MAX_SPEED_DISTANCE_ROT = 1.3 + 0.3;  // m
+    // Rotational
+    const double DISTANCE_MAX_ROTATION = 0.65 + 0.1;  // m
+    const double DISTANCE_FREE_ROTATION = 1.2;        // m
+
+    // Robot behaviour control
+    const double DISTANCE_GOAL_REACHED = 0.1;
+    Robot_state state = drive_to;
+    double goal_point_x = 1;  // map frame
+    double goal_point_y = 1;  // map frame
 };
 
 int main(int argc, char** argv) {
