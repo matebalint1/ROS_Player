@@ -12,13 +12,12 @@
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 
-#include "pointcloud_processor.hpp"
 #include "pointcloud_helpers.hpp"
+#include "pointcloud_processor.hpp"
 
 #include "cv_bridge/cv_bridge.h"        // do not move up
 #include "opencv2/highgui/highgui.hpp"  // do not move up
 #include "opencv2/opencv.hpp"           // do not move up
-
 
 class PlayNode {
    public:
@@ -124,10 +123,19 @@ class PlayNode {
         PointCloudPtr cur_kinect(new PointCloud);
 
         // Find transformation for desired frames
-        tf::Transform transform_kinect_to_odom =
-            get_transform(tfBuffer, "robot1/odom", "robot1/kinect_rgb_optical_frame");
-        tf::Transform transform_odom_to_baselink =
-            get_transform(tfBuffer, "robot1/base_link", "robot1/odom");
+        bool succesful = true;
+        tf::Transform transform_kinect_to_odom;
+        succesful &=
+            get_transform(transform_kinect_to_odom, tfBuffer, "robot1/odom",
+                          "robot1/kinect_rgb_optical_frame");
+                          
+        tf::Transform transform_odom_to_baselink;
+        succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
+                                   "robot1/base_link", "robot1/odom");
+        if (succesful == false) {
+            std::cout << "Transformation missing" << std::endl;
+            return;
+        }
 
         // Transform pointcloud to odom tf frame
         pcl_ros::transformPointCloud(*cur_kinect_in, *cur_kinect,

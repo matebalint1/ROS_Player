@@ -421,8 +421,7 @@ class PlayNode {
                              double robot_yaw_error) {
         if (is_obstacle_between_robot_and_goal(
                 closest_obstacle_distance, closest_obstacle_direction,
-                robot_distance_error,
-                robot_yaw_error)) {
+                robot_distance_error, robot_yaw_error)) {
             // Obstacle in between goal and robot
             collision_avoidance(speed_linear, speed_rotational,
                                 closest_obstacle_distance,
@@ -433,7 +432,8 @@ class PlayNode {
 
             if ((robot_yaw_error > -MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL &&
                  robot_yaw_error < MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL) ||
-                (robot_distance_error > 0.6 && closest_obstacle_distance > 0.6)) {
+                (robot_distance_error > 0.6 &&
+                 closest_obstacle_distance > 0.6)) {
                 // Yaw error is small enough or distance error is large
                 // enough
                 speed_linear = fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED /
@@ -453,48 +453,56 @@ class PlayNode {
         // -------------------------------------------------
         // Get required transformations
         // -------------------------------------------------
+        bool succesful = true;
+        tf::Transform transform_laser_to_baselink;
+        succesful &= get_transform(transform_laser_to_baselink, tfBuffer,
+                                   "robot1/front_laser", "robot1/base_link");
+        tf::Transform transform_odom_to_baselink;
+        succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
+                                   "robot1/base_link", "robot1/odom");
+        tf::Transform transform_base_link_to_map;
+        succesful &= get_transform(transform_base_link_to_map, tfBuffer,
+                                   "robot1/map", "robot1/base_link");
 
-        tf::Transform transform_laser_to_baselink =
-            get_transform(tfBuffer, "robot1/front_laser", "robot1/base_link");
-        tf::Transform transform_odom_to_baselink =
-            get_transform(tfBuffer, "robot1/base_link", "robot1/odom");
-        tf::Transform transform_odom_to_map =
-            get_transform(tfBuffer, "robot1/map", "robot1/base_link");
+        if (succesful == false) {
+            std::cout << "Transformation missing" << std::endl;
+            return;
+        }
 
-        tf::Matrix3x3 rotation(transform_odom_to_map.getRotation());
+        tf::Matrix3x3 rotation(transform_base_link_to_map.getRotation());
         double roll, pitch, yaw;
         rotation.getRPY(roll, pitch, yaw);
 
         std::cout << "Robot position x,y,yaw "
-                  << transform_odom_to_map.getOrigin().getX() << "\t"
-                  << transform_odom_to_map.getOrigin().getY() << "\t" << yaw
-                  << std::endl;
+                  << transform_base_link_to_map.getOrigin().getX() << "\t"
+                  << transform_base_link_to_map.getOrigin().getY() << "\t"
+                  << yaw << std::endl;
 
         // -------------------------------------------------
         // Robot position in the map frame
         // -------------------------------------------------
 
         double robot_map_x =
-            transform_odom_to_map.getOrigin().getX();  // m, in map frame
+            transform_base_link_to_map.getOrigin().getX();  // m, in map frame
         double robot_map_y =
-            transform_odom_to_map.getOrigin().getY();  // m, in map frame
-        double robot_map_yaw = yaw;                    // rad in map frame
+            transform_base_link_to_map.getOrigin().getY();  // m, in map frame
+        double robot_map_yaw = yaw;                         // rad in map frame
 
         // -------------------------------------------------
         // Calculate closest object in laser message
         // -------------------------------------------------
+        //save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
 
         // Convert laser to pointcloud
         sensor_msgs::LaserScan cur_laser = laser_msg;
         PointCloudPtr laser_cloud(new PointCloud);
-        PointCloudPtr temp = laser_msg_to_pointcloud(cur_laser);
+        temp = laser_msg_to_pointcloud(cur_laser);
 
         // Transform cloud to base_link frame
         pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                      transform_laser_to_baselink);
 
-        // save_cloud_to_file(laser_cloud,
-        // "/home/cnc/Desktop/Hockey/laser.pcd");
+        //save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_new.pcd");
 
         // Get closest object
         double closest_laser_x;  // in base_link frame
@@ -669,6 +677,8 @@ class PlayNode {
     ros::Subscriber map_sub;
     ros::Subscriber laser_sub;
     // ros::Subscriber odometry_sub;
+
+    PointCloudPtr temp = PointCloudPtr(new PointCloud);
 
     PointCloud map_objects_msg;
     sensor_msgs::LaserScan laser_msg;

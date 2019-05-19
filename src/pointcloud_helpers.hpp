@@ -10,9 +10,10 @@ typedef pcl::PointXYZRGBA PointTypeRGBA;
 typedef pcl::PointCloud<PointTypeRGBA> PointCloudRGBA;
 typedef pcl::PointCloud<PointTypeRGBA>::Ptr PointCloudPtrRGBA;
 
-tf::Transform get_transform(tf2_ros::Buffer *&tfBuffer,
-                            std::string goal_frame, std::string current_frame) {
-    tf::Transform transform;
+bool get_transform(tf::Transform &transform, tf2_ros::Buffer *&tfBuffer,
+                   std::string goal_frame, std::string current_frame) {
+    // Returns true if succesful
+    
     geometry_msgs::TransformStamped transformStamped;
     try {
         // Find transformation for pointcloud from the buffer
@@ -33,11 +34,13 @@ tf::Transform get_transform(tf2_ros::Buffer *&tfBuffer,
 
         transform.setOrigin(vector);
         transform.setRotation(rotation);
+        return true;
     } catch (tf2::TransformException &ex) {
         ROS_ERROR("%s", ex.what());
         ros::Duration(1.0).sleep();
+        return false;
     }
-    return transform;
+    return true;
 }
 
 float to_pcl_rgb(uint8_t r, uint8_t g, uint8_t b) {
