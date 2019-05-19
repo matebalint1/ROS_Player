@@ -19,7 +19,7 @@
 #include <algorithm>
 #include "pointcloud_helpers.hpp"
 
-enum Robot_state { drive_to, drive_random, stop };
+enum Robot_state { drive_to, drive_random, rotate, move, stop };
 
 class PlayNode {
    public:
@@ -488,10 +488,17 @@ class PlayNode {
             transform_base_link_to_map.getOrigin().getY();  // m, in map frame
         double robot_map_yaw = yaw;                         // rad in map frame
 
+        if (robot_map_last_x == -1 && robot_map_last_y == -1) {
+            // Initialize
+            robot_map_last_x = robot_map_x;
+            robot_map_last_y = robot_map_y;
+            robot_map_last_yaw = robot_map_yaw;
+        }
+
         // -------------------------------------------------
         // Calculate closest object in laser message
         // -------------------------------------------------
-        //save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
+        // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
 
         // Convert laser to pointcloud
         sensor_msgs::LaserScan cur_laser = laser_msg;
@@ -502,7 +509,7 @@ class PlayNode {
         pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                      transform_laser_to_baselink);
 
-        //save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_new.pcd");
+        // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_new.pcd");
 
         // Get closest object
         double closest_laser_x;  // in base_link frame
@@ -607,7 +614,48 @@ class PlayNode {
                 // No valid goal point change state to stop
                 state = stop;
             }
+        } else if (state == rotate) {
+            // Update rotation to go
+            int sign2 = (rotation_to_go >= 0) - (rotation_to_go < 0);
+            if ((robot_map_yaw >= 0 && robot_map_last_yaw >= 0) ||
+                (robot_map_yaw < 0 && robot_map_last_yaw < 0)) {
+                rotation_to_go -= robot_map_yaw - robot_map_last_yaw;
+            } else {
+                // Handle edge cases between -pi,pi and -0,0 properly
+                if ((rotation_to_go >= 0)) {
+                    if (robot_map_yaw >= 0 && robot_map_last_yaw < 0) {
+                        rotation_to_go -= robot_map_yaw - robot_map_last_yaw;
+                    } else {
+                        rotation_to_go -=
+                            2 * 3.1415 + robot_map_yaw - robot_map_last_yaw;
+                    }
+                } else {
+                    if (robot_map_yaw >= 0 && robot_map_last_yaw < 0) {
+                        rotation_to_go +=
+                            2 * 3.1415 - (robot_map_yaw - robot_map_last_yaw);
+                    } else {
+                        rotation_to_go += -robot_map_yaw + robot_map_last_yaw;
+                    }
+                }
+            }
 
+            if (rotation_to_go < 0.1 && rotation_to_go > -0.1) {
+                // Goal reached
+                rotation_to_go = 0;
+                state = stop;
+            }
+        } else if (state == move) {
+            int sign = (distance_to_go >= 0) - (distance_to_go < 0);
+            distance_to_go -= sign * distance_between_points(
+                                         robot_map_x, robot_map_y,
+                                         robot_map_last_x, robot_map_last_y);
+
+            if (distance_to_go < DISTANCE_GOAL_REACHED &&
+                distance_to_go > -DISTANCE_GOAL_REACHED) {
+                // Goal reached
+                distance_to_go = 0;
+                state = stop;
+            }
         } else if (state == stop) {
         }
 
@@ -617,7 +665,6 @@ class PlayNode {
                                 closest_obstacle_distance,
                                 closest_obstacle_direction,
                                 robot_distance_error, robot_yaw_error);
-
             std::cout << "Robot state DRIVE RANDOM" << std::endl;
 
         } else if (state == drive_to) {
@@ -625,8 +672,23 @@ class PlayNode {
                                 closest_obstacle_distance,
                                 closest_obstacle_direction,
                                 robot_distance_error, robot_yaw_error);
-
             std::cout << "Robot state DRIVE TO" << std::endl;
+
+        } else if (state == rotate) {
+            speed_linear = 0;
+            speed_rotational = rotation_to_go * 2 * MAX_ROTATIONAL_SPEEED /
+                               DISTANCE_FREE_ROTATION;
+            std::cout << "Robot state ROTATE, to rotate: " << rotation_to_go
+                      << std::endl;
+
+        } else if (state == move) {
+            int sign = (distance_to_go >= 0) - (distance_to_go < 0);
+            speed_linear = sign * fmax(MIN_LINEAR_SPEED,
+                                       fabs(distance_to_go) * MAX_LINEAR_SPEED /
+                                           DISTANCE_LINEAR_FREE);
+            speed_rotational = 0;
+            std::cout << "Robot state MOVE, distance to move: "
+                      << distance_to_go << std::endl;
 
         } else if (state == stop) {
             speed_linear = 0;
@@ -649,14 +711,19 @@ class PlayNode {
         // Publish speed commands
         // -------------------------------------------------
 
-        set_velocities(fmax(0, fmin(speed_linear, MAX_LINEAR_SPEED)),
-                       fmax(-MAX_ROTATIONAL_SPEEED,
-                            fmin(speed_rotational, MAX_ROTATIONAL_SPEEED)));
+        set_velocities(
+            fmax(-MAX_LINEAR_SPEED, fmin(speed_linear, MAX_LINEAR_SPEED)),
+            fmax(-MAX_ROTATIONAL_SPEEED,
+                 fmin(speed_rotational, MAX_ROTATIONAL_SPEEED)));
 
         // Reset
         got_map = false;
         got_laser = false;
         // got_odometry = false;
+
+        robot_map_last_x = robot_map_x;
+        robot_map_last_y = robot_map_y;
+        robot_map_last_yaw = robot_map_yaw;
     }
 
     bool got_messages() const {
@@ -684,11 +751,16 @@ class PlayNode {
     sensor_msgs::LaserScan laser_msg;
     nav_msgs::Odometry odometry_msg;
 
+    // --------------------------------------------
+    // Play field
+    // --------------------------------------------
+
     double field_width = 3;                     // m
     double field_length = field_width * 5 / 3;  // m
 
-    const double ROBOT_SAFE_ZONE_WIDTH = 0.5;   // m
-    const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m, not relevant anymore
+    // --------------------------------------------
+    // Speed settings
+    // --------------------------------------------
 
     // Real driving
     // const double MAX_LINEAR_SPEED = 0.3;        // m/s
@@ -698,6 +770,14 @@ class PlayNode {
     const double MAX_LINEAR_SPEED = 0.6;       // m/s
     const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
     const double MIN_LINEAR_SPEED = 0.1;       // m/s
+
+    // --------------------------------------------
+    // Collision Avoidance
+    // --------------------------------------------
+
+    // Safety zone
+    const double ROBOT_SAFE_ZONE_WIDTH = 0.5;   // m
+    const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m, not relevant anymore
 
     // Linear
     const double DISTANCE_LINEAR_STOP = 0.6;  // m
@@ -711,10 +791,27 @@ class PlayNode {
     const double DISTANCE_GOAL_REACHED = 0.1;                             // m
     const double MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL = 10 * 3.1415 / 180;  // rad
 
+    // --------------------------------------------
+    // Robot state parameters
+    // --------------------------------------------
+
     // Robot_state state = drive_random;//drive_to;
-    Robot_state state = drive_to;
+    Robot_state state = rotate;
+
+    // Drive to parameters
     double goal_point_x = 1;  // map frame
     double goal_point_y = 1;  // map frame
+
+    // Rotate parameters
+    double rotation_to_go = 3 * 3.14;  // rad
+
+    // Move parameters
+    double distance_to_go = -1;  // m
+
+    // Robot last positon
+    double robot_map_last_x = -1;
+    double robot_map_last_y = -1;
+    double robot_map_last_yaw = 0;
 };
 
 int main(int argc, char** argv) {
