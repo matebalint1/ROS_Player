@@ -495,10 +495,10 @@ class PlayNode {
         // -------------------------------------------------------
 
         // Goals:
-        temp_cloud = combine_measurements(goal_cloud, 0.1, 1, 1000);
+        temp_cloud = combine_measurements(goal_cloud, 0.15, 1, 1000);
 
         // Pucks and Poles:
-        *temp_cloud += *combine_measurements(puck_and_pole_cloud, 0.1, 2, 1000);
+        *temp_cloud += *combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);
 
         // -------------------------------------------------------
         // Publish and prepare for next iteration

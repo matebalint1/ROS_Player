@@ -1,5 +1,6 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
+#pragma once
 
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::PointCloud<PointType> PointCloud;
@@ -9,10 +10,43 @@ typedef pcl::PointXYZRGBA PointTypeRGBA;
 typedef pcl::PointCloud<PointTypeRGBA> PointCloudRGBA;
 typedef pcl::PointCloud<PointTypeRGBA>::Ptr PointCloudPtrRGBA;
 
+bool get_transform(tf::Transform &transform, tf2_ros::Buffer *&tfBuffer,
+                   std::string goal_frame, std::string current_frame) {
+    // Returns true if succesful
+    
+    geometry_msgs::TransformStamped transformStamped;
+    try {
+        // Find transformation for pointcloud from the buffer
+        // (*cur_kinect_in).header.frame_id ==
+        // "robot1/kinect_rgb_optical_frame"
+        transformStamped =
+            tfBuffer->lookupTransform(goal_frame, current_frame, ros::Time(0));
+
+        // Convert TransformStamped to Transform
+        tf::Vector3 vector(transformStamped.transform.translation.x,
+                           transformStamped.transform.translation.y,
+                           transformStamped.transform.translation.z);
+
+        tf::Quaternion rotation(transformStamped.transform.rotation.x,
+                                transformStamped.transform.rotation.y,
+                                transformStamped.transform.rotation.z,
+                                transformStamped.transform.rotation.w);
+
+        transform.setOrigin(vector);
+        transform.setRotation(rotation);
+        return true;
+    } catch (tf2::TransformException &ex) {
+        ROS_ERROR("%s", ex.what());
+        ros::Duration(1.0).sleep();
+        return false;
+    }
+    return true;
+}
+
 float to_pcl_rgb(uint8_t r, uint8_t g, uint8_t b) {
     // pack r/g/b into rgb
     uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
-    return *reinterpret_cast<float*>(&rgb);
+    return *reinterpret_cast<float *>(&rgb);
 }
 
 void save_cloud_to_file(PointCloudPtr cloud, std::string path_and_name) {
