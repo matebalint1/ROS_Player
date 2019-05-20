@@ -8,6 +8,7 @@
 #include "opencv2/opencv.hpp"
 #include "ros/ros.h"
 #include "sensor_msgs/Image.h"
+#include "sensor_msgs/Temperature.h"
 #include "std_msgs/String.h"
 
 #include <pcl/point_types.h>
@@ -44,6 +45,9 @@ class PlayNode {
             n->subscribe("map_node/map", 1, &PlayNode::map_callback, this);
         laser_sub = n->subscribe("robot1/front_laser/scan", 1,
                                  &PlayNode::laser_callback, this);
+
+        field_width_sub = n->subscribe("field_width_node/width", 1,
+                                       &PlayNode::field_width_callback, this);
 
         // odometry_sub =
         //    n->subscribe("robot1/odom", 1, &PlayNode::odometry_callback,
@@ -83,6 +87,13 @@ class PlayNode {
         map_objects_msg = *msg;
         got_map = true;
     }
+
+    void field_width_callback(const sensor_msgs::Temperature::ConstPtr& msg) {
+        sensor_msgs::Temperature width = *msg;
+        field_width = width.temperature;
+        got_field_width = true;
+    }
+
     /*
     void odometry_callback(const nav_msgs::Odometry::ConstPtr& msg) {
         odometry_msg = *msg;
@@ -734,6 +745,7 @@ class PlayNode {
     bool got_odometry;
     bool got_map;
     bool got_laser;
+    bool got_field_width;
 
     tf2_ros::Buffer* tfBuffer;
     tf2_ros::TransformListener* tf_listener;
@@ -743,6 +755,7 @@ class PlayNode {
 
     ros::Subscriber map_sub;
     ros::Subscriber laser_sub;
+    ros::Subscriber field_width_sub;
     // ros::Subscriber odometry_sub;
 
     PointCloudPtr temp = PointCloudPtr(new PointCloud);
@@ -795,8 +808,8 @@ class PlayNode {
     // Robot state parameters
     // --------------------------------------------
 
-    // Robot_state state = drive_random;//drive_to;
-    Robot_state state = rotate;
+    // Robot_state state = drive_random;//drive_to//rotate//move;
+    Robot_state state = drive_to;
 
     // Drive to parameters
     double goal_point_x = 1;  // map frame
