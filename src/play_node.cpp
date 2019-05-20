@@ -8,7 +8,7 @@
 #include "opencv2/opencv.hpp"
 #include "ros/ros.h"
 #include "sensor_msgs/Image.h"
-#include "sensor_msgs/Temperature.h"
+#include "geometry_msgs/Vector3.h"
 #include "std_msgs/String.h"
 
 #include <pcl/point_types.h>
@@ -88,9 +88,9 @@ class PlayNode {
         got_map = true;
     }
 
-    void field_width_callback(const sensor_msgs::Temperature::ConstPtr& msg) {
-        sensor_msgs::Temperature width = *msg;
-        field_width = width.temperature;
+    void field_width_callback(const geometry_msgs::Vector3::ConstPtr& msg) {
+        geometry_msgs::Vector3 width = *msg;
+        field_width = width.x;
         got_field_width = true;
     }
 

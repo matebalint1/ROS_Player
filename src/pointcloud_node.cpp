@@ -41,7 +41,7 @@ class PlayNode {
         ros::topic::waitForMessage<PointCloud>(
             "robot1/kinect/depth_registered/points");
 
-        it = std::make_unique<image_transport::ImageTransport>(*n);
+      
 
         // If not in an object, the fourth parameter here is not necessary, but
         // we need it here to ensure the callback goes to the right place, i.e.
@@ -161,7 +161,6 @@ class PlayNode {
     bool got_kinect;
 
     std::unique_ptr<ros::NodeHandle> n;
-    std::unique_ptr<image_transport::ImageTransport> it;
 
     ros::Publisher velocity_pub;
     ros::Publisher kinect_pub;
