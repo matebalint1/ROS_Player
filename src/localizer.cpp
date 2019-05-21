@@ -10,6 +10,7 @@
  #include <sensor_msgs/PointCloud2.h>
  #include <tf/transform_broadcaster.h>
 
+
  // #include <pcl/point_types.h>
 
  #include "pointcloud_helpers.hpp"
@@ -21,8 +22,11 @@ const Coordinates_Vector Real_Map_Vector
                              { {0,0}, {0,.5}, {0,1.25} , {0,2.5} , {0,3.75}, {0,4,5}, {0,5},
                              {3,0}, {3,.5}, {3,1.25} , {3,2.5} , {3,3.75}, {3,4,5}, {3,5} } ;
 
-
-
+const Coordinates_Vector Default_Goals_Vector
+                             { {1.5,.5}, {1,5,4,5}} // Takes the left most point in the middle of
+                                                    // yellow goal area and the right most point in the middle
+                                                    // of the blue goal area as beginning and end point of
+                                                    // the goal vector.
 
 
 
@@ -39,8 +43,8 @@ const Coordinates_Vector Real_Map_Vector
 
 
 
- /*pcl::PointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& recunstruct(
-   pcl::PointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out);
+ /*pcl::PCoordinates rotation_vectointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& recunstruct(
+   pcl::PCoordinates rotation_vectointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out);
 
  {
 
@@ -87,19 +91,19 @@ const Coordinates_Vector Real_Map_Vector
 
  }
 
- float distance (Coordinates a, Coordinates b)
+ Coordinates distance (Coordinates a, Coordinates b)
 
  {
 
-
-
-   return (sqrt(abs (pow((a[1]-b[1]),2)-pow((a[2]-b[2]),2))));
+  
+  return {a[1]-b[1], a[2]-b[2]};
+   //return (sqrt(abs (pow((a[1]-b[1]),2)-pow((a[2]-b[2]),2))));
 
  }
 
 int index_of_minimumDistance (std::vector<float> distance_vector)
 {
-float min;
+float min= distace_vector[1];
 int index;
  for(size_t i=1;i<15;i++)
    {
@@ -126,7 +130,9 @@ Coordinates maximum_likelihood (Coordinates detected_position)
 
   for (size_t i = 1; i<15; i++)
   {
-        distance_vector[i] = distance(detected_position, Real_Map_Vector[i]);
+        
+        distance_vector[i] = abs(pow(distance(detected_position, Real_Map_Vector[i])[1],2)+
+                             pow(distance(detected_position, Real_Map_Vector[i])[2],2)) ;
 
 
   }
@@ -204,7 +210,52 @@ return label;
       }
 
 
+Coordinates_Vector translate (Coordinates_Vector map_in, Coordinates_Vector goals_vector_detected)
+{
+  Coordinates_Vector translated_map;
+  for (size_t = 1 ; i<goals_vector_detected.size(); i++)
+  {
+    translated_map[i]= map_in[i]-distance(goals_vector_detected, Default_Goals_Vector);
+  }
+  return translated_map;
+  
+}
 
+
+
+Coordinates_Vector frame_rematch(Coordinates_Vector map_in, Coordinates_Vector goals_vector_detected)
+ {
+    Coordinates_Vector map_in_editted = translate (map_in, goals_vector_detected);
+    map_in_editted = rotate(map_in_editted, angle (goal_vector_detected, Default_Goals_Vector));
+
+    return map_in_editted;  
+ }
+
+
+Coordinates_Vector recunstruct ( pcl::PointCloud<PointType>::Ptr map_in)
+{
+  Coordinates_Vector map_in_copy, map_recunstructed;
+  copy_to_array(map_in, map_copy);ve
+  map_recustructed = frame_rematch(map_in);
+  
+  
+  for (size_t i =1; i<map_in.size(); i++)
+  {
+    map_recuntructed [get_label(map_in_copy(i))] =map_in_copy(i);
+
+  } 
+  
+  return map_recunstructed;
+  
+  }
+  
+  
+  
+
+
+
+  
+  
   int main(int argc, char **argv)
    {
 
@@ -226,3 +277,7 @@ return label;
 
 
   }
+
+
+
+
