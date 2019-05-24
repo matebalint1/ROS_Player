@@ -166,7 +166,7 @@ target_link_libraries(map_node
 
 target_link_libraries(field_width_node
   ${catkin_LIBRARIES}
-  #${OpenCV_LIBRARIES}
+  ${OpenCV_LIBRARIES}
 )
 
 #############

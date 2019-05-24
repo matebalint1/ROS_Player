@@ -1089,9 +1089,9 @@ class PointcloudProcessor {
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
         auto delta_time = end_time - start_time;
-        std::cout << "Took for preparations "
-                  << delta_time / std::chrono::milliseconds(1)
-                  << "ms to run.\n";
+        //std::cout << "Took for preparations "
+        //          << delta_time / std::chrono::milliseconds(1)
+        //          << "ms to run.\n";
 
         // *********************************************
         // Puck and Pole recognition
