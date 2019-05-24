@@ -17,7 +17,8 @@
 
 #include "cv_bridge/cv_bridge.h"        // do not move up
 #include "opencv2/highgui/highgui.hpp"  // do not move up
-#include "opencv2/opencv.hpp"           // do not move up
+#include "opencv2/opencv.hpp"
+
 
 class PlayNode {
    public:
@@ -79,7 +80,7 @@ class PlayNode {
         // ROS_INFO("Got new kinect");
         // printf ("Cloud: width = %d, height = %d\n", msg->width, msg->height);
 
-        // BOOST_FOREACH (const pcl::PointXYZRGB& pt, msg->points)
+        // BOOST_FOREACH (const pcl::pub_pointPointXYZRGB& pt, msg->points)
         //  printf ("\t(%f, %f, %d)\n", pt.x, pt.y, pt.r);
         kinect_msg = *msg;
         got_kinect = true;
@@ -99,15 +100,16 @@ class PlayNode {
     }
 
     void pub_pointcloud(PointCloud &cloud) {
-        PointCloudPtr msg(new PointCloud);
+        PointCloud::Ptr pcl_msg(new PointCloud);
+
         // msg->header.frame_id = "robot1/base_link";
-        msg->header.frame_id = "robot1/odom";
+        pcl_msg->header.frame_id = "robot1/odom";
 
-        msg->height = cloud.height;
-        msg->width = cloud.width;
-        msg->points = cloud.points;
+        pcl_msg->height = cloud.height;
+        pcl_msg->width = cloud.width;
+        pcl_msg->points = cloud.points;
 
-        kinect_pub.publish(msg);
+        kinect_pub.publish(pcl_msg);
     }
 
     void process_messages() {
