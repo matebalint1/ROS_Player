@@ -13,7 +13,7 @@
 #include "geometry_msgs/Vector3.h"
 #include "ros/ros.h"
 
-using namespace std::literals::chrono_literals;
+// using namespace std::literals::chrono_literals;
 
 typedef pcl::PointXYZRGB PointType;
 typedef pcl::PointCloud<PointType> PointCloud;
@@ -71,7 +71,7 @@ void process_messages() {
 
     color_filter(cloud, cloud_green_1, 0, 255, 0);
 
-    if (cloud_green_1->points.size() < 4) {
+    if (cloud_green_1->points.size() < 5) {
         // Too few points
         return;
     }
@@ -109,7 +109,7 @@ void process_messages() {
     extract.setNegative(true);
     extract.filter(*cloud_green_2);
 
-    if (cloud_green_2->points.size() < 3) {
+    if (cloud_green_2->points.size() < 4) {
         // Too few points
         return;
     }
@@ -159,20 +159,26 @@ void process_messages() {
         sqrt(pow(v[4], 2) + pow(v[3], 2));
     double mean_distance = (distance + distance2) / 2;
 
+    double angle = 0;//fabs(acos(u[3]*v[3]+u[4]*v[4]));TODO
+
     // std::cout << "distance = " << distance << std::endl;
     // std::cout << "distance2 = " << distance2 << std::endl;
-    std::cout << "mean_distance = " << mean_distance
-              << ", samples so far: " << number_of_samples << std::endl;
 
-    // TODO calculate angle and and check if close to zero.
-    if (true /*checks passed, todo*/) {
+    // Check if measuremt is good
+    if (mean_distance < 10 && mean_distance > 2 &&
+        angle < 5.0 * 3.1415 / 180) {
+
+        std::cout << "mean_distance = " << mean_distance
+                  << ", samples so far: " << number_of_samples << std::endl;
+
         if (field_width_out == -1) {
             // First run
             field_width_out = mean_distance;
             number_of_samples = 1;
         } else {
             // Calculate average
-            field_width_out = 27/30 * field_width_out + 3/30 * mean_distance;
+            field_width_out =
+                27.0 / 30.0 * field_width_out + 3.0 / 30.0 * mean_distance;
             number_of_samples++;
         }
     }
@@ -194,7 +200,6 @@ int main(int argc, char** argv) {
 
     ROS_INFO("Waiting for map_node/map");
     ros::topic::waitForMessage<PointCloud>("map_node/map");
-
     ros::Subscriber map_sub = n->subscribe("map_node/map", 1, map_callback);
 
     // 20 Hz loop
