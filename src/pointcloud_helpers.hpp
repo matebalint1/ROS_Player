@@ -66,8 +66,8 @@ PointCloudPtr get_ideal_field_cloud(double field_width, bool is_blue_team) {
     // given width. Different objects are representet with differently colored
     // points. It includes poles and goals == fixed structures on the field.
 
-    // Origo is defined in the right home corner, the positive y-axis goes along
-    // the width of the field and the positive x-axis along the length of the
+    // Origo is defined in the left home corner, the positive y-axis goes along
+    // the length of the field and the positive x-axis along the widt of the
     // field.
 
     PointCloudPtr field = PointCloudPtr(new PointCloud);
@@ -86,50 +86,50 @@ PointCloudPtr get_ideal_field_cloud(double field_width, bool is_blue_team) {
     double field_lenght = field_width * 5 / 3;
 
     // Add poles
-    for (double y = 0; y <= field_width; y += field_width) {
-        pole_point.y = y;
+    for (double x = 0; x <= field_width; x += field_width) {
+        pole_point.x = x;
 
-        pole_point.x = 0;
+        pole_point.y = 0;
         field->points.push_back(pole_point);
-        pole_point.x = 0.1 * field_lenght;
+        pole_point.y = 0.1 * field_lenght;
         field->points.push_back(pole_point);
-        pole_point.x = 0.25 * field_lenght;
+        pole_point.y = 0.25 * field_lenght;
         field->points.push_back(pole_point);
-        pole_point.x = 0.5 * field_lenght;
+        pole_point.y = 0.5 * field_lenght;
         field->points.push_back(pole_point);
-        pole_point.x = 0.75 * field_lenght;
+        pole_point.y = 0.75 * field_lenght;
         field->points.push_back(pole_point);
-        pole_point.x = 0.9 * field_lenght;
+        pole_point.y = 0.9 * field_lenght;
         field->points.push_back(pole_point);
-        pole_point.x = field_lenght;
+        pole_point.y = field_lenght;
         field->points.push_back(pole_point);
     }
 
     // Add goals
-    for (double y = field_width / 2 - 0.5; y <= field_width / 2 - 0.5 + 1;
-         y++) {
-        goal_point_cyan.y = y;
-        goal_point_orange.y = y;
+    for (double x = field_width / 2 - 0.5; x <= field_width / 2 - 0.5 + 1;
+         x++) {
+        goal_point_cyan.x = x;
+        goal_point_orange.x = x;
 
         if (is_blue_team) {
-            goal_point_cyan.x = 0.1 * field_lenght;
+            goal_point_cyan.y = 0.1 * field_lenght;
             field->points.push_back(goal_point_cyan);
-            goal_point_cyan.x = 0.1 * field_lenght + 0.5;
+            goal_point_cyan.y = 0.1 * field_lenght + 0.5;
             field->points.push_back(goal_point_cyan);
 
-            goal_point_orange.x = 0.9 * field_lenght;
+            goal_point_orange.y = 0.9 * field_lenght;
             field->points.push_back(goal_point_orange);
-            goal_point_orange.x = 0.9 * field_lenght - 0.5;
+            goal_point_orange.y = 0.9 * field_lenght - 0.5;
             field->points.push_back(goal_point_orange);
         } else {
-            goal_point_orange.x = 0.1 * field_lenght;
+            goal_point_orange.y = 0.1 * field_lenght;
             field->points.push_back(goal_point_orange);
-            goal_point_orange.x = 0.1 * field_lenght + 0.5;
+            goal_point_orange.y = 0.1 * field_lenght + 0.5;
             field->points.push_back(goal_point_orange);
 
-            goal_point_cyan.x = 0.9 * field_lenght;
+            goal_point_cyan.y = 0.9 * field_lenght;
             field->points.push_back(goal_point_cyan);
-            goal_point_cyan.x = 0.9 * field_lenght - 0.5;
+            goal_point_cyan.y = 0.9 * field_lenght - 0.5;
             field->points.push_back(goal_point_cyan);
         }
     }
