@@ -86,6 +86,24 @@ class PointcloudProcessor {
             return 1;
         }
 
+        /*// for simulator
+        // Green poles
+        if (g >= 250 && r + b < 50) {
+            return 2;
+        }
+
+        // Blue pucks and goals
+        if (b >= 200 && r + g < 50) {
+            return 3;
+        }
+
+        // Yellow pucks and goals
+        if ((r >= 250 && g >= 250 && b <= 50) ||
+            (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
+             g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235)) {
+            return 1;
+        }*/
+
         // Reserved values for filtering colors (highlighting)
         if ((r == 255 && g == 255 && b == 0) ||
             (r == 0 && g == 255 && b == 0) || (r == 0 && g == 00 && b == 255)) {
@@ -220,9 +238,8 @@ class PointcloudProcessor {
         seg.setInputCloud(cloud_in);
         seg.segment(*inliers, *coefficients);
         if (inliers->indices.size() == 0) {
-            std::cout
-                << "Could not estimate a planar model for the given dataset."
-                << std::endl;
+            ROS_INFO_STREAM(
+                "Could not estimate a planar model for the given dataset.");
             return false;
         }
 
@@ -1089,7 +1106,7 @@ class PointcloudProcessor {
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
         auto delta_time = end_time - start_time;
-        //std::cout << "Took for preparations "
+        // std::cout << "Took for preparations "
         //          << delta_time / std::chrono::milliseconds(1)
         //          << "ms to run.\n";
 
@@ -1154,8 +1171,9 @@ class PointcloudProcessor {
         // Calculate used time
         end_time = std::chrono::high_resolution_clock::now();
         delta_time = end_time - start_time;
-        std::cout << "Took total " << delta_time / std::chrono::milliseconds(1)
-                  << "ms to run.\n";
+        ROS_INFO_STREAM("Took total "
+                        << delta_time / std::chrono::milliseconds(1)
+                        << "ms to run.\n");
 
         return;  //----------------------------------------------------
         // Testing stuff:
@@ -1210,10 +1228,6 @@ class PointcloudProcessor {
 
     PointCloudPtr recognized_objects;
 
-
     // PointCloudPtr pointcloud_puck_model;
     // PointCloudPtr pointcloud_pole_model;
-
-
 };
-

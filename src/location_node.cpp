@@ -209,13 +209,8 @@ class PlayNode {
     }
 
     void process_messages() {
-        // -------------------------------------------------------
-        //
-        // -------------------------------------------------------
         PointCloudPtr cloud_map(new PointCloud(map_cloud_msg));
         PointCloudPtr cloud_target = get_ideal_field_cloud(2.7, true);
-
-        pcl::PCDReader reader;
 
         // Filter puck colors from input map
         color_filter(cloud_map, 255, 255, 0);  // Yellow
@@ -260,62 +255,45 @@ class PlayNode {
         PointCloudPtr Final(new PointCloud);
         icp.align(*Final);
 
-        std::cout << "Has converged:" << icp.hasConverged()
-                  << " score: " << icp.getFitnessScore() << std::endl;
-        //std::cout << icp.getFinalTransformation() << std::endl;
-
+        ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
+                                         << icp.getFitnessScore());
+        // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
-        if(icp.hasConverged() == false || icp.getFitnessScore() > 0.03){
+        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.06) {
             // Not succesful -> stop
-            std::cout << "Not sucessfull transformation!" << std::endl;
+            ROS_INFO_STREAM("Not sucessfull transformation!");
             return;
         }
-
-        // Calculate position and heading of robot
-        // double robot_x_odom = 0;
-        // double robot_y_odom = 0;
-        // double robot_yaw_odom = 0;
-
-        /*// Debugging
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr robot(
-            new pcl::PointCloud<pcl::PointXYZRGB>);
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr robot_temp(
-            new pcl::PointCloud<pcl::PointXYZRGB>);
-        PointType robo_point = PointType();
-        robo_point.x = robot_x_odom;
-        robo_point.y = robot_y_odom;
-        robo_point.z = 0;
-        robot->points.push_back(robo_point);*/
 
         Eigen::Affine3f transform_icp = Eigen::Affine3f::Identity();
         transform_icp.matrix() = icp.getFinalTransformation();
         transforms.push_back(transform_icp);
 
+        // Calculate total transformation
         Eigen::Affine3f transform_odom_to_map = Eigen::Affine3f::Identity();
         transform_odom_to_map = transform_odom_to_map * transforms[2];
         transform_odom_to_map = transform_odom_to_map * transforms[1];
         transform_odom_to_map = transform_odom_to_map * transforms[0];
 
-        //pcl::transformPointCloud(*robot, *robot_temp, transform_odom_to_map);
-        //robot_yaw_odom += acos(transform_odom_to_map.rotation()(0, 0));
-        // std::cout << "Yaw: " << robot_yaw_odom << std::endl;
-        // std::cout << "Robot pos in map frame: " << robot_temp->points[0]
-        //          << std::endl;
-
-        // Publish transformation from map to odom
-        tf_map_to_odom_boardcaster(
-            transform_odom_to_map(0, 3), transform_odom_to_map(1, 3),
-            acos(transform_odom_to_map.rotation()(0, 0)));
-
+        // Set transformation
+        transform_odom_to_map_latest = transform_odom_to_map;
+        transform_set = true;
         got_map_cloud = false;  // reset
     }
 
     bool got_messages() const { return got_map_cloud && got_field_width; }
+    bool is_transform_set() const { return transform_set; }
+    Eigen::Affine3f get_latest_transformation() {
+        return transform_odom_to_map_latest;
+    };
 
    private:
     bool got_map_cloud = false;
     bool got_field_width = false;
+
+    bool transform_set = false;
+    Eigen::Affine3f transform_odom_to_map_latest;
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber map_cloud_sub;
@@ -333,6 +311,14 @@ int main(int argc, char **argv) {
     while (ros::ok()) {
         if (playNode.got_messages()) {
             playNode.process_messages();
+        }
+
+        if (playNode.is_transform_set()) {
+            // Publish latest succesful transfomation
+            playNode.tf_map_to_odom_boardcaster(
+                playNode.get_latest_transformation()(0, 3),
+                playNode.get_latest_transformation()(1, 3),
+                acos(playNode.get_latest_transformation().rotation()(0, 0)));
         }
 
         ros::spinOnce();

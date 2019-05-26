@@ -135,7 +135,7 @@ class PlayNode {
         succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
                                    "robot1/base_link", "robot1/odom");
         if (succesful == false) {
-            std::cout << "Transformation missing" << std::endl;
+            ROS_INFO_STREAM( "Transformation missing, base_link - odom or odom - kinect." );
             return;
         }
 

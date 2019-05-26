@@ -159,24 +159,23 @@ void process_messages() {
         sqrt(pow(v[4], 2) + pow(v[3], 2));
     double mean_distance = (distance + distance2) / 2;
 
-    double angle = 0;//fabs(acos(u[3]*v[3]+u[4]*v[4]));TODO
+    double angle = 0;  // fabs(acos(u[3]*v[3]+u[4]*v[4]));TODO*****************************************
 
     // std::cout << "distance = " << distance << std::endl;
     // std::cout << "distance2 = " << distance2 << std::endl;
 
     // Check if measuremt is good
-    if (mean_distance < 10 && mean_distance > 2 &&
-        angle < 5.0 * 3.1415 / 180) {
-
-        std::cout << "mean_distance = " << mean_distance
-                  << ", samples so far: " << number_of_samples << std::endl;
+    if (mean_distance < 10 && mean_distance > 2 && angle < 5.0 * 3.1415 / 180) {
+        ROS_INFO_STREAM("Field width = " << mean_distance
+                                           << ", samples so far: "
+                                           << number_of_samples);
 
         if (field_width_out == -1) {
             // First run
             field_width_out = mean_distance;
             number_of_samples = 1;
         } else {
-            // Calculate average
+            // Calculate average to get a good estimate
             field_width_out =
                 27.0 / 30.0 * field_width_out + 3.0 / 30.0 * mean_distance;
             number_of_samples++;
@@ -185,7 +184,7 @@ void process_messages() {
 
     if (number_of_samples > MIN_NUMBER_OF_SAMPLES) {
         width_calculation_finished = true;
-        std::cout << "Final field width ready" << std::endl;
+        ROS_INFO_STREAM("Final field width ready");
     }
 }
 
