@@ -260,7 +260,7 @@ class PlayNode {
         // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
-        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.41/*0.06*/) {
+        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.4/*0.06*/) {
             // Not succesful -> stop
             ROS_INFO_STREAM("Not sucessfull transformation!");
             return;

@@ -339,8 +339,8 @@ class PlayNode {
         // other detections nearby occur).
 
         // Parameters
-        const uint8_t MAX_AGE_SINGLE_POINT = 255;   // Larger -> longer life
-        const uint8_t MAX_AGE_CLUSTER_POINT = 255;  // Larger -> longer life
+        const uint8_t MAX_AGE_SINGLE_POINT = 120;//255;   // Larger -> longer life
+        const uint8_t MAX_AGE_CLUSTER_POINT = 120;//255;  // Larger -> longer life
 
         PointCloudPtrRGBA new_points(new PointCloudRGBA);
         pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());
@@ -513,8 +513,8 @@ class PlayNode {
         pub_pointcloud(*temp_cloud,
                        map_pub);  // final map of the environment
 
-        //save_cloud_to_file(temp_cloud,
-        //                   "/home/cnc/Desktop/Hockey/field_from_map_node.pcd");
+        save_cloud_to_file(temp_cloud,
+                           "/home/ros/team2/src/player/src/field_from_map_node.pcd");
 
         // Publish raw map
         *temp_cloud = *map_cloud;  // copy
