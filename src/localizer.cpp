@@ -27,7 +27,7 @@ typedef std::vector<Coordinates_Colored> Coordinates_Vector_Colored;
 
 const Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4, 5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4, 5}, {3, 5}};
 
-const Coordinates Default_Goals_Vector{0, 4}; // Takes the left most point in the middle of
+const Coordinates_Vector Default_Goals_Vector{{.5, .5*1+.25}, {.5, 4.5*1-.25}}; // Takes the left most point in the middle of
                                                                         // yellow goal area and the right most point in the middle
                                                                         // of the blue goal area as beginning and end point of
                                                                         // the goal vector.
@@ -55,8 +55,15 @@ char get_color(PointType point)
 {
 
   Eigen::Vector3i rgbMatrix = point.getRGBVector3i();
+  if (rgbMatrix(1)==0 && rgbMatrix(2)==0)
+      return 'b';
+  else if (rgbMatrix(1) == 0 && rgbMatrix(3) == 0)
+      return 'g';
+  else 
+    return 'y';
+  
 
-  return 0;
+
 }
 
 void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_Vector_Colored &detected_map_array)
@@ -91,13 +98,32 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
 
  }*/
 
+float absolute (Coordinates_Vector in){
+  return sqrt(abs (pow((in[1][1]-in[0][1]),2)+pow((in[1][0]-in[0][0]),2)));
+  //return result;}
+
+}
+
+float dot (Coordinates in1, Coordinates in2)
+{
+  return in1[0]*in2[0]+in1[1]*in2[1];
+}
 Coordinates distance(Coordinates a, Coordinates b)
 
 {
 
   return {a[0] - b[0], a[1] - b[1]};
-  //return (sqrt(abs (pow((a[1]-b[1]),2)-pow((a[2]-b[2]),2))));
+
 }
+
+Coordinates add(Coordinates a, Coordinates b)
+
+{
+
+  return {a[0] + b[0], a[1] + b[1]};
+
+}
+
 
 int index_of_minimumDistance(std::vector<float> distance_vector)
 {
@@ -182,7 +208,7 @@ void tf_map_to_odom_boardcaster(double x, double y, double yaw)
   transform_broadcaster.sendTransform(odom_trans);
 }
 
-Coordinates get_goalsVector(Coordinates_Vector_Colored map_in)
+Coordinates_Vector get_goalsVector(Coordinates_Vector_Colored map_in)
 {
   Coordinates vector_s = {0, 0};
   Coordinates vector_e = {0, 0};
@@ -215,28 +241,45 @@ Coordinates get_goalsVector(Coordinates_Vector_Colored map_in)
   vector_e[0] = vector_e[0] / count;
   vector_e[1] = vector_e[1] / count;
 
-  return distance(vector_e, vector_s);
+  return {vector_s, vector_e};
+}
+
+Coordinates get_translation(Coordinates_Vector_Colored map_in)
+{
+  Coordinates_Vector goals_vector = get_goalsVector(map_in);
+  return distance(Default_Goals_Vector[0], goals_vector[0]);
 }
 
 
-Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in)
+
+
+Coordinates_Vector_Colored  translate(Coordinates_Vector_Colored map_in)
 {
   Coordinates_Vector_Colored translated_map;
-  Coordinates goals_vector_detected = get_goalsVector(map_in);
-  for (size_t i = 1; i < goals_vector_detected.size(); i++)
+
+
+  Coordinates translation = get_translation(map_in);
+  for (size_t i = 1; i < map_in.size(); i++)
   {
-    translated_map[i].point= distance (map_in[i].point , distance(goals_vector_detected, Default_Goals_Vector));
+    translated_map[i].point=add(map_in[i].point, translation);
+    translated_map[i].color = map_in[i].color;
   }
   return translated_map;
 }
 
+float get_rotation (Coordinates_Vector_Colored map_in)
+{
+
+  return acos (dot(distance(get_goalsVector(map_in)[1],get_goalsVector(map_in)[0]),
+                    distance (Default_Goals_Vector[1],Default_Goals_Vector[0]))
+                /(absolute(get_goalsVector(map_in))*absolute(Default_Goals_Vector)));
+}
+
 Coordinates_Vector_Colored rotate(Coordinates_Vector_Colored map_in)
 {
-  Coordinates detected_goals_vector = get_goalsVector(map_in);
+  
 
-  float alpha = acos(( detected_goals_vector[0]*Default_Goals_Vector[0]
-        +detected_goals_vector[1]*Default_Goals_Vector[1])/ (sqrt(pow(Default_Goals_Vector[0],2)+pow(Default_Goals_Vector[1],2))*
-                                                                sqrt(pow(detected_goals_vector[0],2)+pow(detected_goals_vector[0],2))));
+  float alpha =  get_rotation( map_in );
   Coordinates_Vector_Colored map_result;
 
   for (size_t i = 0; i < map_in.size(); i++)
