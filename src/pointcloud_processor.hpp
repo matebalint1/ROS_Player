@@ -120,8 +120,6 @@ class PointcloudProcessor {
         pass_through_filter.filter(*cloud_out);
     }
 
-
-
     // Filters pointcloud by a specific color
     void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
                       int g, int b) {
@@ -1134,6 +1132,7 @@ class PointcloudProcessor {
         // Goal recognition
         // *********************************************
 
+        /*
         // Easy goal recognition *****************************************
         // Does not detect corners
         // Blue goals
@@ -1151,10 +1150,23 @@ class PointcloudProcessor {
         set_color(pointcloud_floor_blue, 0, 255, 255);    // Cyan
         set_color(pointcloud_floor_yellow, 255, 140, 0);  // Orange
 
-        *recognized_objects += *pointcloud_floor_blue;
-        *recognized_objects += *pointcloud_floor_yellow;
+        //*recognized_objects += *pointcloud_floor_blue;
+        //*recognized_objects += *pointcloud_floor_yellow;
 
-        /*
+        if (pointcloud_floor_yellow->points.size() > 0)
+            recognized_objects->points.push_back(
+                get_centroid_of_color(pointcloud_floor_yellow, 255, 140, 0));
+
+        if (pointcloud_floor_blue->points.size() > 0)
+            recognized_objects->points.push_back(
+                get_centroid_of_color(pointcloud_floor_blue, 0, 255, 255));
+
+        recognized_objects->is_dense = false;
+        recognized_objects->width = 1;
+        recognized_objects->height = recognized_objects->points.size();
+        */
+
+        ///*
         // OpenCV goals ~250 ms:*******************************************
         double x_offset = 0;
         double y_offset = 0;
@@ -1175,7 +1187,7 @@ class PointcloudProcessor {
             get_goal_corners_opencv(floor_yellow_edges, x_offset, y_offset,
                                     pixel_size, marginal, 255, 140, 0),
             is_goal_corner, 0.1, 1, 100));
-        */
+        //*/
 
         // PCL goals ~300 ms:***********************************************
         /*
