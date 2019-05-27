@@ -822,7 +822,7 @@ class PlayNode {
     // --------------------------------------------
 
     // Robot_state state = drive_random;//drive_to//rotate//move;
-    Robot_state state = drive_to;
+    Robot_state state = move;//drive_to;
 
     // Drive to parameters
     double goal_point_x = 1;  // map frame
@@ -847,7 +847,7 @@ int main(int argc, char** argv) {
     ros::Rate r(20);
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
-        // playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for debugging
+        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for debugging
         if (playNode.got_messages()) {
             playNode.process_messages();
         }
