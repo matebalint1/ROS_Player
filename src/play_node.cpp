@@ -788,14 +788,14 @@ class PlayNode {
     // --------------------------------------------
 
     // Real driving
-    // const double MAX_LINEAR_SPEED = 0.3;        // m/s
-    // const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
-    // const double MIN_LINEAR_SPEED = 0.1;       // m/s
+     const double MAX_LINEAR_SPEED = 0.3;        // m/s
+     const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
+     const double MIN_LINEAR_SPEED = 0.08;       // m/s
 
     // For simulation
-    const double MAX_LINEAR_SPEED = 0.6;       // m/s
-    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
-    const double MIN_LINEAR_SPEED = 0.1;       // m/s
+//    const double MAX_LINEAR_SPEED = 0.6;       // m/s
+//    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
+    //const double MIN_LINEAR_SPEED = 0.1;       // m/s
 
     // --------------------------------------------
     // Collision Avoidance
@@ -806,12 +806,12 @@ class PlayNode {
     const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m, not relevant anymore
 
     // Linear
-    const double DISTANCE_LINEAR_STOP = 0.6;  // m
-    const double DISTANCE_LINEAR_FREE = 1.2;  // m
+    const double DISTANCE_LINEAR_STOP = 0.7;  // m
+    const double DISTANCE_LINEAR_FREE = 1.3;  // m
 
     // Rotational
-    const double DISTANCE_MAX_ROTATION = 0.65 + 0.1;  // m
-    const double DISTANCE_FREE_ROTATION = 1.2;        // m
+    const double DISTANCE_MAX_ROTATION = 0.75 + 0.1;  // m
+    const double DISTANCE_FREE_ROTATION = 1.3;        // m
 
     // Robot behaviour control
     const double DISTANCE_GOAL_REACHED = 0.1;                             // m
@@ -822,17 +822,17 @@ class PlayNode {
     // --------------------------------------------
 
     // Robot_state state = drive_random;//drive_to//rotate//move;
-    Robot_state state = move;//drive_to;
+    Robot_state state = drive_random;
 
     // Drive to parameters
-    double goal_point_x = 1;  // map frame
-    double goal_point_y = 1;  // map frame
+    double goal_point_x = 0.6;  // map frame
+    double goal_point_y = 0.6;  // map frame
 
     // Rotate parameters
     double rotation_to_go = 3 * 3.14;  // rad
 
     // Move parameters
-    double distance_to_go = -1;  // m
+    double distance_to_go = 2;  // m
 
     // Robot last positon
     double robot_map_last_x = -1;
@@ -847,7 +847,7 @@ int main(int argc, char** argv) {
     ros::Rate r(20);
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
-        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for debugging
+//        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for debugging
         if (playNode.got_messages()) {
             playNode.process_messages();
         }
