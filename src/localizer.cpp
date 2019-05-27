@@ -25,19 +25,46 @@ typedef struct Coordinate_c_s
 typedef std::vector<std::vector<float>> Coordinates_Vector;
 typedef std::vector<Coordinates_Colored> Coordinates_Vector_Colored;
 
-const Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4, 5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4, 5}, {3, 5}};
 
-const Coordinates_Vector Default_Goals_Vector{{.5, .5*1+.25}, {.5, 4.5*1-.25}}; // Takes the left most point in the middle of
-                                                                        // yellow goal area and the right most point in the middle
-                                                                        // of the blue goal area as beginning and end point of
-                                                                        // the goal vector.
 
-pcl::PointCloud<pcl::PointXYZRGB> pcl_detected_objects;
+
+
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_detected_objects;
 
 void pcl_Callback(const PointCloud::ConstPtr &msg)
 {
-  pcl_detected_objects = *msg;
+  pcl_detected_objects =  PointCloudPtr(new PointCloud(*msg));
 }
+
+double width;
+
+void width_Callback(const geometry_msgs::Vector3::ConstPtr  &msg)
+{
+  width= msg->x;
+}
+
+
+ Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4, 5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4, 5}, {3, 5}};
+
+ Coordinates_Vector Default_Goals_Vector{{.5, .5*+.25}, {.5, 4.5*1-.25}}; // Takes the left most point in the middle of
+                                                                        // yellow goal area and the right most point in the middle
+                                                                        // of the blue goal area as beginning and end point of
+                                                                        // the goal vector.
+void scale (Coordinates_Vector &vector_in)
+{
+  for (auto i:vector_in)
+  {
+    for ( auto j: i)
+    {
+    j = width/3*j; 
+    }
+  }
+
+
+}
+
+
+
 
 /*pcl::PCoordinates rotation_vectointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& recunstruct(
    pcl::PCoordinates rotation_vectointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out);
@@ -55,7 +82,7 @@ char get_color(PointType point)
 {
 
   Eigen::Vector3i rgbMatrix = point.getRGBVector3i();
-  if (rgbMatrix(1)==0 && rgbMatrix(2)==0)
+  if (rgbMatrix(1) == 0 && rgbMatrix(2)*rgbMatrix(3) != 0)
       return 'b';
   else if (rgbMatrix(1) == 0 && rgbMatrix(3) == 0)
       return 'g';
@@ -320,8 +347,23 @@ int main(int argc, char **argv)
 
   ros::init(argc, argv, "localization_node");
   ros::NodeHandle n;
+  ros::Subscriber map_sub = n.subscribe("map_node/map", 1, pcl_Callback);
+  ros::Subscriber dimension_sub = n.subscribe("field_width_node/width", 1, width_Callback);
+ 
+  scale(Default_Goals_Vector);
+  scale(Real_Map_Vector);
 
-  ros::Subscriber sub = n.subscribe("map_node/map", 1, pcl_Callback);
+
+  Coordinates_Vector_Colored map_in;
+  
+  copy_to_array (pcl_detected_objects , map_in);
+
+  Coordinates translation= get_translation(map_in);
+  float rotation= get_rotation (map_in);
+
+  tf_map_to_odom_boardcaster (translation[0],translation[1],rotation);
+
+
 
   //ros::Publisher remap_pub = n.advertise <Coordinates> ("remapper_node/out_map");
 
