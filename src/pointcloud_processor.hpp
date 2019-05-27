@@ -309,7 +309,7 @@ class PointcloudProcessor {
 
         // Detection parameters
         const int color_threshold =
-            5;  // min number of points in main color // 5 works
+            15;  // min number of points in main color // 5 works
         const double min_z_height = 0.1;
         const double max_z_height = 0.52;
         const double min_diagonal_size = 0.06;
@@ -1089,9 +1089,9 @@ class PointcloudProcessor {
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
         auto delta_time = end_time - start_time;
-        std::cout << "Took for preparations "
-                  << delta_time / std::chrono::milliseconds(1)
-                  << "ms to run.\n";
+        //std::cout << "Took for preparations "
+        //          << delta_time / std::chrono::milliseconds(1)
+        //          << "ms to run.\n";
 
         // *********************************************
         // Puck and Pole recognition
