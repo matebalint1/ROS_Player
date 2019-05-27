@@ -262,6 +262,7 @@ class PlayNode {
 
         // Check if succesful
         if (icp.hasConverged() == false || icp.getFitnessScore() > 0.06) {
+
             // Not succesful -> stop
             ROS_INFO_STREAM("Not sucessfull transformation!");
             return;
