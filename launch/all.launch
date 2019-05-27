@@ -10,5 +10,11 @@
 
   <node pkg="player" name="field_width_node" type="field_width_node" output="screen">
   </node>
+
+<!--
+<node pkg="player" name="localizion_node" type="localizer.cpp" output="screen">
+  </node>
+-->
+
    
 </launch>

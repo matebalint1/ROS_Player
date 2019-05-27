@@ -1,6 +1,7 @@
 
 #include <vector>
 #include <math.h>
+//#include <iostream.h>
 
 #include "ros/ros.h"
 #include <pcl/point_cloud.h>
@@ -25,46 +26,45 @@ typedef struct Coordinate_c_s
 typedef std::vector<std::vector<float>> Coordinates_Vector;
 typedef std::vector<Coordinates_Colored> Coordinates_Vector_Colored;
 
-
-
-
+bool got_map = false;
+bool got_width = false;
 
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_detected_objects;
 
 void pcl_Callback(const PointCloud::ConstPtr &msg)
 {
-  pcl_detected_objects =  PointCloudPtr(new PointCloud(*msg));
+  pcl_detected_objects = PointCloudPtr(new PointCloud(*msg));
+  
+  got_map = true;
+  ROS_INFO_STREAM ("Got map already!");
 }
 
 double width;
 
-void width_Callback(const geometry_msgs::Vector3::ConstPtr  &msg)
+void width_Callback(const geometry_msgs::Vector3::ConstPtr &msg)
 {
-  width= msg->x;
+  width = msg->x;
+  got_width = true;
 }
 
 
- Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4, 5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4, 5}, {3, 5}};
 
- Coordinates_Vector Default_Goals_Vector{{.5, .5*+.25}, {.5, 4.5*1-.25}}; // Takes the left most point in the middle of
-                                                                        // yellow goal area and the right most point in the middle
-                                                                        // of the blue goal area as beginning and end point of
-                                                                        // the goal vector.
-void scale (Coordinates_Vector &vector_in)
+Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4, 5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4, 5}, {3, 5}};
+
+Coordinates_Vector Default_Goals_Vector{{.5, .5 * +.25}, {.5, 4.5 * 1 - .25}}; // Takes the left most point in the middle of
+                                                                               // yellow goal area and the right most point in the middle
+                                                                               // of the blue goal area as beginning and end point of
+                                                                               // the goal vector.
+void scale(Coordinates_Vector &vector_in)
 {
-  for (auto i:vector_in)
+  for (auto i : vector_in)
   {
-    for ( auto j: i)
+    for (auto j : i)
     {
-    j = width/3*j; 
+      j = width / 3 * j;
     }
   }
-
-
 }
-
-
-
 
 /*pcl::PCoordinates rotation_vectointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& recunstruct(
    pcl::PCoordinates rotation_vectointCloud<pcl::PointXYZRGB>::Ptr::ConstPtr& cloud_in, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_out);
@@ -82,26 +82,38 @@ char get_color(PointType point)
 {
 
   Eigen::Vector3i rgbMatrix = point.getRGBVector3i();
-  if (rgbMatrix(1) == 0 && rgbMatrix(2)*rgbMatrix(3) != 0)
-      return 'b';
-  else if (rgbMatrix(1) == 0 && rgbMatrix(3) == 0)
-      return 'g';
-  else 
+  if (rgbMatrix(0) == 0 && rgbMatrix(1) * rgbMatrix(2) != 0)
+    return 'b';
+  else if (rgbMatrix(0) == 0 && rgbMatrix(2) == 0)
+    return 'g';
+  else
     return 'y';
-  
-
-
 }
 
 void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_Vector_Colored &detected_map_array)
 
 {
-  for (size_t i = 0; i < cloud_in->points.size(); ++i)
+  
+  for (size_t i = 0; i < cloud_in->points.size(); i++)
   {
-    detected_map_array[i].point[0] = cloud_in->points[i].x;
-    detected_map_array[i].point[1] = cloud_in->points[i].y;
-    detected_map_array[i].color = get_color(cloud_in->points[i]);
+    ROS_INFO_STREAM("Now Copying Coordinates!");
+    Coordinates_Colored coordinate; 
+    Coordinates point (2);
+    point[0]=cloud_in->points[i].x;
+    point[1]=cloud_in->points[i].y;
+    coordinate.point=point;
+    coordinate.color= get_color(cloud_in->points[i]);
+    detected_map_array.push_back(coordinate); 
+    std::cout << i+1 <<"th iteration."<<std::endl;
+  
+    
+    
+    ROS_INFO_STREAM("Succeeded Copying the Point.");
   }
+
+  ROS_INFO_STREAM("Succeeded Cloning the Map.");
+
+
 }
 
 /*void reconstruct(
@@ -125,22 +137,21 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
 
  }*/
 
-float absolute (Coordinates_Vector in){
-  return sqrt(abs (pow((in[1][1]-in[0][1]),2)+pow((in[1][0]-in[0][0]),2)));
+float absolute(Coordinates_Vector in)
+{
+  return sqrt(abs(pow((in[1][1] - in[0][1]), 2) + pow((in[1][0] - in[0][0]), 2)));
   //return result;}
-
 }
 
-float dot (Coordinates in1, Coordinates in2)
+float dot(Coordinates in1, Coordinates in2)
 {
-  return in1[0]*in2[0]+in1[1]*in2[1];
+  return in1[0] * in2[0] + in1[1] * in2[1];
 }
 Coordinates distance(Coordinates a, Coordinates b)
 
 {
 
   return {a[0] - b[0], a[1] - b[1]};
-
 }
 
 Coordinates add(Coordinates a, Coordinates b)
@@ -148,9 +159,7 @@ Coordinates add(Coordinates a, Coordinates b)
 {
 
   return {a[0] + b[0], a[1] + b[1]};
-
 }
-
 
 int index_of_minimumDistance(std::vector<float> distance_vector)
 {
@@ -273,42 +282,39 @@ Coordinates_Vector get_goalsVector(Coordinates_Vector_Colored map_in)
 
 Coordinates get_translation(Coordinates_Vector_Colored map_in)
 {
+  ROS_INFO_STREAM ("Calculating the translation!");
   Coordinates_Vector goals_vector = get_goalsVector(map_in);
   return distance(Default_Goals_Vector[0], goals_vector[0]);
+  
 }
 
-
-
-
-Coordinates_Vector_Colored  translate(Coordinates_Vector_Colored map_in)
+Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in)
 {
   Coordinates_Vector_Colored translated_map;
-
 
   Coordinates translation = get_translation(map_in);
   for (size_t i = 1; i < map_in.size(); i++)
   {
-    translated_map[i].point=add(map_in[i].point, translation);
+    translated_map[i].point = add(map_in[i].point, translation);
     translated_map[i].color = map_in[i].color;
   }
   return translated_map;
 }
 
-float get_rotation (Coordinates_Vector_Colored map_in)
+float get_rotation(Coordinates_Vector_Colored map_in)
 {
 
-  return acos (dot(distance(get_goalsVector(map_in)[1],get_goalsVector(map_in)[0]),
-                    distance (Default_Goals_Vector[1],Default_Goals_Vector[0]))
-                /(absolute(get_goalsVector(map_in))*absolute(Default_Goals_Vector)));
+  return acos(dot(distance(get_goalsVector(map_in)[1], get_goalsVector(map_in)[0]),
+                  distance(Default_Goals_Vector[1], Default_Goals_Vector[0])) /
+              (absolute(get_goalsVector(map_in)) * absolute(Default_Goals_Vector)));
 }
 
 Coordinates_Vector_Colored rotate(Coordinates_Vector_Colored map_in)
 {
-  
 
-  float alpha =  get_rotation( map_in );
+  float alpha = get_rotation(map_in);
   Coordinates_Vector_Colored map_result;
-
+  ROS_INFO_STREAM ("Getting the rotation!");
   for (size_t i = 0; i < map_in.size(); i++)
 
   {
@@ -344,34 +350,48 @@ Coordinates_Vector_Colored reconstruct(pcl::PointCloud<PointType>::Ptr map_in)
 
 int main(int argc, char **argv)
 {
+  ROS_INFO_STREAM("STARTING");
 
   ros::init(argc, argv, "localization_node");
   ros::NodeHandle n;
+
   ros::Subscriber map_sub = n.subscribe("map_node/map", 1, pcl_Callback);
   ros::Subscriber dimension_sub = n.subscribe("field_width_node/width", 1, width_Callback);
- 
-  scale(Default_Goals_Vector);
-  scale(Real_Map_Vector);
+  ros::Rate r(20);
 
 
-  Coordinates_Vector_Colored map_in;
-  
-  copy_to_array (pcl_detected_objects , map_in);
+  Coordinates_Vector_Colored map_in(1);
+  while (ros::ok())
+  {
+    if (got_width == true)
+    {
+      scale(Default_Goals_Vector);
+      scale(Real_Map_Vector);
 
-  Coordinates translation= get_translation(map_in);
-  float rotation= get_rotation (map_in);
+      ROS_INFO_STREAM("Scaling Successful!");
+    }
 
-  tf_map_to_odom_boardcaster (translation[0],translation[1],rotation);
+    
+    ROS_INFO_STREAM("");
 
+    if (got_map == true){
+      copy_to_array(pcl_detected_objects, map_in);
+    
 
+    Coordinates translation = get_translation(map_in);
+    float rotation = get_rotation(map_in);
 
-  //ros::Publisher remap_pub = n.advertise <Coordinates> ("remapper_node/out_map");
+    tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
+    }
+    //ros::Publisher remap_pub = n.advertise <Coordinates> ("remapper_node/out_map");
 
-  //pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_map (new pcl::PointCloud<pcl::PointXYZRGB>);
-  //pcl::PointCloud<pcl::PointXYZRGB>::Ptr ideal_map (new pcl::PointCloud<pcl::PointXYZRGB>);
+    //pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_map (new pcl::PointCloud<pcl::PointXYZRGB>);
+    //pcl::PointCloud<pcl::PointXYZRGB>::Ptr ideal_map (new pcl::PointCloud<pcl::PointXYZRGB>);
 
-  //pcl::PointCloud<pcl::PointXYZRGB>::Ptr reconstruced_map=
-  //  recunstruct(detected_map, ideal_map);
+    //pcl::PointCloud<pcl::PointXYZRGB>::Ptr reconstruced_map=
+    //  recunstruct(detected_map, ideal_map);
 
-  ros::spin();
+    ros::spinOnce();
+    r.sleep();
+  }
 }
