@@ -339,8 +339,10 @@ class PlayNode {
         // other detections nearby occur).
 
         // Parameters
-        const uint8_t MAX_AGE_SINGLE_POINT = 120;//255;   // Larger -> longer life
-        const uint8_t MAX_AGE_CLUSTER_POINT = 120;//255;  // Larger -> longer life
+        const uint8_t MAX_AGE_SINGLE_POINT =
+            120;  // 255;   // Larger -> longer life
+        const uint8_t MAX_AGE_CLUSTER_POINT =
+            120;  // 255;  // Larger -> longer life
 
         PointCloudPtrRGBA new_points(new PointCloudRGBA);
         pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());
@@ -466,14 +468,19 @@ class PlayNode {
 
         // Divide map_cloud by object type into two clouds
         PointCloudPtrRGBA goal_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
+        PointCloudPtrRGBA goal_cloud_orange =
+            PointCloudPtrRGBA(new PointCloudRGBA);
+        PointCloudPtrRGBA goal_cloud_cyan =
+            PointCloudPtrRGBA(new PointCloudRGBA);
+
         PointCloudPtrRGBA puck_and_pole_cloud =
             PointCloudPtrRGBA(new PointCloudRGBA);
         PointCloudPtrRGBA temp = PointCloudPtrRGBA(new PointCloudRGBA);
 
-        color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
-        *goal_cloud = *temp;
-        color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow goal
-        *goal_cloud += *temp;
+        // color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
+        //*goal_cloud = *temp;
+        // color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow
+        // goal *goal_cloud += *temp;
 
         color_filter(map_cloud, temp, 0, 0, 255);  // Blue
         *puck_and_pole_cloud = *temp;
@@ -488,7 +495,15 @@ class PlayNode {
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
         update_map(puck_and_pole_cloud, 0.15, 1, 10000);
-        update_map(goal_cloud, 0.15, 1, 10000);
+        // update_map(goal_cloud, 0.15, 1, 10000);
+
+        // Simple goal detection*********************
+        color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
+        voxel_grid_filter_m(temp, goal_cloud_cyan, 0.05, 1);
+
+        color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow goal
+        voxel_grid_filter_m(temp, goal_cloud_orange, 0.05, 1);
+        // ******************************************
 
         // -------------------------------------------------------
         // Create estimate of the environment
@@ -498,7 +513,16 @@ class PlayNode {
         temp_cloud = combine_measurements(goal_cloud, 0.15, 1, 1000);
 
         // Pucks and Poles:
-        *temp_cloud += *combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);
+        //*temp_cloud +=
+        //    *combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);
+
+        temp_cloud->points.push_back(
+            get_centroid_of_color(goal_cloud_orange, 255, 140, 0));
+        temp_cloud->points.push_back(
+            get_centroid_of_color(goal_cloud_cyan, 0, 255, 255));
+        temp_cloud->is_dense = false;
+        temp_cloud->width = 1;
+        temp_cloud->height = temp_cloud->points.size();
 
         // -------------------------------------------------------
         // Publish and prepare for next iteration
@@ -506,15 +530,14 @@ class PlayNode {
 
         // Save clouds for next round
         *map_cloud = *puck_and_pole_cloud;
-        *map_cloud += *goal_cloud;
+        //*map_cloud += *goal_cloud;
+        *map_cloud += *goal_cloud_cyan;
+        *map_cloud += *goal_cloud_orange;
 
         // Publish final map
         set_alpha(temp_cloud, 0xff);
         pub_pointcloud(*temp_cloud,
                        map_pub);  // final map of the environment
-
-        save_cloud_to_file(temp_cloud,
-                           "/home/ros/team2/src/player/src/field_from_map_node.pcd");
 
         // Publish raw map
         *temp_cloud = *map_cloud;  // copy

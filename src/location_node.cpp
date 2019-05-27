@@ -7,7 +7,7 @@
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 
-#include <pcl/common/centroid.h>
+
 #include <pcl/common/transforms.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/registration/icp.h>
@@ -92,34 +92,7 @@ class PlayNode {
         extract.filter(*cloud);
     }
 
-    PointType get_centroid_of_color(PointCloudPtr &cloud, int r, int g, int b) {
-        // Filters pointcloud by a specific color
-        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-        pcl::ExtractIndices<PointType> extract;
-        for (int i = 0; i < (*cloud).size(); i++) {
-            uint32_t argb = cloud->points[i].rgba;
-            uint8_t alpha = (argb >> 24) & 0xff;
-            uint8_t bp = (argb >> 0) & 0xff;
-            uint8_t gp = (argb >> 8) & 0xff;
-            uint8_t rp = (argb >> 16) & 0xff;
 
-            if (r == rp && g == gp && b == bp) {
-                // Keep these points
-                inliers->indices.push_back(i);
-            }
-        }
-
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_cloud(
-            new pcl::PointCloud<pcl::PointXYZRGB>);
-        extract.setInputCloud(cloud);
-        extract.setIndices(inliers);
-        extract.setNegative(false);
-        extract.filter(*color_cloud);
-
-        PointType centroid;
-        pcl::computeCentroid(*color_cloud, centroid);
-        return centroid;
-    }
 
     Eigen::Affine3f translate_cloud(PointCloudPtr &cloud_in,
                                     PointCloudPtr &cloud_out,
@@ -234,7 +207,7 @@ class PlayNode {
         //          << std::endl;
         std::vector<Eigen::Affine3f> transforms;
 
-        if (cyan_points >= 2 && orange_points >= 2) {
+        if (cyan_points >= 1 && orange_points >= 1) {
             // Use goals for translation
             transforms = translate_cloud_based_on_centroids(
                 cloud_target, cloud_map, 255, 140, 0, 0, 255, 255);

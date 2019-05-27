@@ -55,6 +55,7 @@ class PlayNode {
     }
 
     void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
+        static tf::TransformBroadcaster transform_broadcaster;
         // Quaternion from yaw
         geometry_msgs::Quaternion odom_quat =
             tf::createQuaternionMsgFromYaw(yaw);

@@ -1,5 +1,9 @@
+#include <pcl/common/centroid.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/filters/voxel_grid.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
+
 #pragma once
 
 typedef pcl::PointXYZRGB PointType;
@@ -13,7 +17,7 @@ typedef pcl::PointCloud<PointTypeRGBA>::Ptr PointCloudPtrRGBA;
 bool get_transform(tf::Transform &transform, tf2_ros::Buffer *&tfBuffer,
                    std::string goal_frame, std::string current_frame) {
     // Returns true if succesful
-    
+
     geometry_msgs::TransformStamped transformStamped;
     try {
         // Find transformation for pointcloud from the buffer
@@ -41,6 +45,86 @@ bool get_transform(tf::Transform &transform, tf2_ros::Buffer *&tfBuffer,
         return false;
     }
     return true;
+}
+
+void voxel_grid_filter_m(PointCloudPtr &cloud_in, PointCloudPtr &cloud_out,
+                         double leaf_size = 0.02, int min_n_points = 0) {
+    pcl::VoxelGrid<PointType> voxel_grid_filter = pcl::VoxelGrid<PointType>();
+    // Voxel grid filter
+    voxel_grid_filter.setInputCloud(cloud_in);
+    voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+    voxel_grid_filter.setMinimumPointsNumberPerVoxel(min_n_points);
+    voxel_grid_filter.filter(*cloud_out);
+}
+
+void voxel_grid_filter_m(PointCloudPtrRGBA &cloud_in,
+                         PointCloudPtrRGBA &cloud_out, double leaf_size = 0.02,
+                         int min_n_points = 0) {
+    pcl::VoxelGrid<PointTypeRGBA> voxel_grid_filter =
+        pcl::VoxelGrid<PointTypeRGBA>();
+    // Voxel grid filter
+    voxel_grid_filter.setInputCloud(cloud_in);
+    voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
+    voxel_grid_filter.setMinimumPointsNumberPerVoxel(min_n_points);
+    voxel_grid_filter.filter(*cloud_out);
+}
+
+PointType get_centroid_of_color(PointCloudPtr &cloud, int r, int g, int b) {
+    // Filters pointcloud by a specific color
+    pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+    pcl::ExtractIndices<PointType> extract;
+    for (int i = 0; i < (*cloud).size(); i++) {
+        uint32_t argb = cloud->points[i].rgba;
+        uint8_t alpha = (argb >> 24) & 0xff;
+        uint8_t bp = (argb >> 0) & 0xff;
+        uint8_t gp = (argb >> 8) & 0xff;
+        uint8_t rp = (argb >> 16) & 0xff;
+
+        if (r == rp && g == gp && b == bp) {
+            // Keep these points
+            inliers->indices.push_back(i);
+        }
+    }
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_cloud(
+        new pcl::PointCloud<pcl::PointXYZRGB>);
+    extract.setInputCloud(cloud);
+    extract.setIndices(inliers);
+    extract.setNegative(false);
+    extract.filter(*color_cloud);
+
+    PointType centroid;
+    pcl::computeCentroid(*color_cloud, centroid);
+    return centroid;
+}
+
+PointTypeRGBA get_centroid_of_color(PointCloudPtrRGBA &cloud, int r, int g,
+                                    int b) {
+    // Filters pointcloud by a specific color
+    pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+    pcl::ExtractIndices<PointTypeRGBA> extract;
+    for (int i = 0; i < (*cloud).size(); i++) {
+        uint32_t argb = cloud->points[i].rgba;
+        uint8_t alpha = (argb >> 24) & 0xff;
+        uint8_t bp = (argb >> 0) & 0xff;
+        uint8_t gp = (argb >> 8) & 0xff;
+        uint8_t rp = (argb >> 16) & 0xff;
+
+        if (r == rp && g == gp && b == bp) {
+            // Keep these points
+            inliers->indices.push_back(i);
+        }
+    }
+
+    PointCloudPtrRGBA color_cloud(new PointCloudRGBA);
+    extract.setInputCloud(cloud);
+    extract.setIndices(inliers);
+    extract.setNegative(false);
+    extract.filter(*color_cloud);
+
+    PointTypeRGBA centroid;
+    pcl::computeCentroid(*color_cloud, centroid);
+    return centroid;
 }
 
 float to_pcl_rgb(uint8_t r, uint8_t g, uint8_t b) {
