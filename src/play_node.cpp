@@ -64,7 +64,7 @@ class PlayNode {
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header.stamp = ros::Time::now();
 
-        odom_trans.header.frame_id = "robot1/map";
+        odom_trans.header.frame_id = "map";
         odom_trans.child_frame_id = "robot1/odom";
 
         odom_trans.transform.translation.x = x;
@@ -472,7 +472,7 @@ class PlayNode {
         //                          "robot1/base_link", "robot1/odom");
         tf::Transform transform_base_link_to_map;
         bool succesful_robot_pos_tf =
-            get_transform(transform_base_link_to_map, tfBuffer, "robot1/map",
+            get_transform(transform_base_link_to_map, tfBuffer, "map",
                           "robot1/base_link");
 
         if (succesful_laser_tf == false) {

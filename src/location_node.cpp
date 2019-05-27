@@ -58,7 +58,7 @@ class PlayNode {
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header.stamp = ros::Time::now();
 
-        odom_trans.header.frame_id = "robot1/map";
+        odom_trans.header.frame_id = "map";
         odom_trans.child_frame_id = "robot1/odom";
 
         odom_trans.transform.translation.x = x;
