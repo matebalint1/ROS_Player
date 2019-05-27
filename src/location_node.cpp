@@ -172,9 +172,10 @@ class PlayNode {
         double vector_map_len =
             sqrt(vector_map_x * vector_map_x + vector_map_y * vector_map_y);
 
-        double rotation = acos(
-            (vector_target_y * vector_map_y + vector_target_x * vector_map_x) /
-            (vector_target_len * vector_map_len));
+        double rotation_map = atan2(vector_map_y, vector_map_x);
+        double rotation_target = atan2(vector_target_y, vector_target_x);
+        double rotation = rotation_target - rotation_map;
+
         double translation_x = goal_orange_target.x - goal_orange_map.x;
         double translation_y = goal_orange_target.y - goal_orange_map.y;
 
@@ -260,7 +261,7 @@ class PlayNode {
         // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
-        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.41/*0.06*/) {
+        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.06) {
             // Not succesful -> stop
             ROS_INFO_STREAM("Not sucessfull transformation!");
             return;
