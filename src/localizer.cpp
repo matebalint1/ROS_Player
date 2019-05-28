@@ -245,9 +245,11 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
 
 
 
-double dot(Coordinates in1, Coordinates in2)
+double dot(Coordinates_Vector in1, Coordinates_Vector in2)
 {
-  return in1[0] * in2[0] + in1[1] * in2[1];
+  
+  return distance(in1[0],in1[1])[0]*distance(in1[0],in1[1])[0]
+          +distance(in2[0],in2[1])[1]*distance(in2[0],in2[1])[1];
 }
 
 
@@ -409,9 +411,13 @@ Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in)
 double get_rotation(Coordinates_Vector_Colored map_in)
 {
 
-  return acos(dot(distance(get_goalsVector(map_in)[1], get_goalsVector(map_in)[0]),
-                  distance(Default_Goals_Vector[1], Default_Goals_Vector[0])) /
+
+              /*std::cout << "Goals_Vector's size:" << absolute(get_goalsVector(map_in)) << std::endl;
+              std::cout << "Default Goals_Vector's size:" << absolute(Default_Goals_Vector) << std::endl;
+              std::cout << "Dot Product:" << dot(get_goalsVector(map_in), Default_Goals_Vector)<< std::endl;
+  return acos(dot (get_goalsVector(map_in), Default_Goals_Vector) /*/
               (absolute(get_goalsVector(map_in)) * absolute(Default_Goals_Vector)));
+              
 }
 
 Coordinates_Vector_Colored rotate(Coordinates_Vector_Colored map_in)
@@ -471,38 +477,42 @@ int main(int argc, char **argv)
   {
     if (clock % 400 == 7)
       clock=0;
-    if (got_width == true)
-    {
-      scale_Default_Goals();
-      scale(Real_Map_Vector);
-
-     // ROS_INFO_STREAM("Scaling Successful!");
-    }
+   
 
     
 
     
    // ROS_INFO_STREAM("");
 
-    if (got_map == true){
-        
+    if (got_map == true && got_width == true){
+
+      scale_Default_Goals();
+      scale(Real_Map_Vector);
+  
       copy_to_array(pcl_detected_objects, map_in);
       //if (clock==0) print_colored_coordinates(map_in);
     
 
     Coordinates translation = get_translation(map_in);
-    double rotation = get_rotation(map_in)//*180/M_PI;
+    double rotation =0;
+    rotation = get_rotation(map_in);//*180/M_PI;
+    
 
-    tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
-    flush_array(map_in);
-    got_map=false;
-    got_width=false;
-    scale_down (Real_Map_Vector);
+
+    if(rotation==rotation && translation==translation){
+        tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
+        std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
+    }
+      flush_array(map_in);
+      got_map=false;
+      got_width=false;
+      scale_down (Real_Map_Vector);
+
     //std::cout << std::endl <<std::endl <<std::endl;
 
     
   
-      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;    
+          
 
     }
 
