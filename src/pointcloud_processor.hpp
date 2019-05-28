@@ -650,14 +650,15 @@ class PointcloudProcessor {
         }
         // imwrite("/home/cnc/Desktop/ResultImage.png", floor_image);
 
-        // Extract edges
+        // Extract edges using a kernel sliding over the image and counting
+        // number of blue, yellow, and black pixels.
         for (int x = 0; x < floor_image.cols - kernel_size; x++) {
             for (int y = 0; y < floor_image.rows - kernel_size; y++) {
                 int number_of_blue_color = 0;
                 int number_of_yellow_color = 0;
                 int number_of_black = 0;
 
-                // Calculate frequencies of colors
+                // Calculate frequencies of colors inside kernel
                 for (int i = x; i < x + kernel_size; i++) {
                     for (int j = y; j < y + kernel_size; j++) {
                         int rp = floor_image.at<cv::Vec3b>(j, i)[2];
@@ -680,6 +681,7 @@ class PointcloudProcessor {
                 float ratio_yellow =
                     (float)number_of_yellow_color / sum_of_valid_points;
 
+                // Determine if kernel is on a goal edge or not
                 if (ratio_blue > 0.5 - COLOR_DIFF_MAX &&
                     ratio_blue < 0.5 + COLOR_DIFF_MAX &&
                     number_of_black < MAX_BLACK_PIX) {
