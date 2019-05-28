@@ -4,11 +4,11 @@
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/image_encodings.h>
 #include "cv_bridge/cv_bridge.h"
+#include "geometry_msgs/Vector3.h"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/opencv.hpp"
 #include "ros/ros.h"
 #include "sensor_msgs/Image.h"
-#include "geometry_msgs/Vector3.h"
 #include "std_msgs/String.h"
 
 #include <pcl/point_types.h>
@@ -38,7 +38,7 @@ class PlayNode {
         ros::topic::waitForMessage<sensor_msgs::LaserScan>(
             "robot1/front_laser/scan");
 
-        ROS_INFO("Waiting for map_node/map");
+        // ROS_INFO("Waiting for map_node/map");
         // ros::topic::waitForMessage<PointCloud>("map_node/map");
 
         map_sub =
@@ -64,7 +64,7 @@ class PlayNode {
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header.stamp = ros::Time::now();
 
-        odom_trans.header.frame_id = "robot1/map";
+        odom_trans.header.frame_id = "map";
         odom_trans.child_frame_id = "robot1/odom";
 
         odom_trans.transform.translation.x = x;
@@ -348,8 +348,7 @@ class PlayNode {
         if (closest_obstacle_distance < DISTANCE_LINEAR_STOP) {
             speed_linear = 0;
 
-            std::cout << "Linear speed mode: COLLISION AVOIDANCE (min)"
-                      << std::endl;
+            ROS_INFO_STREAM("Linear speed mode: COLLISION AVOIDANCE (min)");
         } else if (closest_obstacle_distance < DISTANCE_LINEAR_FREE) {
             speed_linear = (closest_obstacle_distance - DISTANCE_LINEAR_STOP) *
                            (MAX_LINEAR_SPEED) /
@@ -358,7 +357,7 @@ class PlayNode {
             // Make robot move with a decet speed when close to stop distance
             speed_linear = fmax(MIN_LINEAR_SPEED, speed_linear);
 
-            std::cout << "Linear speed mode: CONTROL" << std::endl;
+            ROS_INFO_STREAM("Linear speed mode: CONTROL");
         } else {
             // No obstacle in view
             // if (state == drive_to) {
@@ -366,7 +365,7 @@ class PlayNode {
             // Random
             speed_linear = MAX_LINEAR_SPEED;
             // }
-            std::cout << "Linear speed mode: FREE" << std::endl;
+            ROS_INFO_STREAM("Linear speed mode: FREE");
         }
 
         // Rotational speed
@@ -381,8 +380,7 @@ class PlayNode {
                 speed_rotational = -sign_of_rotation * MAX_ROTATIONAL_SPEEED;
             }
 
-            std::cout << "Angular speed mode: COLLISION AVOIDANCE (max)"
-                      << std::endl;
+            ROS_INFO_STREAM("Angular speed mode: COLLISION AVOIDANCE (max)");
         } else if (closest_obstacle_distance < DISTANCE_FREE_ROTATION) {
             speed_rotational =
                 (-closest_obstacle_distance + DISTANCE_FREE_ROTATION) *
@@ -391,7 +389,7 @@ class PlayNode {
 
             speed_rotational = -sign_of_rotation * fabs(speed_rotational);
 
-            std::cout << "Angular speed mode: CONTROL" << std::endl;
+            ROS_INFO_STREAM("Angular speed mode: CONTROL");
         } else {
             // No obstacle in view
             // if (state == drive_to) {
@@ -399,7 +397,7 @@ class PlayNode {
             // Random
             speed_rotational = 0;
             // }
-            std::cout << "Angular speed mode: FREE" << std::endl;
+            ROS_INFO_STREAM("Angular speed mode: FREE");
         }
     }
 
@@ -464,19 +462,28 @@ class PlayNode {
         // -------------------------------------------------
         // Get required transformations
         // -------------------------------------------------
-        bool succesful = true;
-        tf::Transform transform_laser_to_baselink;
-        succesful &= get_transform(transform_laser_to_baselink, tfBuffer,
-                                   "robot1/front_laser", "robot1/base_link");
-        tf::Transform transform_odom_to_baselink;
-        succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
-                                   "robot1/base_link", "robot1/odom");
-        tf::Transform transform_base_link_to_map;
-        succesful &= get_transform(transform_base_link_to_map, tfBuffer,
-                                   "robot1/map", "robot1/base_link");
 
-        if (succesful == false) {
-            std::cout << "Transformation missing" << std::endl;
+        tf::Transform transform_laser_to_baselink;
+        bool succesful_laser_tf =
+            get_transform(transform_laser_to_baselink, tfBuffer,
+                          "robot1/front_laser", "robot1/base_link");
+        // tf::Transform transform_odom_to_baselink;
+        // succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
+        //                          "robot1/base_link", "robot1/odom");
+        tf::Transform transform_base_link_to_map;
+        bool succesful_robot_pos_tf =
+            get_transform(transform_base_link_to_map, tfBuffer, "map",
+                          "robot1/base_link");
+
+        if (succesful_laser_tf == false) {
+            ROS_INFO_STREAM("Laser transformation missing!");
+            return;
+        }
+
+        if (true|| succesful_robot_pos_tf == false || got_field_width == false) {
+            ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
+            // Make robot rotate untill location and field width found.
+            set_velocities(0, MAX_ROTATIONAL_SPEEED);
             return;
         }
 
@@ -484,10 +491,10 @@ class PlayNode {
         double roll, pitch, yaw;
         rotation.getRPY(roll, pitch, yaw);
 
-        std::cout << "Robot position x,y,yaw "
-                  << transform_base_link_to_map.getOrigin().getX() << "\t"
-                  << transform_base_link_to_map.getOrigin().getY() << "\t"
-                  << yaw << std::endl;
+        ROS_INFO_STREAM("Robot position x,y,yaw "
+                        << transform_base_link_to_map.getOrigin().getX() << "\t"
+                        << transform_base_link_to_map.getOrigin().getY() << "\t"
+                        << yaw);
 
         // -------------------------------------------------
         // Robot position in the map frame
@@ -534,8 +541,9 @@ class PlayNode {
         to_polar(closest_laser_x, closest_laser_y, closest_laser_distance,
                  closest_laser_direction);
 
-        std::cout << "Closest laser obstacle r: " << closest_laser_distance
-                  << "\tangle: " << closest_laser_direction << std::endl;
+        ROS_INFO_STREAM("Closest laser obstacle r: "
+                        << closest_laser_distance
+                        << "\tangle: " << closest_laser_direction);
 
         // -------------------------------------------------
         // Calculate closest wall to robot of the field
@@ -555,12 +563,14 @@ class PlayNode {
                  closest_wall_direction, robot_map_x, robot_map_y,
                  robot_map_yaw);
 
-        std::cout << "Closest wall  obstacle r: " << closest_wall_distance
-                  << "\tangle: " << closest_wall_direction << std::endl;
+        ROS_INFO_STREAM("Closest wall  obstacle r: " << closest_wall_distance
+                                                     << "\tangle: "
+                                                     << closest_wall_direction);
 
         // -------------------------------------------------
         // Calculate closest object in map
         // -------------------------------------------------
+        // TODO
 
         // -------------------------------------------------
         // Calculate closest obstacle of all
@@ -676,21 +686,21 @@ class PlayNode {
                                 closest_obstacle_distance,
                                 closest_obstacle_direction,
                                 robot_distance_error, robot_yaw_error);
-            std::cout << "Robot state DRIVE RANDOM" << std::endl;
+            ROS_INFO_STREAM("Robot state DRIVE RANDOM");
 
         } else if (state == drive_to) {
             set_speeds_drive_to(speed_linear, speed_rotational,
                                 closest_obstacle_distance,
                                 closest_obstacle_direction,
                                 robot_distance_error, robot_yaw_error);
-            std::cout << "Robot state DRIVE TO" << std::endl;
+            ROS_INFO_STREAM("Robot state DRIVE TO");
 
         } else if (state == rotate) {
             speed_linear = 0;
             speed_rotational = rotation_to_go * 2 * MAX_ROTATIONAL_SPEEED /
                                DISTANCE_FREE_ROTATION;
-            std::cout << "Robot state ROTATE, to rotate: " << rotation_to_go
-                      << std::endl;
+            ROS_INFO_STREAM(
+                "Robot state ROTATE, to rotate: " << rotation_to_go);
 
         } else if (state == move) {
             int sign = (distance_to_go >= 0) - (distance_to_go < 0);
@@ -698,25 +708,27 @@ class PlayNode {
                                        fabs(distance_to_go) * MAX_LINEAR_SPEED /
                                            DISTANCE_LINEAR_FREE);
             speed_rotational = 0;
-            std::cout << "Robot state MOVE, distance to move: "
-                      << distance_to_go << std::endl;
+            ROS_INFO_STREAM(
+                "Robot state MOVE, distance to move: " << distance_to_go);
 
         } else if (state == stop) {
             speed_linear = 0;
             speed_rotational = 0;
 
-            std::cout << "Robot state STOP" << std::endl;
+            ROS_INFO_STREAM("Robot state STOP");
         }
 
-        std::cout << "Error to goal r: " << robot_distance_error
-                  << "\tangle: " << robot_yaw_error << std::endl;
+        ROS_INFO_STREAM("Error to goal r: " << robot_distance_error
+                                            << "\tangle: " << robot_yaw_error);
 
-        std::cout << "Closest control obstacle r: " << closest_obstacle_distance
-                  << "\tangle: " << closest_obstacle_direction << std::endl;
+        ROS_INFO_STREAM("Closest control obstacle r: "
+                        << closest_obstacle_distance
+                        << "\tangle: " << closest_obstacle_direction);
 
-        std::cout << "Rotational out: " << speed_rotational << std::endl;
-        std::cout << "Linear out: " << speed_linear
-                  << "\n************************************" << std::endl;
+        ROS_INFO_STREAM("Rotational out: " << speed_rotational);
+        ROS_INFO_STREAM("Linear out: "
+                        << speed_linear
+                        << "\n************************************");
 
         // -------------------------------------------------
         // Publish speed commands
@@ -742,10 +754,10 @@ class PlayNode {
     }
 
    private:
-    bool got_odometry;
-    bool got_map;
-    bool got_laser;
-    bool got_field_width;
+    bool got_odometry = false;
+    bool got_map = false;
+    bool got_laser = false;
+    bool got_field_width = false;
 
     tf2_ros::Buffer* tfBuffer;
     tf2_ros::TransformListener* tf_listener;
@@ -776,13 +788,14 @@ class PlayNode {
     // --------------------------------------------
 
     // Real driving
-    // const double MAX_LINEAR_SPEED = 0.3;        // m/s
-    // const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
+     const double MAX_LINEAR_SPEED = 0.3;        // m/s
+     const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
+     const double MIN_LINEAR_SPEED = 0.08;       // m/s
 
     // For simulation
-    const double MAX_LINEAR_SPEED = 0.6;       // m/s
-    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
-    const double MIN_LINEAR_SPEED = 0.1;       // m/s
+//    const double MAX_LINEAR_SPEED = 0.6;       // m/s
+//    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
+    //const double MIN_LINEAR_SPEED = 0.1;       // m/s
 
     // --------------------------------------------
     // Collision Avoidance
@@ -793,12 +806,12 @@ class PlayNode {
     const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m, not relevant anymore
 
     // Linear
-    const double DISTANCE_LINEAR_STOP = 0.6;  // m
-    const double DISTANCE_LINEAR_FREE = 1.2;  // m
+    const double DISTANCE_LINEAR_STOP = 0.7;  // m
+    const double DISTANCE_LINEAR_FREE = 1.3;  // m
 
     // Rotational
-    const double DISTANCE_MAX_ROTATION = 0.65 + 0.1;  // m
-    const double DISTANCE_FREE_ROTATION = 1.2;        // m
+    const double DISTANCE_MAX_ROTATION = 0.75 + 0.1;  // m
+    const double DISTANCE_FREE_ROTATION = 1.3;        // m
 
     // Robot behaviour control
     const double DISTANCE_GOAL_REACHED = 0.1;                             // m
@@ -809,17 +822,17 @@ class PlayNode {
     // --------------------------------------------
 
     // Robot_state state = drive_random;//drive_to//rotate//move;
-    Robot_state state = drive_to;
+    Robot_state state = drive_random;
 
     // Drive to parameters
-    double goal_point_x = 1;  // map frame
-    double goal_point_y = 1;  // map frame
+    double goal_point_x = 0.6;  // map frame
+    double goal_point_y = 0.6;  // map frame
 
     // Rotate parameters
     double rotation_to_go = 3 * 3.14;  // rad
 
     // Move parameters
-    double distance_to_go = -1;  // m
+    double distance_to_go = 2;  // m
 
     // Robot last positon
     double robot_map_last_x = -1;
@@ -834,7 +847,7 @@ int main(int argc, char** argv) {
     ros::Rate r(20);
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
-        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);
+//        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for debugging
         if (playNode.got_messages()) {
             playNode.process_messages();
         }

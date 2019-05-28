@@ -4,7 +4,6 @@
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/statistical_outlier_removal.h>
-#include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
@@ -47,7 +46,7 @@ class PointcloudProcessor {
         pointcloud_not_floor_yellow = PointCloudPtr(new PointCloud);
 
         pass_through_filter = pcl::PassThrough<pcl::PointXYZRGB>();
-        voxel_grid_filter = pcl::VoxelGrid<pcl::PointXYZRGB>();
+
         conditional_filter = pcl::ConditionalRemoval<pcl::PointXYZRGB>();
         statistical_outlier_removal_filter =
             pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>();
@@ -86,6 +85,24 @@ class PointcloudProcessor {
             return 1;
         }
 
+        /*// for simulator
+        // Green poles
+        if (g >= 250 && r + b < 50) {
+            return 2;
+        }
+
+        // Blue pucks and goals
+        if (b >= 200 && r + g < 50) {
+            return 3;
+        }
+
+        // Yellow pucks and goals
+        if ((r >= 250 && g >= 250 && b <= 50) ||
+            (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
+             g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235)) {
+            return 1;
+        }*/
+
         // Reserved values for filtering colors (highlighting)
         if ((r == 255 && g == 255 && b == 0) ||
             (r == 0 && g == 255 && b == 0) || (r == 0 && g == 00 && b == 255)) {
@@ -101,15 +118,6 @@ class PointcloudProcessor {
         pass_through_filter.setFilterFieldName(axis);
         pass_through_filter.setFilterLimits(min, max);
         pass_through_filter.filter(*cloud_out);
-    }
-
-    void voxel_grid_filter_m(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
-                             double leaf_size = 0.02, int min_n_points = 0) {
-        // Voxel grid filter
-        voxel_grid_filter.setInputCloud(cloud_in);
-        voxel_grid_filter.setLeafSize(leaf_size, leaf_size, leaf_size);
-        voxel_grid_filter.setMinimumPointsNumberPerVoxel(min_n_points);
-        voxel_grid_filter.filter(*cloud_out);
     }
 
     // Filters pointcloud by a specific color
@@ -196,6 +204,13 @@ class PointcloudProcessor {
         };
     }
 
+    void set_color(PointCloudPtr& cloud, int r, int g, int b) {
+        // This function sets the color of all points according to parameters.
+        for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
+            pt->rgb = to_pcl_rgb(r, g, b);
+        }
+    }
+
     bool planar_segmentation(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
                              pcl::ModelCoefficients::Ptr& coefficients,
                              bool get_inliers) {
@@ -220,9 +235,8 @@ class PointcloudProcessor {
         seg.setInputCloud(cloud_in);
         seg.segment(*inliers, *coefficients);
         if (inliers->indices.size() == 0) {
-            std::cout
-                << "Could not estimate a planar model for the given dataset."
-                << std::endl;
+            ROS_INFO_STREAM(
+                "Could not estimate a planar model for the given dataset.");
             return false;
         }
 
@@ -283,6 +297,10 @@ class PointcloudProcessor {
     void radius_outlier_removal(PointCloudPtr& cloud_in,
                                 PointCloudPtr& cloud_out, double radius = 0.05,
                                 int min_neighbors = 5) {
+        if (cloud_in->points.size() == 0) {
+            cloud_out->clear();
+            return;
+        }
         pcl::RadiusOutlierRemoval<pcl::PointXYZRGB> outrem;
         // build the filter
         outrem.setInputCloud(cloud_in);
@@ -632,14 +650,15 @@ class PointcloudProcessor {
         }
         // imwrite("/home/cnc/Desktop/ResultImage.png", floor_image);
 
-        // Extract edges
+        // Extract edges using a kernel sliding over the image and counting
+        // number of blue, yellow, and black pixels.
         for (int x = 0; x < floor_image.cols - kernel_size; x++) {
             for (int y = 0; y < floor_image.rows - kernel_size; y++) {
                 int number_of_blue_color = 0;
                 int number_of_yellow_color = 0;
                 int number_of_black = 0;
 
-                // Calculate frequencies of colors
+                // Calculate frequencies of colors inside kernel
                 for (int i = x; i < x + kernel_size; i++) {
                     for (int j = y; j < y + kernel_size; j++) {
                         int rp = floor_image.at<cv::Vec3b>(j, i)[2];
@@ -662,6 +681,7 @@ class PointcloudProcessor {
                 float ratio_yellow =
                     (float)number_of_yellow_color / sum_of_valid_points;
 
+                // Determine if kernel is on a goal edge or not
                 if (ratio_blue > 0.5 - COLOR_DIFF_MAX &&
                     ratio_blue < 0.5 + COLOR_DIFF_MAX &&
                     number_of_black < MAX_BLACK_PIX) {
@@ -1089,7 +1109,7 @@ class PointcloudProcessor {
         // Calculate used time
         auto end_time = std::chrono::high_resolution_clock::now();
         auto delta_time = end_time - start_time;
-        //std::cout << "Took for preparations "
+        // std::cout << "Took for preparations "
         //          << delta_time / std::chrono::milliseconds(1)
         //          << "ms to run.\n";
 
@@ -1114,6 +1134,41 @@ class PointcloudProcessor {
         // Goal recognition
         // *********************************************
 
+        /*
+        // Easy goal recognition *****************************************
+        // Does not detect corners
+        // Blue goals
+        color_filter(pointcloud_floor, pointcloud_floor_blue, 0, 0, 255);
+        // Yellow goals
+        color_filter(pointcloud_floor, pointcloud_floor_yellow, 255, 255, 0);
+
+        voxel_grid_filter_m(pointcloud_floor_blue, pointcloud_temp, 0.05, 5);
+        voxel_grid_filter_m(pointcloud_floor_yellow, pointcloud_temp2, 0.05, 5);
+
+        radius_outlier_removal(pointcloud_temp, pointcloud_floor_blue, 0.2, 35);
+        radius_outlier_removal(pointcloud_temp2, pointcloud_floor_yellow, 0.2,
+                               35);
+        // Change color
+        set_color(pointcloud_floor_blue, 0, 255, 255);    // Cyan
+        set_color(pointcloud_floor_yellow, 255, 140, 0);  // Orange
+
+        //*recognized_objects += *pointcloud_floor_blue;
+        //*recognized_objects += *pointcloud_floor_yellow;
+
+        if (pointcloud_floor_yellow->points.size() > 0)
+            recognized_objects->points.push_back(
+                get_centroid_of_color(pointcloud_floor_yellow, 255, 140, 0));
+
+        if (pointcloud_floor_blue->points.size() > 0)
+            recognized_objects->points.push_back(
+                get_centroid_of_color(pointcloud_floor_blue, 0, 255, 255));
+
+        recognized_objects->is_dense = false;
+        recognized_objects->width = 1;
+        recognized_objects->height = recognized_objects->points.size();
+        */
+
+        ///*
         // OpenCV goals ~250 ms:*******************************************
         double x_offset = 0;
         double y_offset = 0;
@@ -1134,6 +1189,7 @@ class PointcloudProcessor {
             get_goal_corners_opencv(floor_yellow_edges, x_offset, y_offset,
                                     pixel_size, marginal, 255, 140, 0),
             is_goal_corner, 0.1, 1, 100));
+        //*/
 
         // PCL goals ~300 ms:***********************************************
         /*
@@ -1154,8 +1210,9 @@ class PointcloudProcessor {
         // Calculate used time
         end_time = std::chrono::high_resolution_clock::now();
         delta_time = end_time - start_time;
-        std::cout << "Took total " << delta_time / std::chrono::milliseconds(1)
-                  << "ms to run.\n";
+        ROS_INFO_STREAM("Took total "
+                        << delta_time / std::chrono::milliseconds(1)
+                        << "ms to run.");
 
         return;  //----------------------------------------------------
         // Testing stuff:
@@ -1191,7 +1248,7 @@ class PointcloudProcessor {
 
    private:
     pcl::PassThrough<PointType> pass_through_filter;
-    pcl::VoxelGrid<PointType> voxel_grid_filter;
+
     pcl::ConditionalRemoval<PointType> conditional_filter;
     pcl::StatisticalOutlierRemoval<PointType>
         statistical_outlier_removal_filter;
@@ -1210,10 +1267,6 @@ class PointcloudProcessor {
 
     PointCloudPtr recognized_objects;
 
-
     // PointCloudPtr pointcloud_puck_model;
     // PointCloudPtr pointcloud_pole_model;
-
-
 };
-
