@@ -491,7 +491,7 @@ int main(int argc, char **argv)
     
 
     Coordinates translation = get_translation(map_in);
-    double rotation = get_rotation(map_in)*180/M_PI;
+    double rotation = get_rotation(map_in)//*180/M_PI;
 
     tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
     flush_array(map_in);
@@ -502,7 +502,7 @@ int main(int argc, char **argv)
 
     
   
-      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation << std::endl;    
+      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;    
 
     }
 
