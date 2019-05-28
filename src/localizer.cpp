@@ -248,8 +248,8 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
 double dot(Coordinates_Vector in1, Coordinates_Vector in2)
 {
   
-  return distance(in1[0],in1[1])[0]*distance(in1[0],in1[1])[0]
-          +distance(in2[0],in2[1])[1]*distance(in2[0],in2[1])[1];
+  return distance(in1[1],in1[0])[0]*distance(in2[1],in2[0])[0]
+          +distance(in1[1],in1[0])[1]*distance(in2[1],in2[0])[1];
 }
 
 
@@ -414,8 +414,8 @@ double get_rotation(Coordinates_Vector_Colored map_in)
 
               /*std::cout << "Goals_Vector's size:" << absolute(get_goalsVector(map_in)) << std::endl;
               std::cout << "Default Goals_Vector's size:" << absolute(Default_Goals_Vector) << std::endl;
-              std::cout << "Dot Product:" << dot(get_goalsVector(map_in), Default_Goals_Vector)<< std::endl;
-  return acos(dot (get_goalsVector(map_in), Default_Goals_Vector) /*/
+              std::cout << "Dot Product:" << dot(get_goalsVector(map_in), Default_Goals_Vector)<< std::endl;*/
+  return acos(dot (get_goalsVector(map_in), Default_Goals_Vector) /
               (absolute(get_goalsVector(map_in)) * absolute(Default_Goals_Vector)));
               
 }
@@ -496,6 +496,7 @@ int main(int argc, char **argv)
     Coordinates translation = get_translation(map_in);
     double rotation =0;
     rotation = get_rotation(map_in);//*180/M_PI;
+     
     
 
 
