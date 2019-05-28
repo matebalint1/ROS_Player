@@ -21,6 +21,7 @@ typedef struct Coordinate_c_s
 {
   Coordinates point;
   char color;
+  int label;
 } Coordinates_Colored;
 
 typedef std::vector<std::vector<double>> Coordinates_Vector;
@@ -49,12 +50,25 @@ void width_Callback(const geometry_msgs::Vector3::ConstPtr &msg)
 
 
 
-Coordinates_Vector Real_Map_Vector{{0, 0}, {.5,0}, {1.25,0}, {2.5,0}, {3.75,0}, {4.5,0}, {5,0}, {0,3}, {.5,3}, {1.25 ,3}, {2.5,3}, {3.75,3}, {4.5,3}, {5,3}};
+Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4.5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4.5}, {3, 5}};
 
-Coordinates_Vector Default_Goals_Vector{{.5 *1 +.25,.5}, {4.5 * 1 - .25,.5}}; // Takes the left most point in the middle of
+Coordinates_Vector Default_Goals_Vector   {{.5 *1 +.25, 1.5}, {4.5 * 1 - .25, 1.5}}; // Takes the left most point in the middle of
                                                                                // yellow goal area and the right most point in the middle
                                                                                // of the blue goal area as beginning and end point of
                                                                                // the goal vector.
+
+
+void scale_Default_Goals()
+{
+    Default_Goals_Vector  = {{.5 *width/3 +.25, 1.5}, {4.5 * width/3 - .25, 1.5}};
+}
+
+
+
+
+
+
+
 void scale(Coordinates_Vector &vector_in)
 {
   for (auto i : vector_in)
@@ -65,7 +79,6 @@ void scale(Coordinates_Vector &vector_in)
     }
   }
 }
-
 
 void scale_down(Coordinates_Vector &vector_in)
 {
@@ -112,6 +125,74 @@ void flush_array (Coordinates_Vector_Colored &detected_map_array)
   }
 }
 
+double absolute(Coordinates_Vector in)
+{
+  return sqrt(abs(pow((in[1][1] - in[0][1]), 2) + pow((in[1][0] - in[0][0]), 2)));
+  //return result;}
+}
+
+
+Coordinates distance(Coordinates a, Coordinates b)
+
+{
+
+  return {a[0] - b[0], a[1] - b[1]};
+}
+
+int index_of_minimumDistance(std::vector<double> distance_vector)
+{
+  //ROS_INFO_STREAM("DEBUG get_label_index_of");
+  double min = distance_vector[0];
+  int index;
+  for (auto i : distance_vector)
+  {
+    if (i < min)
+      min = i;
+  }
+
+  for (size_t i = 0; i < distance_vector.size(); i++)
+  {
+    if (distance_vector[i] == min)
+      index = i;
+  }
+  return index;
+}
+
+Coordinates maximum_likelihood(Coordinates detected_position)
+{
+
+  //ROS_INFO_STREAM("DEBUG get_label_maximumlikelihood");
+  std::vector<double> distance_vector(0);
+
+  for (size_t i = 0; i < Real_Map_Vector.size(); i++)
+  {
+   // ROS_INFO_STREAM("DEBUG get_label_maximumlikelihood_for");
+    distance_vector.push_back( absolute ({Real_Map_Vector[i], detected_position} ) );
+   
+  }
+
+  //  std::sort (distance_vector.begin(),distance_vector.end());
+  return Real_Map_Vector[index_of_minimumDistance(distance_vector)];
+}
+
+int get_label(Coordinates pole_position)
+
+{
+  //ROS_INFO_STREAM("DEBUG get_label");
+  int label = 0;
+
+  for (size_t i = 0; Real_Map_Vector.size(); i++)
+  {
+    //std::cout<<std::endl; 
+    if (Real_Map_Vector[i] == maximum_likelihood(pole_position))
+    {
+      label = i;
+      break;
+    }
+  }
+  return label;
+}
+
 void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_Vector_Colored &detected_map_array)
 
 {
@@ -125,6 +206,9 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
     point[1]=cloud_in->points[i].y;
     coordinate.point=point;
     coordinate.color= get_color(cloud_in->points[i]);
+    
+    
+    coordinate.label= get_label(coordinate.point);
     detected_map_array.push_back(coordinate); 
     //std::cout << "Map Size is:" << detected_map_array.size();
     
@@ -159,22 +243,13 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
 
  }*/
 
-double absolute(Coordinates_Vector in)
-{
-  return sqrt(abs(pow((in[1][1] - in[0][1]), 2) + pow((in[1][0] - in[0][0]), 2)));
-  //return result;}
-}
+
 
 double dot(Coordinates in1, Coordinates in2)
 {
   return in1[0] * in2[0] + in1[1] * in2[1];
 }
-Coordinates distance(Coordinates a, Coordinates b)
 
-{
-
-  return {a[0] - b[0], a[1] - b[1]};
-}
 
 Coordinates add(Coordinates a, Coordinates b)
 
@@ -183,56 +258,11 @@ Coordinates add(Coordinates a, Coordinates b)
   return {a[0] + b[0], a[1] + b[1]};
 }
 
-int index_of_minimumDistance(std::vector<double> distance_vector)
-{
-  double min = distance_vector[0];
-  int index;
-  for (auto i : distance_vector)
-  {
-    if (i < min)
-      min = i;
-  }
 
-  for (size_t i = 0; i < distance_vector.size(); i++)
-  {
-    if (distance_vector[i] == min)
-      index = i;
-  }
-  return index;
-}
 
-Coordinates maximum_likelihood(Coordinates detected_position)
-{
 
-  std::vector<double> distance_vector;
 
-  for (size_t i = 0; detected_position.size(); i++)
-  {
 
-    distance_vector[i] = abs(pow(distance(detected_position, Real_Map_Vector[i])[0], 2) +
-                             pow(distance(detected_position, Real_Map_Vector[i])[1], 2));
-  }
-
-  //  std::sort (distance_vector.begin(),distance_vector.end());
-  return Real_Map_Vector[index_of_minimumDistance(distance_vector)];
-}
-
-int get_label(Coordinates pole_position)
-
-{
-
-  int label = 0;
-
-  for (size_t i = 0; pole_position.size(); i++)
-  {
-    if (Real_Map_Vector[i] == maximum_likelihood(pole_position))
-    {
-      label = i;
-      break;
-    }
-  }
-  return label;
-}
 
 /*std::vector<double> localize (std::vector<std::vector<double> > ideal_map, std::vector<std::vector<double> > detected_map   )
 
@@ -266,6 +296,50 @@ void tf_map_to_odom_boardcaster(double x, double y, double yaw)
   transform_broadcaster.sendTransform(odom_trans);
 }
 
+Coordinates_Vector get_centroidsVector(Coordinates_Vector_Colored map_in)
+{
+
+  Coordinates vector_s = {0, 0};
+  Coordinates vector_e = {0, 0};
+  int count_s=0;
+  int count_e=0;
+
+  for (auto point_colored : map_in)
+  {
+    int label_modulus = point_colored.label%8;
+    if (label_modulus%8==1 || label_modulus%8==2 || label_modulus%8==3 ){
+    vector_s[0] = vector_s[1] + point_colored.point[0];
+    count_s++;
+    }
+
+    if (label_modulus%8==1 || label_modulus%8==2 || label_modulus%8==3 ){
+    vector_e[0] = vector_s[0] + point_colored.point[0];
+    count_e++;
+    }
+    vector_s[1]=vector_e[1]+point_colored.point[1];
+    vector_e[1]=vector_e[1]+point_colored.point[1];
+    
+
+
+
+  }
+
+    vector_s[0]=  vector_s[1]/count_s;
+    vector_e[0]=  vector_e[1]/count_e;
+    vector_s[1]=  vector_s[1]/(count_s+count_e);
+    vector_e[1]=  vector_e[1]/((count_e+count_e));
+
+
+    
+
+    
+
+    return  {vector_s, vector_e};
+
+
+
+  }
+
 Coordinates_Vector get_goalsVector(Coordinates_Vector_Colored map_in)
 {
   Coordinates vector_s = {0, 0};
@@ -294,12 +368,21 @@ Coordinates_Vector get_goalsVector(Coordinates_Vector_Colored map_in)
       vector_e[1] = vector_e[1] + point_colored.point[1];
       vector_e[0] = vector_e[0] + point_colored.point[0];
     }
+
   }
 
+
+  
+  
+  if (count!=0){
   vector_e[0] = vector_e[0] / count;
   vector_e[1] = vector_e[1] / count;
 
+//std::cout<< vector_e[0]<<"::"<<vector_e[1]<<std::endl;
+
   return {vector_s, vector_e};
+  }
+  else return get_centroidsVector(map_in);
 }
 
 Coordinates get_translation(Coordinates_Vector_Colored map_in)
@@ -370,19 +453,6 @@ void print_colored_coordinates (Coordinates_Vector_Colored vector_in)
 }
 
 
-Coordinates_Vector_Colored reconstruct(pcl::PointCloud<PointType>::Ptr map_in)
-{
-  Coordinates_Vector_Colored map_in_copy, map_reconstructed;
-  copy_to_array(map_in, map_in_copy);
-  Coordinates_Vector_Colored map_recostructed = frame_rematch(map_in_copy);
-
-  for (size_t i = 0; i < map_in_copy.size(); i++)
-  {
-    map_reconstructed[get_label(map_in_copy[i].point)] = map_in_copy[i];
-  }
-
-  return map_reconstructed;
-}
 
 int main(int argc, char **argv)
 {
@@ -403,7 +473,7 @@ int main(int argc, char **argv)
       clock=0;
     if (got_width == true)
     {
-      scale(Default_Goals_Vector);
+      scale_Default_Goals();
       scale(Real_Map_Vector);
 
      // ROS_INFO_STREAM("Scaling Successful!");
@@ -421,23 +491,22 @@ int main(int argc, char **argv)
     
 
     Coordinates translation = get_translation(map_in);
-    double rotation = get_rotation(map_in);// * 180 / M_PI;
+    double rotation = get_rotation(map_in)*180/M_PI;
+
     tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
-    
-    
-    
-    scale_down (Real_Map_Vector);
-    scale_down (Default_Goals_Vector);
     flush_array(map_in);
     got_map=false;
     got_width=false;
+    scale_down (Real_Map_Vector);
     //std::cout << std::endl <<std::endl <<std::endl;
 
     
   
-      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;    
+      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation << std::endl;    
 
     }
+
+    
     //ros::Publisher remap_pub = n.advertise <Coordinates> ("remapper_node/out_map");
 
     //pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_map (new pcl::PointCloud<pcl::PointXYZRGB>);
