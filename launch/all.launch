@@ -16,5 +16,9 @@
   </node>
 -->
 
+<!-- <node pkg="player" name="localizion_node" type="localizer_node" output="screen">
+  </node>
+-->
+
    
 </launch>
