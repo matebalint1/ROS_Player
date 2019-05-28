@@ -49,9 +49,9 @@ void width_Callback(const geometry_msgs::Vector3::ConstPtr &msg)
 
 
 
-Coordinates_Vector Real_Map_Vector{{0, 0}, {0, .5}, {0, 1.25}, {0, 2.5}, {0, 3.75}, {0, 4, 5}, {0, 5}, {3, 0}, {3, .5}, {3, 1.25}, {3, 2.5}, {3, 3.75}, {3, 4, 5}, {3, 5}};
+Coordinates_Vector Real_Map_Vector{{0, 0}, {.5,0}, {1.25,0}, {2.5,0}, {3.75,0}, {4.5,0}, {5,0}, {0,3}, {.5,3}, {1.25 ,3}, {2.5,3}, {3.75,3}, {4.5,3}, {5,3}};
 
-Coordinates_Vector Default_Goals_Vector{{.5, .5 *1 +.25}, {.5, 4.5 * 1 - .25}}; // Takes the left most point in the middle of
+Coordinates_Vector Default_Goals_Vector{{.5 *1 +.25,.5}, {4.5 * 1 - .25,.5}}; // Takes the left most point in the middle of
                                                                                // yellow goal area and the right most point in the middle
                                                                                // of the blue goal area as beginning and end point of
                                                                                // the goal vector.
@@ -421,8 +421,7 @@ int main(int argc, char **argv)
     
 
     Coordinates translation = get_translation(map_in);
-    double rotation = get_rotation(map_in) * 180 / M_PI;
-
+    double rotation = get_rotation(map_in);// * 180 / M_PI;
     tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
     
     
@@ -436,7 +435,7 @@ int main(int argc, char **argv)
 
     
   
-      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation << std::endl;    
+      std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;    
 
     }
     //ros::Publisher remap_pub = n.advertise <Coordinates> ("remapper_node/out_map");
