@@ -159,13 +159,16 @@ void process_messages() {
         sqrt(pow(v[4], 2) + pow(v[3], 2));
     double mean_distance = (distance + distance2) / 2;
 
-    double angle = 0;  // fabs(acos(u[3]*v[3]+u[4]*v[4]));TODO*****************************************
+    double angle = fabs( acos( ( u[3] * v[3] + u[4] * v[4] )
+					/ sqrt( ( pow( u[3], 2 ) + pow( u[4], 2 ) ) * ( pow( v[3], 2 ) + pow( v[4], 2 ) ) ) ) );  
+
+	std::cout << "The angle between the two lines is " << angle << "[rad]" << std::endl;
 
     // std::cout << "distance = " << distance << std::endl;
     // std::cout << "distance2 = " << distance2 << std::endl;
 
     // Check if measuremt is good
-    if (mean_distance < 10 && mean_distance > 2 && angle < 5.0 * 3.1415 / 180) {
+    if (mean_distance < 10 && mean_distance > 2 && angle < 10.0 * 3.1415 / 180) {
         ROS_INFO_STREAM("Field width = " << mean_distance
                                            << ", samples so far: "
                                            << number_of_samples);
