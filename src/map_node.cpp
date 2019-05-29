@@ -144,11 +144,11 @@ class PlayNode {
 
         double average_x = centroid.x;
         double average_y = centroid.y;
-        double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
+ /*       double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
                                   pow(max_point.x - min_point.x, 2));
 
         // Check if size of the pointcloud is within the limits
-        if (diagonal_xy >= 0.18) {
+        if (diagonal_xy >= 0.21) {
             // std::cout << "too big, diagonal: " << diagonal_xy << std::endl;
             result_point.rgb = 0;
             result_point.x = 0;
@@ -156,7 +156,7 @@ class PlayNode {
 
             // size does not match -> return a black point in origo
             return result_point;
-        }
+        }*/
 
         // Return point, color represents point type: green -> buck,
         // blue or yellow -> pole.
@@ -278,7 +278,7 @@ class PlayNode {
         int num_of_max_color = *std::max_element(colors.begin(), colors.end());
 
         float choosen_color = c_black;
-        if (num_of_max_color > color_threshold) {
+        if (num_of_max_color >= color_threshold) {
             if (max_frequency_index == 0) {
                 // Blue
                 choosen_color = c_blue;
@@ -344,7 +344,7 @@ class PlayNode {
         const uint8_t MAX_AGE_SINGLE_POINT =
             120;  // 255;   // Larger -> longer life
         const uint8_t MAX_AGE_CLUSTER_POINT =
-            120;  // 255;  // Larger -> longer life
+            60;  // 255;  // Larger -> longer life
 
         PointCloudPtrRGBA new_points(new PointCloudRGBA);
         pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());
@@ -498,10 +498,10 @@ class PlayNode {
 
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
-        update_map(puck_and_pole_cloud, 0.15, 1, 10000, 0.2, 20);
-        update_map(goal_cloud, 0.15, 1, 10000, 0.2, 20);
+        update_map(puck_and_pole_cloud, 0.15, 1, 10000, 0.2, 10);
+        update_map(goal_cloud, 0.15, 1, 10000, 0.2, 10);
+        
         //update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
-
         // Simple goal detection*********************
         // color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
         // voxel_grid_filter_m(temp, goal_cloud_cyan, 0.05, 1);
@@ -514,10 +514,10 @@ class PlayNode {
         // Create estimate of the environment
         // -------------------------------------------------------
         // Pucks and Poles:
-        temp_cloud = combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);
+        *temp_cloud = *combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);// 0.15->0.2
 
         // Goals:
-        *temp_cloud += *combine_measurements(goal_cloud, 0.15, 1, 1000);
+        *temp_cloud += *combine_measurements(goal_cloud, 0.15, 1, 1000); // 0.15->0.2
 
         // Simple
         //temp_cloud->points.push_back(

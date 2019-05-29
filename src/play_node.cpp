@@ -477,10 +477,10 @@ class PlayNode {
 
         if (succesful_laser_tf == false) {
             ROS_INFO_STREAM("Laser transformation missing!");
-            return;
+            //return;
         }
 
-        if (true|| succesful_robot_pos_tf == false || got_field_width == false) {
+        if (succesful_robot_pos_tf == false || got_field_width == false) {
             ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
             // Make robot rotate untill location and field width found.
             set_velocities(0, MAX_ROTATIONAL_SPEEED);
@@ -789,7 +789,7 @@ class PlayNode {
 
     // Real driving
      const double MAX_LINEAR_SPEED = 0.3;        // m/s
-     const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
+     const double MAX_ROTATIONAL_SPEEED = 0.3;   // rad/s
      const double MIN_LINEAR_SPEED = 0.08;       // m/s
 
     // For simulation

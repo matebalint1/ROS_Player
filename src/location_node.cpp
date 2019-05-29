@@ -7,7 +7,6 @@
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 
-
 #include <pcl/common/transforms.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/registration/icp.h>
@@ -92,8 +91,6 @@ class PlayNode {
         extract.filter(*cloud);
     }
 
-
-
     Eigen::Affine3f translate_cloud(PointCloudPtr &cloud_in,
                                     PointCloudPtr &cloud_out,
                                     double translation_x, double translation_y,
@@ -125,30 +122,32 @@ class PlayNode {
             new pcl::PointCloud<pcl::PointXYZRGB>);
 
         // Manual translation based on goals
+
+        // Get centroids of given colors
+        // Ideal map
         PointType goal_orange_target =
             get_centroid_of_color(cloud_target, r1, g1, b1);
         PointType goal_cyan_target =
             get_centroid_of_color(cloud_target, r2, g2, b2);
-
+        // Measured map
         PointType goal_orange_map =
             get_centroid_of_color(cloud_map, r1, g1, b1);
         PointType goal_cyan_map = get_centroid_of_color(cloud_map, r2, g2, b2);
 
+        // Ideal field vector
         double vector_target_x = goal_cyan_target.x - goal_orange_target.x;
         double vector_target_y = goal_cyan_target.y - goal_orange_target.y;
 
+        // Measured field vector
         double vector_map_x = goal_cyan_map.x - goal_orange_map.x;
         double vector_map_y = goal_cyan_map.y - goal_orange_map.y;
 
-        double vector_target_len = sqrt(vector_target_x * vector_target_x +
-                                        vector_target_y * vector_target_y);
-        double vector_map_len =
-            sqrt(vector_map_x * vector_map_x + vector_map_y * vector_map_y);
-
+        // Calculate rotation
         double rotation_map = atan2(vector_map_y, vector_map_x);
         double rotation_target = atan2(vector_target_y, vector_target_x);
         double rotation = rotation_target - rotation_map;
 
+        // Calculate translation
         double translation_x = goal_orange_target.x - goal_orange_map.x;
         double translation_y = goal_orange_target.y - goal_orange_map.y;
 
@@ -192,20 +191,13 @@ class PlayNode {
         // color_filter(cloud_map, 255, 140, 0); // Orange goal for testing
         // color_filter(cloud_map, 0, 255, 255); // Cyan goal for testing
 
-        // std::cout << "Cloud map cloud input size: " <<
-        // cloud_map->points.size()
-        //          << std::endl;
-        // std::cout << "Cloud target map size:" << cloud_target->points.size()
-        //          << std::endl;
-
-        // Manual translation
+        // Manual translation using centroid based vectors.
         int orange_points =
             get_number_of_coloured_points(cloud_map, 255, 140, 0);
         int cyan_points = get_number_of_coloured_points(cloud_map, 0, 255, 255);
 
-        // std::cout << "cyan" << cyan_points << " orange" << orange_points
-        //          << std::endl;
-        std::vector<Eigen::Affine3f> transforms;
+        std::vector<Eigen::Affine3f>
+            transforms;  // store transformations here untill the end
 
         if (cyan_points >= 1 && orange_points >= 1) {
             // Use goals for translation
@@ -229,16 +221,18 @@ class PlayNode {
         PointCloudPtr Final(new PointCloud);
         icp.align(*Final);
 
-        ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
-                                         << icp.getFitnessScore());
         // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
         if (icp.hasConverged() == false || icp.getFitnessScore() > 0.06) {
-
             // Not succesful -> stop
-            ROS_INFO_STREAM("Not sucessfull transformation!");
+            ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
+                                             << icp.getFitnessScore()
+                                             << " Not sucessfull!!!");
             return;
+        } else {
+            ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
+                                             << icp.getFitnessScore());
         }
 
         Eigen::Affine3f transform_icp = Eigen::Affine3f::Identity();
