@@ -161,7 +161,6 @@ int get_label(Coordinates pole_position){
     return label;
 }
 
-<<<<<<< HEAD
 Coordinates add(Coordinates a, Coordinates b)
 
 {
@@ -171,6 +170,7 @@ Coordinates add(Coordinates a, Coordinates b)
 
 Coordinates get_centroid (Coordinates_Vector_Colored map_in)
 {
+       
   int count = 0;
   Coordinates result = {0,0};
   for (auto i: map_in)
@@ -258,25 +258,6 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
 
   //ROS_INFO_STREAM("Succeeded Cloning the Map.");
 
-=======
-void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in,
-                   Coordinates_Vector_Colored &detected_map_array){
-    for (size_t i = 0; i < cloud_in->points.size(); i++) {
-        // ROS_INFO_STREAM("Now Copying Coordinates!");
-        Coordinates_Colored coordinate;
-        Coordinates point(2);
-        point[0] = cloud_in->points[i].x;
-        point[1] = cloud_in->points[i].y;
-        coordinate.point = point;
-        coordinate.color = get_color(cloud_in->points[i]);
-
-        coordinate.label = get_label(coordinate.point);
-        detected_map_array.push_back(coordinate);
-        // std::cout << "Map Size is:" << detected_map_array.size();
-
-        // ROS_INFO_STREAM("Succeeded Copying the Point.");
-    }
->>>>>>> ceee18e211e343cf1dfc7a3d0db6f5f6bba36d0c
 
     // ROS_INFO_STREAM("Succeeded Cloning the Map.");
 }
@@ -308,14 +289,8 @@ double dot(Coordinates_Vector in1, Coordinates_Vector in2) {
            distance(in1[1], in1[0])[1] * distance(in2[1], in2[0])[1];
 }
 
-<<<<<<< HEAD
 
 
-=======
-Coordinates add(Coordinates a, Coordinates b){
-    return {a[0] + b[0], a[1] + b[1]};
-}
->>>>>>> ceee18e211e343cf1dfc7a3d0db6f5f6bba36d0c
 
 /*std::vector<double> localize (std::vector<std::vector<double> > ideal_map,
 std::vector<std::vector<double> > detected_map   )
@@ -423,7 +398,6 @@ Coordinates get_translation(Coordinates_Vector_Colored map_in) {
     return distance(Default_Goals_Vector[0], goals_vector[0]);
 }
 
-<<<<<<< HEAD
 Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in)
 {
   Coordinates_Vector_Colored translated_map;
@@ -456,29 +430,9 @@ double get_rotation(Coordinates_Vector_Colored map_in)
   return angle(get_goalsVector(map_in), Default_Goals_Vector);
               
               
-=======
-Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in) {
-    Coordinates_Vector_Colored translated_map;
-
-    Coordinates translation = get_translation(map_in);
-    for (size_t i = 1; i < map_in.size(); i++) {
-        translated_map[i].point = add(map_in[i].point, translation);
-        translated_map[i].color = map_in[i].color;
-    }
-    return translated_map;
->>>>>>> ceee18e211e343cf1dfc7a3d0db6f5f6bba36d0c
 }
 
-double get_rotation(Coordinates_Vector_Colored map_in) {
-    /*std::cout << "Goals_Vector's size:" << absolute(get_goalsVector(map_in))
-    << std::endl; std::cout << "Default Goals_Vector's size:" <<
-    absolute(Default_Goals_Vector) << std::endl;
-    std::cout << "Dot Product:" << dot(get_goalsVector(map_in),
-    Default_Goals_Vector)<< std::endl;*/
-    return acos(
-        dot(get_goalsVector(map_in), Default_Goals_Vector) /
-        (absolute(get_goalsVector(map_in)) * absolute(Default_Goals_Vector)));
-}
+
 
 Coordinates_Vector_Colored rotate(Coordinates_Vector_Colored map_in) {
     double alpha = get_rotation(map_in);
@@ -559,21 +513,25 @@ int main(int argc, char **argv) {
             // std::cout << std::endl <<std::endl <<std::endl;
         }
 
-<<<<<<< HEAD
     Coordinates translation = get_translation(map_in);
     double rotation =0;
     rotation = get_rotation(map_in);
 
     
     Coordinates_Vector_Colored map_reconstructed =frame_rematch (map_in);
+    
     label_map (map_reconstructed);
 
     
-
     Coordinates translation_error = distance(Real_Map_Vector[0],
                         get_centroid(get_coordinates_with_label( map_reconstructed ,0)));
-    double rotation_error = angle ({0, get_centroid(get_coordinates_with_label( map_reconstructed ,0))
-                                    }, {0, Real_Map_Vector[0]});
+    
+    
+    
+    double rotation_error = angle ({{0,0}, get_centroid(get_coordinates_with_label( map_reconstructed ,0))
+                                    }, {{0,0}, Real_Map_Vector[0]});
+
+     
 
 
     translation = add (translation, translation_error); 
@@ -582,7 +540,8 @@ int main(int argc, char **argv) {
     
     if(rotation==rotation && translation==translation){
         tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
-        std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
+       // std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
+        std::cout << "Correction X:"<< translation_error[0] <<" Correction Y:" << translation_error[1]<< " Correction <:" << rotation_error*180/M_PI << std::endl;
     }
       flush_array(map_in);
       got_map=false;
@@ -594,18 +553,6 @@ int main(int argc, char **argv) {
     
   
           
-=======
-        // ros::Publisher remap_pub = n.advertise <Coordinates>
-        // ("remapper_node/out_map");
-
-        // pcl::PointCloud<pcl::PointXYZRGB>::Ptr detected_map (new
-        // pcl::PointCloud<pcl::PointXYZRGB>);
-        // pcl::PointCloud<pcl::PointXYZRGB>::Ptr ideal_map (new
-        // pcl::PointCloud<pcl::PointXYZRGB>);
-
-        // pcl::PointCloud<pcl::PointXYZRGB>::Ptr reconstruced_map=
-        //  recunstruct(detected_map, ideal_map);
->>>>>>> ceee18e211e343cf1dfc7a3d0db6f5f6bba36d0c
 
         ros::spinOnce();
         clock++;
