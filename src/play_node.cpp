@@ -789,7 +789,7 @@ class PlayNode {
 
     // Real driving
      const double MAX_LINEAR_SPEED = 0.3;        // m/s
-     const double MAX_ROTATIONAL_SPEEED = 0.2;   // rad/s
+     const double MAX_ROTATIONAL_SPEEED = 0.3;   // rad/s
      const double MIN_LINEAR_SPEED = 0.08;       // m/s
 
     // For simulation
