@@ -344,7 +344,7 @@ class PlayNode {
         const uint8_t MAX_AGE_SINGLE_POINT =
             120;  // 255;   // Larger -> longer life
         const uint8_t MAX_AGE_CLUSTER_POINT =
-            120;  // 255;  // Larger -> longer life
+            60;  // 255;  // Larger -> longer life
 
         PointCloudPtrRGBA new_points(new PointCloudRGBA);
         pcl::PointIndices::Ptr points_to_be_removed(new pcl::PointIndices());

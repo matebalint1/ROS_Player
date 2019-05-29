@@ -477,7 +477,7 @@ class PlayNode {
 
         if (succesful_laser_tf == false) {
             ROS_INFO_STREAM("Laser transformation missing!");
-            return;
+            //return;
         }
 
         if (succesful_robot_pos_tf == false || got_field_width == false) {
