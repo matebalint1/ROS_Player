@@ -7,7 +7,6 @@
 #include <pcl_ros/transforms.h>
 #include <tf2_ros/transform_listener.h>
 
-
 #include <pcl/common/transforms.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/registration/icp.h>
@@ -91,8 +90,6 @@ class PlayNode {
         extract.setNegative(true);
         extract.filter(*cloud);
     }
-
-
 
     Eigen::Affine3f translate_cloud(PointCloudPtr &cloud_in,
                                     PointCloudPtr &cloud_out,
@@ -229,16 +226,18 @@ class PlayNode {
         PointCloudPtr Final(new PointCloud);
         icp.align(*Final);
 
-        ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
-                                         << icp.getFitnessScore());
         // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
         if (icp.hasConverged() == false || icp.getFitnessScore() > 0.06) {
-
             // Not succesful -> stop
-            ROS_INFO_STREAM("Not sucessfull transformation!");
+            ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
+                                             << icp.getFitnessScore()
+                                             << " Not sucessfull!!!");
             return;
+        } else {
+            ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
+                                             << icp.getFitnessScore());
         }
 
         Eigen::Affine3f transform_icp = Eigen::Affine3f::Identity();
