@@ -480,7 +480,7 @@ class PlayNode {
             return;
         }
 
-        if (true|| succesful_robot_pos_tf == false || got_field_width == false) {
+        if (succesful_robot_pos_tf == false || got_field_width == false) {
             ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
             // Make robot rotate untill location and field width found.
             set_velocities(0, MAX_ROTATIONAL_SPEEED);
