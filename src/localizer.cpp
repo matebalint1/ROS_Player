@@ -193,6 +193,74 @@ int get_label(Coordinates pole_position)
   return label;
 }
 
+Coordinates add(Coordinates a, Coordinates b)
+
+{
+
+  return {a[0] + b[0], a[1] + b[1]};
+}
+
+Coordinates get_centroid (Coordinates_Vector_Colored map_in)
+{
+  int count = 0;
+  Coordinates result = {0,0};
+  for (auto i: map_in)
+  {
+    result = add (result, i.point);
+    ++count;
+  }
+  return {result[0]/count, result[1]/count}; 
+
+}
+
+Coordinates_Vector_Colored get_coordinates_with_label (Coordinates_Vector_Colored map_in, int label)
+{
+  Coordinates_Vector_Colored result(0);
+  for (auto i : map_in)
+  {
+    if (i.label == label)
+      result.push_back(i);
+  }
+  return result;
+
+}
+
+
+
+void sort_based_on_label (Coordinates_Vector_Colored &detected_map_array)
+{
+    Coordinates_Vector_Colored::iterator i; 
+    Coordinates_Colored swap_intermediate;
+   
+    for (i = detected_map_array.begin(); i != detected_map_array.end(); ++i) { 
+  {
+      
+      
+      for (Coordinates_Vector_Colored::iterator j=next(i,1); j != detected_map_array.end(); ++j)
+      {
+          if (j->label < i->label)
+          {
+          
+             swap_intermediate = *i;
+             *i = *j;
+             *j=swap_intermediate;
+          
+          }
+       }
+  
+   }
+  }
+}
+
+
+void label_map (Coordinates_Vector_Colored &map_in)
+{
+  for (auto coordinate: map_in)
+    coordinate.label= get_label(coordinate.point);
+} 
+
+
+
 void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_Vector_Colored &detected_map_array)
 
 {
@@ -208,8 +276,10 @@ void copy_to_array(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_in, Coordinates_
     coordinate.color= get_color(cloud_in->points[i]);
     
     
-    coordinate.label= get_label(coordinate.point);
+    
     detected_map_array.push_back(coordinate); 
+    sort_based_on_label (detected_map_array);
+    
     //std::cout << "Map Size is:" << detected_map_array.size();
     
     
@@ -253,12 +323,7 @@ double dot(Coordinates_Vector in1, Coordinates_Vector in2)
 }
 
 
-Coordinates add(Coordinates a, Coordinates b)
 
-{
-
-  return {a[0] + b[0], a[1] + b[1]};
-}
 
 
 
@@ -408,6 +473,15 @@ Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in)
   return translated_map;
 }
 
+double angle (Coordinates_Vector in1, Coordinates_Vector in2 )
+
+{
+  acos(dot (in1, in2) /
+              (absolute(in1) * absolute(in2)));
+}
+
+
+
 double get_rotation(Coordinates_Vector_Colored map_in)
 {
 
@@ -415,8 +489,8 @@ double get_rotation(Coordinates_Vector_Colored map_in)
               /*std::cout << "Goals_Vector's size:" << absolute(get_goalsVector(map_in)) << std::endl;
               std::cout << "Default Goals_Vector's size:" << absolute(Default_Goals_Vector) << std::endl;
               std::cout << "Dot Product:" << dot(get_goalsVector(map_in), Default_Goals_Vector)<< std::endl;*/
-  return acos(dot (get_goalsVector(map_in), Default_Goals_Vector) /
-              (absolute(get_goalsVector(map_in)) * absolute(Default_Goals_Vector)));
+  return angle(get_goalsVector(map_in), Default_Goals_Vector);
+              
               
 }
 
@@ -495,11 +569,24 @@ int main(int argc, char **argv)
 
     Coordinates translation = get_translation(map_in);
     double rotation =0;
-    rotation = get_rotation(map_in);//*180/M_PI;
-     
+    rotation = get_rotation(map_in);
+
+    
+    Coordinates_Vector_Colored map_reconstructed =frame_rematch (map_in);
+    label_map (map_reconstructed);
+
     
 
+    Coordinates translation_error = distance(Real_Map_Vector[0],
+                        get_centroid(get_coordinates_with_label( map_reconstructed ,0)));
+    double rotation_error = angle ({0, get_centroid(get_coordinates_with_label( map_reconstructed ,0))
+                                    }, {0, Real_Map_Vector[0]});
 
+
+    translation = add (translation, translation_error); 
+    rotation = rotation + rotation_error; 
+     
+    
     if(rotation==rotation && translation==translation){
         tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
         std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
