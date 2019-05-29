@@ -142,11 +142,6 @@ class PlayNode {
         double vector_map_x = goal_cyan_map.x - goal_orange_map.x;
         double vector_map_y = goal_cyan_map.y - goal_orange_map.y;
 
-        // double vector_target_len = sqrt(vector_target_x * vector_target_x +
-        //                                vector_target_y * vector_target_y);
-        // double vector_map_len =
-        //    sqrt(vector_map_x * vector_map_x + vector_map_y * vector_map_y);
-
         // Calculate rotation
         double rotation_map = atan2(vector_map_y, vector_map_x);
         double rotation_target = atan2(vector_target_y, vector_target_x);
@@ -201,9 +196,8 @@ class PlayNode {
             get_number_of_coloured_points(cloud_map, 255, 140, 0);
         int cyan_points = get_number_of_coloured_points(cloud_map, 0, 255, 255);
 
-        // std::cout << "cyan" << cyan_points << " orange" << orange_points
-        //          << std::endl;
-        std::vector<Eigen::Affine3f> transforms;
+        std::vector<Eigen::Affine3f>
+            transforms;  // store transformations here untill the end
 
         if (cyan_points >= 1 && orange_points >= 1) {
             // Use goals for translation

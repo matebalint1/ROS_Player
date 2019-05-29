@@ -327,7 +327,7 @@ class PointcloudProcessor {
 
         // Detection parameters
         const int color_threshold =
-            15;  // min number of points in main color // 5 works
+            20;  // min number of points in main color // 15->20
         const double min_z_height = 0.1;
         const double max_z_height = 0.52;
         const double min_diagonal_size = 0.06;
@@ -1126,7 +1126,7 @@ class PointcloudProcessor {
 
         // Find pucks and poles from not floor pointcoud
         recognized_objects = combine_close_points(
-            pointcloud_not_floor, is_buck_or_pole, 0.03, 16, 2500);
+            pointcloud_not_floor, is_buck_or_pole, 0.03, 30, 2500);//16->30
 
         remove_edge_detections(recognized_objects, transform_odom_to_baselink);
 

@@ -163,7 +163,7 @@ void process_messages() {
         (u[3] * v[3] + u[4] * v[4]) /
         sqrt((pow(u[3], 2) + pow(u[4], 2)) * (pow(v[3], 2) + pow(v[4], 2)))));
 
-    ROS_INFO_STREAM("The angle between the two lines is " << angle << "[rad]");
+    ROS_INFO_STREAM("The angle between the two lines is " << angle << " [rad]");
 
     // std::cout << "distance = " << distance << std::endl;
     // std::cout << "distance2 = " << distance2 << std::endl;

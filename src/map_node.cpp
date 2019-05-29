@@ -498,8 +498,8 @@ class PlayNode {
 
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
-        update_map(puck_and_pole_cloud, 0.15, 1, 10000, 0.2, 20);
-        update_map(goal_cloud, 0.15, 1, 10000, 0.2, 20);
+        update_map(puck_and_pole_cloud, 0.15, 1, 10000, 0.2, 10); //20->10
+        update_map(goal_cloud, 0.15, 1, 10000, 0.2, 10);//20->10 max size
         //update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
 
         // Simple goal detection*********************
@@ -514,10 +514,10 @@ class PlayNode {
         // Create estimate of the environment
         // -------------------------------------------------------
         // Pucks and Poles:
-        temp_cloud = combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);
+        temp_cloud = combine_measurements(puck_and_pole_cloud, 0.2, 1, 1000);// 0.15->0.2
 
         // Goals:
-        *temp_cloud += *combine_measurements(goal_cloud, 0.15, 1, 1000);
+        *temp_cloud += *combine_measurements(goal_cloud, 0.2, 1, 1000); // 0.15->0.2
 
         // Simple
         //temp_cloud->points.push_back(
