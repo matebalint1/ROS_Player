@@ -97,8 +97,8 @@ char get_color(PointType point) {
         return 'b';
     else if (rgbMatrix(0) == 0 && rgbMatrix(2) == 0)
         return 'g';
-    else
-        return 'y';
+    else if (rgbMatrix(0) == 255 && rgbMatrix(1)==140 && rgbMatrix(2) == 0)
+        return 'y' ;
 }
 
 void flush_array(Coordinates_Vector_Colored &detected_map_array)
@@ -364,8 +364,8 @@ Coordinates_Vector get_goalsVector(Coordinates_Vector_Colored map_in) {
         if (point_colored.color == 'b')  // Start point of goals vector
         {
             ++count;
-            vector_s[1] = vector_e[1] - point_colored.point[1];
-            vector_s[0] = vector_e[0] - point_colored.point[0];
+            vector_s[1] = vector_e[1] + point_colored.point[1];
+            vector_s[0] = vector_e[0] + point_colored.point[0];
         }
     }
     vector_s[0] = vector_s[0] / count;
@@ -393,29 +393,41 @@ Coordinates_Vector get_goalsVector(Coordinates_Vector_Colored map_in) {
 }
 
 Coordinates get_translation(Coordinates_Vector_Colored map_in) {
-    // ROS_INFO_STREAM ("Calculating the translation!");
+     //ROS_INFO_STREAM ("Calculating the translation!");
     Coordinates_Vector goals_vector = get_goalsVector(map_in);
     return distance(Default_Goals_Vector[0], goals_vector[0]);
 }
 
 Coordinates_Vector_Colored translate(Coordinates_Vector_Colored map_in)
 {
-  Coordinates_Vector_Colored translated_map;
-
+  Coordinates_Vector_Colored translated_map(map_in.size());
+    
   Coordinates translation = get_translation(map_in);
-  for (size_t i = 1; i < map_in.size(); i++)
+  //ROS_INFO_STREAM ("Getting into loop!");
+
+  for (size_t i = 0; i < map_in.size(); i++)
   {
     translated_map[i].point = add(map_in[i].point, translation);
     translated_map[i].color = map_in[i].color;
+    //std::cout<<i<<std::endl;
   }
+  
+  //ROS_INFO_STREAM ("Now Returning!");
   return translated_map;
 }
 
 double angle (Coordinates_Vector in1, Coordinates_Vector in2 )
 
 {
-  acos(dot (in1, in2) /
-              (absolute(in1) * absolute(in2)));
+ double a= atan( distance( in1[1], in1[0] )[1] /distance( in1[1], in1[0] )[0])-
+ atan( distance( in2[1], in2[0] )[1] /distance( in2[1], in2[0] )[0]);
+ // double a= acos(dot (in1, in2) /
+             // (absolute(in1) * absolute(in2)));
+    //std::cout << "Abs1: " << absolute(in1) << "Abs2: " << absolute(in2) << std::endl << dot(in1,in2) << std::endl;
+
+    
+  return a;
+
 }
 
 
@@ -427,7 +439,9 @@ double get_rotation(Coordinates_Vector_Colored map_in)
               /*std::cout << "Goals_Vector's size:" << absolute(get_goalsVector(map_in)) << std::endl;
               std::cout << "Default Goals_Vector's size:" << absolute(Default_Goals_Vector) << std::endl;
               std::cout << "Dot Product:" << dot(get_goalsVector(map_in), Default_Goals_Vector)<< std::endl;*/
+  if (distance(get_goalsVector(map_in)[1],get_goalsVector(map_in)[0])[1] >0)
   return angle(get_goalsVector(map_in), Default_Goals_Vector);
+  else return (angle(get_goalsVector(map_in), Default_Goals_Vector));
               
               
 }
@@ -435,24 +449,33 @@ double get_rotation(Coordinates_Vector_Colored map_in)
 
 
 Coordinates_Vector_Colored rotate(Coordinates_Vector_Colored map_in) {
+      
     double alpha = get_rotation(map_in);
-    Coordinates_Vector_Colored map_result;
-    // ROS_INFO_STREAM ("Getting the rotation!");
+    //  std::cout << alpha << std::endl;
+    Coordinates_Vector_Colored map_result(map_in.size());
+     //ROS_INFO_STREAM ("Getting the rotation!");
     for (size_t i = 0; i < map_in.size(); i++)
 
     {
-        map_result[i].point[0] =
+        Coordinates point= {0,0};
+         
+        point[0] =
             map_in[i].point[0] * cos(alpha) - map_in[i].point[1] * sin(alpha);
-        map_result[i].point[1] =
+        point[1] =
             map_in[i].point[1] * sin(alpha) + map_in[i].point[1] * cos(alpha);
+        map_result[i].point=point;
         map_result[i].color = map_in[i].color;
+    //std::cout <<i << std::endl;
     }
 
     return map_result;
 }
 
 Coordinates_Vector_Colored frame_rematch(Coordinates_Vector_Colored map_in) {
+    
     Coordinates_Vector_Colored map_in_editted = translate(map_in);
+    
+    
     map_in_editted = rotate(map_in_editted);
 
     return map_in_editted;
@@ -463,9 +486,9 @@ void print_colored_coordinates(Coordinates_Vector_Colored vector_in) {
     for (auto point_colored : vector_in) {
         std::cout
             << " X: "
-            << point_colored.point[0];  // << "  Y:" ;
-                                        // point_colored.point[1]//<< " Color: "
-                                        // << point_colored.color << std::endl;
+            << point_colored.point[0]   << "  Y: " << 
+                                         point_colored.point[1] << " Color: "
+                                         << std::isprint(point_colored.color) << std::endl;
     }
 }
 
@@ -498,50 +521,49 @@ int main(int argc, char **argv) {
             double rotation = 0;
             rotation = get_rotation(map_in);  //*180/M_PI;
 
-            if (rotation == rotation && translation == translation) {
-                tf_map_to_odom_boardcaster(translation[0], translation[1],
-                                           rotation);
-                std::cout << "Translation X:" << translation[0]
-                          << " Translation Y:" << translation[1]
-                          << " Rotation:" << rotation * 180 / M_PI << std::endl;
-            }
-            flush_array(map_in);
-            got_map = false;
-            got_width = false;
-            scale_down(Real_Map_Vector);
-
             // std::cout << std::endl <<std::endl <<std::endl;
         }
 
     Coordinates translation = get_translation(map_in);
     double rotation =0;
     rotation = get_rotation(map_in);
+    //map_reconstructed =map_in;
+    Coordinates translation_error;
 
     
-    Coordinates_Vector_Colored map_reconstructed =frame_rematch (map_in);
+    
+     
+    
+int count=0;
+//while (count<10){
+count++;
+        Coordinates_Vector_Colored  map_reconstructed =frame_rematch (map_in);
     
     label_map (map_reconstructed);
+    //std:: cout<< get_goalsVector(map_in)[0][0] << " " << get_goalsVector(map_in)[0][1] ; 
 
     
-    Coordinates translation_error = distance(Real_Map_Vector[0],
-                        get_centroid(get_coordinates_with_label( map_reconstructed ,0)));
+     translation_error = distance(Real_Map_Vector[0],
+                         get_centroid(get_coordinates_with_label( map_reconstructed ,0)));
+    //print_colored_coordinates(get_coordinates_with_label( map_reconstructed ,0));
     
+    //ROS_INFO_STREAM ("Angle Error Calculation");
     
-    
-    double rotation_error = angle ({{0,0}, get_centroid(get_coordinates_with_label( map_reconstructed ,0))
-                                    }, {{0,0}, Real_Map_Vector[0]});
+    //double rotation_error =  angle({{0,0}, get_centroid(get_coordinates_with_label( map_reconstructed ,0))
+      //                             }, {{0,0}, translation);
 
      
 
+    //ROS_INFO_STREAM ("WTF!");
+    translation = add (translation, translation_error);    
+//}
 
-    translation = add (translation, translation_error); 
-    rotation = rotation + rotation_error; 
+
      
-    
     if(rotation==rotation && translation==translation){
         tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
-       // std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
-        std::cout << "Correction X:"<< translation_error[0] <<" Correction Y:" << translation_error[1]<< " Correction <:" << rotation_error*180/M_PI << std::endl;
+       std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
+        std::cout << "Correction X:"<< translation_error[0] <<" Correction Y:" << translation_error[1] << std::endl;
     }
       flush_array(map_in);
       got_map=false;
@@ -551,11 +573,14 @@ int main(int argc, char **argv) {
     //std::cout << std::endl <<std::endl <<std::endl;
 
     
+
   
           
 
         ros::spinOnce();
         clock++;
         r.sleep();
-    }
-}
+    }}
+
+    
+
