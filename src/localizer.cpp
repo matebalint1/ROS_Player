@@ -421,6 +421,7 @@ double angle (Coordinates_Vector in1, Coordinates_Vector in2 )
 {
  double a= atan( distance( in1[1], in1[0] )[1] /distance( in1[1], in1[0] )[0])-
  atan( distance( in2[1], in2[0] )[1] /distance( in2[1], in2[0] )[0]);
+
  // double a= acos(dot (in1, in2) /
              // (absolute(in1) * absolute(in2)));
     //std::cout << "Abs1: " << absolute(in1) << "Abs2: " << absolute(in2) << std::endl << dot(in1,in2) << std::endl;
@@ -440,7 +441,7 @@ double get_rotation(Coordinates_Vector_Colored map_in)
               std::cout << "Default Goals_Vector's size:" << absolute(Default_Goals_Vector) << std::endl;
               std::cout << "Dot Product:" << dot(get_goalsVector(map_in), Default_Goals_Vector)<< std::endl;*/
   if (distance(get_goalsVector(map_in)[1],get_goalsVector(map_in)[0])[1] >0)
-  return angle(get_goalsVector(map_in), Default_Goals_Vector);
+  return (-angle(get_goalsVector(map_in), Default_Goals_Vector));
   else return (angle(get_goalsVector(map_in), Default_Goals_Vector));
               
               
@@ -525,26 +526,33 @@ int main(int argc, char **argv) {
         }
 
     Coordinates translation = get_translation(map_in);
-    double rotation =0;
-    rotation = get_rotation(map_in);
-    //map_reconstructed =map_in;
+    double initial_error_normal = absolute ({translation, {0,0}});
+    
+    
+    
+   double rotation = get_rotation(map_in);
+   double rotation_initial = rotation ;
+   Coordinates_Vector_Colored  map_reconstructed =map_in;
     Coordinates translation_error;
 
     
     
      
-    
+ double translated_error_normal = 3;  
+  double rotation_final = 0; 
 int count=0;
-//while (count<10){
+while (translated_error_normal>.1){
 count++;
-        Coordinates_Vector_Colored  map_reconstructed =frame_rematch (map_in);
+         map_reconstructed =frame_rematch (map_reconstructed);
+         translated_error_normal = absolute ({{0,0}, get_translation (map_reconstructed)});
+          rotation_final = get_rotation (map_reconstructed) ;
     
-    label_map (map_reconstructed);
+        label_map (map_reconstructed);
     //std:: cout<< get_goalsVector(map_in)[0][0] << " " << get_goalsVector(map_in)[0][1] ; 
 
     
-     translation_error = distance(Real_Map_Vector[0],
-                         get_centroid(get_coordinates_with_label( map_reconstructed ,0)));
+     translation_error = {0,0};// distance(Real_Map_Vector[0],
+                         //get_centroid(get_coordinates_with_label( map_reconstructed ,0)));
     //print_colored_coordinates(get_coordinates_with_label( map_reconstructed ,0));
     
     //ROS_INFO_STREAM ("Angle Error Calculation");
@@ -555,15 +563,19 @@ count++;
      
 
     //ROS_INFO_STREAM ("WTF!");
-    translation = add (translation, translation_error);    
-//}
+    //translation = add (translation, translation_error);    
+}
 
 
      
     if(rotation==rotation && translation==translation){
         tf_map_to_odom_boardcaster(translation[0], translation[1], rotation);
+       //absolute ({get_centroid(get_coordinates_with_label( map_reconstructed ,0)), {0,0}});
        std::cout << "Translation X:"<< translation[0] <<" Translation Y:" << translation[1]<< " Rotation:" << rotation*180/M_PI << std::endl;
-        std::cout << "Correction X:"<< translation_error[0] <<" Correction Y:" << translation_error[1] << std::endl;
+       // std::cout << "Correction X:"<< translation_error[0] <<" Correction Y:" << translation_error[1] << std::endl;
+        std::cout << "Estimation Accuracy Translational: " << (1 - translated_error_normal/initial_error_normal)*100  
+       << " %" << " Radial:" << (1 - rotation_final/rotation_initial) * 100
+        << " %" << std::endl;
     }
       flush_array(map_in);
       got_map=false;
