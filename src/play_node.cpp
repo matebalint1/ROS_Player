@@ -477,14 +477,16 @@ class PlayNode {
             get_transform(transform_laser_to_baselink, tfBuffer,
                           "robot1/front_laser", "robot1/base_link");
         tf::Transform transform_odom_to_baselink;
-        bool succesful_odom_baselink = get_transform(transform_odom_to_baselink, tfBuffer,
-                                       "robot1/odom", "robot1/base_link");
+        bool succesful_odom_baselink =
+            get_transform(transform_odom_to_baselink, tfBuffer, "robot1/odom",
+                          "robot1/base_link");
         tf::Transform transform_base_link_to_map;
         bool succesful_robot_pos_tf = get_transform(
             transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
 
         if (succesful_laser_tf == false || succesful_odom_baselink == false) {
-            ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
+            ROS_INFO_STREAM(
+                "Laser or odom to baselink transformation missing!");
             // return;
         }
 
@@ -547,12 +549,41 @@ class PlayNode {
         pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                      transform_laser_to_baselink);
 
-        // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_new.pcd");
+        // -------------------------------------------------
+        // Prepare map data
+        // -------------------------------------------------
+        PointCloudPtr map_cloud(new PointCloud);
+        PointCloudPtr map_cloud_pucks(new PointCloud);
+
+        // Transform to baselink frame
+        pcl_ros::transformPointCloud(map_objects_msg,
+                                     *map_cloud,
+                                     transform_odom_to_baselink);
+
+        color_filter(map_cloud, temp, 0, 0, 255);  // Blue
+        *map_cloud_pucks = *temp;
+        color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
+        *map_cloud_pucks += *temp;
+
+        // -------------------------------------------------
+        // Apply masks for the collision avoidance data, e.g. add safe zones
+        // -------------------------------------------------
+
+        // Do not avoid any bucks -> remove all pucks from the collision
+        // avoidance cloud
+        double safe_zone_radius = 0.15; //m
+
+        for(int i = 0; i < map_cloud_pucks->points.size(); i++){
+            for(int i = 0; i < map_cloud_pucks->points.size(); i++){
+            
+            }
+        }
+
 
         // -------------------------------------------------
         // Find closest obstacle in combined laser and kinect cloud
         // -------------------------------------------------
-        *collision_avoidance_cloud += *laser_cloud; // combine data
+        *collision_avoidance_cloud += *laser_cloud;  // combine data
 
         // Get closest object
         double closest_laser_x;  // in base_link frame
