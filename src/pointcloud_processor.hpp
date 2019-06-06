@@ -44,12 +44,13 @@ class PointcloudProcessor {
         pointcloud_not_floor_green = PointCloudPtr(new PointCloud);
         pointcloud_not_floor_blue = PointCloudPtr(new PointCloud);
         pointcloud_not_floor_yellow = PointCloudPtr(new PointCloud);
+        collision_avoidance_cloud = PointCloudPtr(new PointCloud);
 
-        pass_through_filter = pcl::PassThrough<pcl::PointXYZRGB>();
+        pass_through_filter = pcl::PassThrough<PointType>();
 
-        conditional_filter = pcl::ConditionalRemoval<pcl::PointXYZRGB>();
+        conditional_filter = pcl::ConditionalRemoval<PointType>();
         statistical_outlier_removal_filter =
-            pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB>();
+            pcl::StatisticalOutlierRemoval<PointType>();
 
         // cv::namedWindow(IMAGE_WINDOW);
         // cv::namedWindow(IMAGE_WINDOW2);
@@ -1126,9 +1127,16 @@ class PointcloudProcessor {
 
         // Find pucks and poles from not floor pointcoud
         recognized_objects = combine_close_points(
-            pointcloud_not_floor, is_buck_or_pole, 0.03, 30, 2500);//16->30
+            pointcloud_not_floor, is_buck_or_pole, 0.03, 30, 2500);  // 16->30
 
         remove_edge_detections(recognized_objects, transform_odom_to_baselink);
+
+        // *********************************************
+        // Create collision avoidance point cloud
+        // *********************************************
+        voxel_grid_filter_m(pointcloud_not_floor, collision_avoidance_cloud,
+                            0.05, 1);
+        edit_z_to(collision_avoidance_cloud, 0);
 
         // *********************************************
         // Goal recognition
@@ -1245,6 +1253,9 @@ class PointcloudProcessor {
     PointCloudPtr& get_floor_pointcloud() { return pointcloud_floor; }
     PointCloudPtr& get_not_floor_pointcloud() { return pointcloud_not_floor; }
     PointCloudPtr& get_recognized_objects() { return recognized_objects; }
+    PointCloudPtr& get_collision_avoidance_cloud() {
+        return collision_avoidance_cloud;
+    }
 
    private:
     pcl::PassThrough<PointType> pass_through_filter;
@@ -1266,6 +1277,7 @@ class PointcloudProcessor {
     PointCloudPtr pointcloud_not_floor_yellow;
 
     PointCloudPtr recognized_objects;
+    PointCloudPtr collision_avoidance_cloud;
 
     // PointCloudPtr pointcloud_puck_model;
     // PointCloudPtr pointcloud_pole_model;

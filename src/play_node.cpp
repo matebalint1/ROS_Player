@@ -471,13 +471,12 @@ class PlayNode {
         // succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
         //                          "robot1/base_link", "robot1/odom");
         tf::Transform transform_base_link_to_map;
-        bool succesful_robot_pos_tf =
-            get_transform(transform_base_link_to_map, tfBuffer, "map",
-                          "robot1/base_link");
+        bool succesful_robot_pos_tf = get_transform(
+            transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
 
         if (succesful_laser_tf == false) {
             ROS_INFO_STREAM("Laser transformation missing!");
-            //return;
+            // return;
         }
 
         if (succesful_robot_pos_tf == false || got_field_width == false) {
@@ -514,7 +513,12 @@ class PlayNode {
         }
 
         // -------------------------------------------------
-        // Calculate closest object in laser message
+        // Calculate closest object in map
+        // -------------------------------------------------
+        // TODO 
+
+        // -------------------------------------------------
+        // Calculate closest object in laser message and in the kinect 2D collision avoidance cloud
         // -------------------------------------------------
         // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
 
@@ -567,10 +571,7 @@ class PlayNode {
                                                      << "\tangle: "
                                                      << closest_wall_direction);
 
-        // -------------------------------------------------
-        // Calculate closest object in map
-        // -------------------------------------------------
-        // TODO
+
 
         // -------------------------------------------------
         // Calculate closest obstacle of all
@@ -788,14 +789,14 @@ class PlayNode {
     // --------------------------------------------
 
     // Real driving
-     const double MAX_LINEAR_SPEED = 0.3;        // m/s
-     const double MAX_ROTATIONAL_SPEEED = 0.3;   // rad/s
-     const double MIN_LINEAR_SPEED = 0.08;       // m/s
+    const double MAX_LINEAR_SPEED = 0.3;       // m/s
+    const double MAX_ROTATIONAL_SPEEED = 0.3;  // rad/s
+    const double MIN_LINEAR_SPEED = 0.08;      // m/s
 
     // For simulation
-//    const double MAX_LINEAR_SPEED = 0.6;       // m/s
-//    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
-    //const double MIN_LINEAR_SPEED = 0.1;       // m/s
+    //    const double MAX_LINEAR_SPEED = 0.6;       // m/s
+    //    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
+    // const double MIN_LINEAR_SPEED = 0.1;       // m/s
 
     // --------------------------------------------
     // Collision Avoidance
@@ -847,7 +848,8 @@ int main(int argc, char** argv) {
     ros::Rate r(20);
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
-//        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for debugging
+        //        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);  // for
+        //        debugging
         if (playNode.got_messages()) {
             playNode.process_messages();
         }

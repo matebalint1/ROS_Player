@@ -19,7 +19,6 @@
 #include "opencv2/highgui/highgui.hpp"  // do not move up
 #include "opencv2/opencv.hpp"
 
-
 class PlayNode {
    public:
     PlayNode(int argc, char **argv) {
@@ -33,6 +32,8 @@ class PlayNode {
             n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
         kinect_pub =
             n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
+        kinect_collision_avoidance_2d =
+            n->advertise<PointCloud>("pointcloud_node/collision_avoidance", 1);
 
         // ROS_INFO("Waiting for camera image");
         // ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
@@ -41,8 +42,6 @@ class PlayNode {
         ROS_INFO("Waiting for /robot1/kinect/depth_registered/points");
         ros::topic::waitForMessage<PointCloud>(
             "robot1/kinect/depth_registered/points");
-
-      
 
         // If not in an object, the fourth parameter here is not necessary, but
         // we need it here to ensure the callback goes to the right place, i.e.
@@ -99,7 +98,7 @@ class PlayNode {
         velocity_pub.publish(msg);
     }
 
-    void pub_pointcloud(PointCloud &cloud) {
+    void pub_pointcloud(PointCloud &cloud, ros::Publisher &pub) {
         PointCloud::Ptr pcl_msg(new PointCloud);
 
         // msg->header.frame_id = "robot1/base_link";
@@ -109,7 +108,7 @@ class PlayNode {
         pcl_msg->width = cloud.width;
         pcl_msg->points = cloud.points;
 
-        kinect_pub.publish(pcl_msg);
+        pub.publish(pcl_msg);
     }
 
     void process_messages() {
@@ -130,12 +129,13 @@ class PlayNode {
         succesful &=
             get_transform(transform_kinect_to_odom, tfBuffer, "robot1/odom",
                           "robot1/kinect_rgb_optical_frame");
-                          
+
         tf::Transform transform_odom_to_baselink;
         succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
                                    "robot1/base_link", "robot1/odom");
         if (succesful == false) {
-            ROS_INFO_STREAM( "Transformation missing, base_link - odom or odom - kinect." );
+            ROS_INFO_STREAM(
+                "Transformation missing, base_link - odom or odom - kinect.");
             return;
         }
 
@@ -147,8 +147,11 @@ class PlayNode {
         pointcloud_processor.process_pointcloud(cur_kinect,
                                                 transform_odom_to_baselink);
 
-        // Publish pointcloud
-        pub_pointcloud(*pointcloud_processor.get_recognized_objects());
+        // Publish pointclouds
+        pub_pointcloud(*(pointcloud_processor.get_recognized_objects()),
+                       kinect_pub);
+        pub_pointcloud(*(pointcloud_processor.get_collision_avoidance_cloud()),
+                       kinect_collision_avoidance_2d);
 
         got_kinect = false;  // reset
     }
@@ -166,6 +169,7 @@ class PlayNode {
 
     ros::Publisher velocity_pub;
     ros::Publisher kinect_pub;
+    ros::Publisher kinect_collision_avoidance_2d;
 
     image_transport::Subscriber image_sub;
     ros::Subscriber laser_sub;
