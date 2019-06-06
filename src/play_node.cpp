@@ -467,6 +467,27 @@ class PlayNode {
         }
     }
 
+    void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
+                      int r, int g, int b) {
+        // Filters pointcloud by a specific color
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::ExtractIndices<PointType> extract;
+        for (int i = 0; i < (*cloud_in).size(); i++) {
+            uint32_t rgb = cloud_in->points[i].rgb;
+            uint8_t bp = (rgb >> 0) & 0xff;
+            uint8_t gp = (rgb >> 8) & 0xff;
+            uint8_t rp = (rgb >> 16) & 0xff;
+
+            if (r == rp && g == gp && b == bp) {
+                // Use these points
+                inliers->indices.push_back(i);
+            }
+        }
+        extract.setInputCloud(cloud_in);
+        extract.setIndices(inliers);
+        extract.filter(*cloud_out);
+    }
+
     void process_messages() {
         // -------------------------------------------------
         // Get required transformations
@@ -549,6 +570,8 @@ class PlayNode {
         pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                      transform_laser_to_baselink);
 
+        *collision_avoidance_cloud += *laser_cloud;  // combine data
+
         // -------------------------------------------------
         // Prepare map data
         // -------------------------------------------------
@@ -556,8 +579,7 @@ class PlayNode {
         PointCloudPtr map_cloud_pucks(new PointCloud);
 
         // Transform to baselink frame
-        pcl_ros::transformPointCloud(map_objects_msg,
-                                     *map_cloud,
+        pcl_ros::transformPointCloud(map_objects_msg, *map_cloud,
                                      transform_odom_to_baselink);
 
         color_filter(map_cloud, temp, 0, 0, 255);  // Blue
@@ -571,19 +593,33 @@ class PlayNode {
 
         // Do not avoid any bucks -> remove all pucks from the collision
         // avoidance cloud
-        double safe_zone_radius = 0.15; //m
+        double safe_zone_radius = 0.15;  // m
 
-        for(int i = 0; i < map_cloud_pucks->points.size(); i++){
-            for(int i = 0; i < map_cloud_pucks->points.size(); i++){
-            
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::ExtractIndices<PointType> extract;
+
+        for (int i = 0; i < map_cloud_pucks->points.size(); i++) {
+            for (int j = 0; j < collision_avoidance_cloud->points.size(); j++) {
+                if (distance_between_points(
+                        map_cloud_pucks->points[i].x,
+                        map_cloud_pucks->points[i].y,
+                        collision_avoidance_cloud->points[j].x,
+                        collision_avoidance_cloud->points[j].y) <=
+                    safe_zone_radius) {
+                    // Remove these points
+                    inliers->indices.push_back(j);
+                }
             }
         }
 
+        extract.setInputCloud(collision_avoidance_cloud);
+        extract.setIndices(inliers);
+        extract.setNegative(true);
+        extract.filter(*collision_avoidance_cloud);
 
         // -------------------------------------------------
         // Find closest obstacle in combined laser and kinect cloud
         // -------------------------------------------------
-        *collision_avoidance_cloud += *laser_cloud;  // combine data
 
         // Get closest object
         double closest_laser_x;  // in base_link frame
