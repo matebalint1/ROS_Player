@@ -43,6 +43,10 @@ class PlayNode {
 
         map_sub =
             n->subscribe("map_node/map", 1, &PlayNode::map_callback, this);
+        collision_avoidance_cloud_sub =
+            n->subscribe("map_node/map", 1,
+                         &PlayNode::collision_avoidance_cloud_callback, this);
+
         laser_sub = n->subscribe("robot1/front_laser/scan", 1,
                                  &PlayNode::laser_callback, this);
 
@@ -86,6 +90,11 @@ class PlayNode {
         // ROS_INFO("Got new map");
         map_objects_msg = *msg;
         got_map = true;
+    }
+
+    void collision_avoidance_cloud_callback(const PointCloud::ConstPtr& msg) {
+        collision_avoidance_cloud_msg = *msg;
+        got_collision_avoidance_cloud = true;
     }
 
     void field_width_callback(const geometry_msgs::Vector3::ConstPtr& msg) {
@@ -467,15 +476,15 @@ class PlayNode {
         bool succesful_laser_tf =
             get_transform(transform_laser_to_baselink, tfBuffer,
                           "robot1/front_laser", "robot1/base_link");
-        // tf::Transform transform_odom_to_baselink;
-        // succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
-        //                          "robot1/base_link", "robot1/odom");
+        tf::Transform transform_odom_to_baselink;
+        bool succesful_odom_baselink = get_transform(transform_odom_to_baselink, tfBuffer,
+                                       "robot1/odom", "robot1/base_link");
         tf::Transform transform_base_link_to_map;
         bool succesful_robot_pos_tf = get_transform(
             transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
 
-        if (succesful_laser_tf == false) {
-            ROS_INFO_STREAM("Laser transformation missing!");
+        if (succesful_laser_tf == false || succesful_odom_baselink == false) {
+            ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
             // return;
         }
 
@@ -513,18 +522,25 @@ class PlayNode {
         }
 
         // -------------------------------------------------
-        // Calculate closest object in map
+        // Prepare kinect collision avoidance data
         // -------------------------------------------------
-        // TODO 
+        PointCloudPtr collision_avoidance_cloud(new PointCloud);
+
+        // Transform to baselink frame
+        pcl_ros::transformPointCloud(collision_avoidance_cloud_msg,
+                                     *collision_avoidance_cloud,
+                                     transform_odom_to_baselink);
 
         // -------------------------------------------------
-        // Calculate closest object in laser message and in the kinect 2D collision avoidance cloud
+        // Prepare laser collision avoidance data
         // -------------------------------------------------
+
         // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
 
         // Convert laser to pointcloud
         sensor_msgs::LaserScan cur_laser = laser_msg;
         PointCloudPtr laser_cloud(new PointCloud);
+
         temp = laser_msg_to_pointcloud(cur_laser);
 
         // Transform cloud to base_link frame
@@ -533,10 +549,15 @@ class PlayNode {
 
         // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_new.pcd");
 
+        // -------------------------------------------------
+        // Find closest obstacle in combined laser and kinect cloud
+        // -------------------------------------------------
+        *collision_avoidance_cloud += *laser_cloud; // combine data
+
         // Get closest object
         double closest_laser_x;  // in base_link frame
         double closest_laser_y;  // in base_link frame
-        get_closest_object_in_laser(laser_cloud, closest_laser_x,
+        get_closest_object_in_laser(collision_avoidance_cloud, closest_laser_x,
                                     closest_laser_y);
 
         // Transform point to distance,direction
@@ -570,8 +591,6 @@ class PlayNode {
         ROS_INFO_STREAM("Closest wall  obstacle r: " << closest_wall_distance
                                                      << "\tangle: "
                                                      << closest_wall_direction);
-
-
 
         // -------------------------------------------------
         // Calculate closest obstacle of all
@@ -751,7 +770,7 @@ class PlayNode {
     }
 
     bool got_messages() const {
-        return got_laser && got_laser /*&& got_odometry*/;
+        return got_laser && got_laser && got_collision_avoidance_cloud;
     }
 
    private:
@@ -759,6 +778,7 @@ class PlayNode {
     bool got_map = false;
     bool got_laser = false;
     bool got_field_width = false;
+    bool got_collision_avoidance_cloud = false;
 
     tf2_ros::Buffer* tfBuffer;
     tf2_ros::TransformListener* tf_listener;
@@ -767,6 +787,7 @@ class PlayNode {
     ros::Publisher velocity_pub;
 
     ros::Subscriber map_sub;
+    ros::Subscriber collision_avoidance_cloud_sub;
     ros::Subscriber laser_sub;
     ros::Subscriber field_width_sub;
     // ros::Subscriber odometry_sub;
@@ -774,6 +795,8 @@ class PlayNode {
     PointCloudPtr temp = PointCloudPtr(new PointCloud);
 
     PointCloud map_objects_msg;
+    PointCloud collision_avoidance_cloud_msg;
+
     sensor_msgs::LaserScan laser_msg;
     nav_msgs::Odometry odometry_msg;
 
