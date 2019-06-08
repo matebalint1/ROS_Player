@@ -44,7 +44,7 @@ class PlayNode {
         map_sub =
             n->subscribe("map_node/map", 1, &PlayNode::map_callback, this);
         collision_avoidance_cloud_sub =
-            n->subscribe("map_node/map", 1,
+            n->subscribe("pointcloud_node/collision_avoidance", 1,
                          &PlayNode::collision_avoidance_cloud_callback, this);
 
         laser_sub = n->subscribe("robot1/front_laser/scan", 1,
@@ -467,13 +467,14 @@ class PlayNode {
         }
     }
 
-    void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out,
-                      int r, int g, int b) {
+    void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
+                      int g, int b) {
         // Filters pointcloud by a specific color
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
-        for (int i = 0; i < (*cloud_in).size(); i++) {
-            uint32_t rgb = cloud_in->points[i].rgb;
+
+        for (int i = 0; i < cloud_in->points.size(); i++) {
+            uint32_t rgb = *reinterpret_cast<int*>(&cloud_in->points[i].rgb);
             uint8_t bp = (rgb >> 0) & 0xff;
             uint8_t gp = (rgb >> 8) & 0xff;
             uint8_t rp = (rgb >> 16) & 0xff;
@@ -576,16 +577,23 @@ class PlayNode {
         // Prepare map data
         // -------------------------------------------------
         PointCloudPtr map_cloud(new PointCloud);
-        PointCloudPtr map_cloud_pucks(new PointCloud);
+        PointCloudPtr safe_points(new PointCloud);
 
         // Transform to baselink frame
-        pcl_ros::transformPointCloud(map_objects_msg, *map_cloud,
+        PointCloudPtr temp2(new PointCloud(map_objects_msg));
+        pcl_ros::transformPointCloud(*temp2, *map_cloud,
                                      transform_odom_to_baselink);
+        // std::cout << "map cloud: " << map_cloud->points.size() << std::endl;
 
+        // Filter pucks to a own cloud
         color_filter(map_cloud, temp, 0, 0, 255);  // Blue
-        *map_cloud_pucks = *temp;
+        *safe_points = *temp;
         color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
-        *map_cloud_pucks += *temp;
+        *safe_points += *temp;
+
+        safe_points->is_dense = false;
+        safe_points->width = 1;
+        safe_points->height = safe_points->points.size();
 
         // -------------------------------------------------
         // Apply masks for the collision avoidance data, e.g. add safe zones
@@ -598,24 +606,32 @@ class PlayNode {
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
 
-        for (int i = 0; i < map_cloud_pucks->points.size(); i++) {
+        // Add safe zone around pucks (robot does not avoid them)
+        for (int i = 0; i < safe_points->points.size(); i++) {
             for (int j = 0; j < collision_avoidance_cloud->points.size(); j++) {
                 if (distance_between_points(
-                        map_cloud_pucks->points[i].x,
-                        map_cloud_pucks->points[i].y,
+                        safe_points->points[i].x, safe_points->points[i].y,
                         collision_avoidance_cloud->points[j].x,
                         collision_avoidance_cloud->points[j].y) <=
                     safe_zone_radius) {
                     // Remove these points
                     inliers->indices.push_back(j);
+                    // std::cout << "remove pioint: "
+                    //          << collision_avoidance_cloud->points[j]
+                    //          << std::endl;
                 }
             }
         }
+        std::cout << "safe zones: " << safe_points->points.size() << std::endl;
 
+        // std::cout << "size before safe zones: "
+        //          << collision_avoidance_cloud->points.size() << std::endl;
         extract.setInputCloud(collision_avoidance_cloud);
         extract.setIndices(inliers);
         extract.setNegative(true);
         extract.filter(*collision_avoidance_cloud);
+        // std::cout << "size after safe zones: "
+        //          << collision_avoidance_cloud->points.size() << std::endl;
 
         // -------------------------------------------------
         // Find closest obstacle in combined laser and kinect cloud
