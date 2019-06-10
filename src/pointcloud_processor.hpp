@@ -86,23 +86,23 @@ class PointcloudProcessor {
             return 1;
         }
 
-        /*// for simulator
-        // Green poles
-        if (g >= 250 && r + b < 50) {
-            return 2;
-        }
+        /* // for simulator
+         // Green poles
+         if (g >= 250 && r + b < 50) {
+             return 2;
+         }
 
-        // Blue pucks and goals
-        if (b >= 200 && r + g < 50) {
-            return 3;
-        }
+         // Blue pucks and goals
+         if (b >= 200 && r + g < 50) {
+             return 3;
+         }
 
-        // Yellow pucks and goals
-        if ((r >= 250 && g >= 250 && b <= 50) ||
-            (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
-             g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235)) {
-            return 1;
-        }*/
+         // Yellow pucks and goals
+         if ((r >= 250 && g >= 250 && b <= 50) ||
+             (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
+              g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235)) {
+             return 1;
+         }*/
 
         // Reserved values for filtering colors (highlighting)
         if ((r == 255 && g == 255 && b == 0) ||

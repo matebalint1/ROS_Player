@@ -33,6 +33,7 @@ class PlayNode {
 
         velocity_pub =
             n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
+        debug_cloud_pub = n->advertise<PointCloud>("play_node/debug", 1);
 
         ROS_INFO("Waiting for laser scan message");
         ros::topic::waitForMessage<sensor_msgs::LaserScan>(
@@ -56,6 +57,16 @@ class PlayNode {
         // odometry_sub =
         //    n->subscribe("robot1/odom", 1, &PlayNode::odometry_callback,
         //    this);
+    }
+
+    void pub_pointcloud(PointCloud& cloud, ros::Publisher& pub) {
+        PointCloudPtr msg(new PointCloud);
+        msg->header.frame_id = "robot1/base_link";
+
+        msg->height = cloud.height;
+        msg->width = cloud.width;
+        msg->points = cloud.points;
+        pub.publish(msg);
     }
 
     void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
@@ -500,8 +511,8 @@ class PlayNode {
                           "robot1/front_laser", "robot1/base_link");
         tf::Transform transform_odom_to_baselink;
         bool succesful_odom_baselink =
-            get_transform(transform_odom_to_baselink, tfBuffer, "robot1/odom",
-                          "robot1/base_link");
+            get_transform(transform_odom_to_baselink, tfBuffer,
+                          "robot1/base_link", "robot1/odom");
         tf::Transform transform_base_link_to_map;
         bool succesful_robot_pos_tf = get_transform(
             transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
@@ -515,8 +526,9 @@ class PlayNode {
         if (succesful_robot_pos_tf == false || got_field_width == false) {
             ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
             // Make robot rotate untill location and field width found.
+
             set_velocities(0, MAX_ROTATIONAL_SPEEED);
-            return;
+            return;  // disable for debugging
         }
 
         tf::Matrix3x3 rotation(transform_base_link_to_map.getRotation());
@@ -601,7 +613,7 @@ class PlayNode {
 
         // Do not avoid any bucks -> remove all pucks from the collision
         // avoidance cloud
-        double safe_zone_radius = 0.15;  // m
+        double safe_zone_radius = 0.2;  // m
 
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
@@ -613,16 +625,17 @@ class PlayNode {
                         safe_points->points[i].x, safe_points->points[i].y,
                         collision_avoidance_cloud->points[j].x,
                         collision_avoidance_cloud->points[j].y) <=
-                    safe_zone_radius) {
+                        safe_zone_radius) {
                     // Remove these points
                     inliers->indices.push_back(j);
-                    // std::cout << "remove pioint: "
+
+                    // std::cout << "remove point: "
                     //          << collision_avoidance_cloud->points[j]
                     //          << std::endl;
                 }
             }
         }
-        std::cout << "safe zones: " << safe_points->points.size() << std::endl;
+        //std::cout << "safe zones: " << safe_points->points.size() << std::endl;
 
         // std::cout << "size before safe zones: "
         //          << collision_avoidance_cloud->points.size() << std::endl;
@@ -630,8 +643,14 @@ class PlayNode {
         extract.setIndices(inliers);
         extract.setNegative(true);
         extract.filter(*collision_avoidance_cloud);
+
+        collision_avoidance_cloud->is_dense = false;
+        collision_avoidance_cloud->width = 1;
+        collision_avoidance_cloud->height = collision_avoidance_cloud->points.size();
+
         // std::cout << "size after safe zones: "
         //          << collision_avoidance_cloud->points.size() << std::endl;
+        pub_pointcloud(*collision_avoidance_cloud, debug_cloud_pub);
 
         // -------------------------------------------------
         // Find closest obstacle in combined laser and kinect cloud
@@ -868,6 +887,7 @@ class PlayNode {
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Publisher velocity_pub;
+    ros::Publisher debug_cloud_pub;
 
     ros::Subscriber map_sub;
     ros::Subscriber collision_avoidance_cloud_sub;
