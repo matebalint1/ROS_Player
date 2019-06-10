@@ -1,3 +1,4 @@
+#include "geometry_msgs/Vector3.h"
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 
@@ -28,6 +29,12 @@ class PlayNode {
         map_pub = n->advertise<PointCloud>("map_node/map", 1);
         map_raw_pub = n->advertise<PointCloud>("map_node/map_raw", 1);
 
+        // Subscribers for feedback
+        tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
+        tf_listener = new tf2_ros::TransformListener(*tfBuffer);
+        field_width_sub = n->subscribe("field_width_node/width", 1,
+                                       &PlayNode::field_width_callback, this);
+
         map_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
         temp_cloud = PointCloudPtrRGBA(new PointCloudRGBA);
 
@@ -45,6 +52,12 @@ class PlayNode {
 
         detected_objects_msg = *msg;
         got_detected_objects = true;
+    }
+
+    void field_width_callback(const geometry_msgs::Vector3::ConstPtr &msg) {
+        geometry_msgs::Vector3 width = *msg;
+        field_width = width.x;
+        got_field_width = true;
     }
 
     void pub_pointcloud(PointCloudRGBA &cloud, ros::Publisher &pub) {
@@ -144,19 +157,18 @@ class PlayNode {
 
         double average_x = centroid.x;
         double average_y = centroid.y;
- /*       double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
-                                  pow(max_point.x - min_point.x, 2));
+        /*       double diagonal_xy = sqrt(pow(max_point.y - min_point.y, 2) +
+                                         pow(max_point.x - min_point.x, 2));
 
-        // Check if size of the pointcloud is within the limits
-        if (diagonal_xy >= 0.21) {
-            // std::cout << "too big, diagonal: " << diagonal_xy << std::endl;
-            result_point.rgb = 0;
-            result_point.x = 0;
-            result_point.y = 0;
+               // Check if size of the pointcloud is within the limits
+               if (diagonal_xy >= 0.21) {
+                   // std::cout << "too big, diagonal: " << diagonal_xy <<
+           std::endl; result_point.rgb = 0; result_point.x = 0; result_point.y =
+           0;
 
-            // size does not match -> return a black point in origo
-            return result_point;
-        }*/
+                   // size does not match -> return a black point in origo
+                   return result_point;
+               }*/
 
         // Return point, color represents point type: green -> buck,
         // blue or yellow -> pole.
@@ -460,6 +472,119 @@ class PlayNode {
         cloud->height = cloud->points.size();
     }
 
+    void remove_outlier_based_on_feedback(
+        PointCloudPtrRGBA &puck_and_pole_cloud, PointCloudPtrRGBA &goal_cloud) {
+        // This function removes wrong detections from map cloud, based on known
+        // information of field and robot location.
+        const double MAX_DISTANCE_FROM_IDEAL = 0.2;  // m
+
+        tf::Transform transform_odom_to_map;
+        bool succesful_robot_pos_tf = get_transform(
+            transform_odom_to_map, tfBuffer, "map", "robot1/odom");
+
+        bool transformation_set = false;
+        n->param("transformation_map_to_odom_set", transformation_set, false);
+        // std::cout << "got to map transform: " << transformation_set
+        //          << std::endl;
+
+        if (tf_delay_counter <= 10 && transformation_set) {
+            // This delay prevents the feedback from being done with old tf
+            // data.
+            tf_delay_counter++;
+        }
+
+        if (got_field_width == true && succesful_robot_pos_tf == true &&
+            transformation_set == true && tf_delay_counter >= 10) {
+            // Got required data for performing feedback operation, e.g removing
+            // wrong detections from map_cloud.
+
+            // Create copy of clouds
+            PointCloudPtrRGBA temp_goal_cloud(new PointCloudRGBA(*goal_cloud));
+            PointCloudPtrRGBA temp_puck_and_pole_cloud(
+                new PointCloudRGBA(*puck_and_pole_cloud));
+
+            PointCloudPtrRGBA map_goal_cloud(new PointCloudRGBA);
+            PointCloudPtrRGBA map_puck_and_pole_cloud(new PointCloudRGBA);
+
+            // Transform clouds to map frame
+            pcl_ros::transformPointCloud(*temp_goal_cloud, *map_goal_cloud,
+                                         transform_odom_to_map);
+            pcl_ros::transformPointCloud(*temp_puck_and_pole_cloud,
+                                         *map_puck_and_pole_cloud,
+                                         transform_odom_to_map);
+
+            // Remove pucks and poles that are outside of the field
+            pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+            pcl::ExtractIndices<PointTypeRGBA> extract;
+            for (int j = 0; j < map_puck_and_pole_cloud->points.size(); j++) {
+                // Get color of point
+                uint32_t rgb = *reinterpret_cast<int *>(
+                    &map_puck_and_pole_cloud->points[j].rgb);
+                uint8_t b = (rgb >> 0) & 0xff;
+                uint8_t g = (rgb >> 8) & 0xff;
+                uint8_t r = (rgb >> 16) & 0xff;
+
+                double x = map_puck_and_pole_cloud->points[j].x;
+                double y = map_puck_and_pole_cloud->points[j].y;
+
+                if (r == 0 && g == 255 && b == 0) {  // green -> pole
+                    if (!(((x > -MAX_DISTANCE_FROM_IDEAL &&
+                            x < MAX_DISTANCE_FROM_IDEAL) ||
+                           (x > field_width - MAX_DISTANCE_FROM_IDEAL &&
+                            x < field_width + MAX_DISTANCE_FROM_IDEAL)) &&
+                          y > -MAX_DISTANCE_FROM_IDEAL &&
+                          y < 5.0 / 3.0 * field_width +
+                                  MAX_DISTANCE_FROM_IDEAL)) {
+                        // Pole outside of correct area -> remove
+                        // Remove these points
+                        std::cout << "Pole removed x: " << x << " y: " << y
+                                  << std::endl;
+                        inliers->indices.push_back(j);
+                    }
+                } else {  // yellow or blue -> buck
+                    if (!(((x > -MAX_DISTANCE_FROM_IDEAL &&
+                            x < field_width + MAX_DISTANCE_FROM_IDEAL)) &&
+                          y > -MAX_DISTANCE_FROM_IDEAL &&
+                          y < 5.0 / 3.0 * field_width +
+                                  MAX_DISTANCE_FROM_IDEAL)) {
+                        // Puck outside of field -> remove
+                        // Remove these points
+                        inliers->indices.push_back(j);
+
+                        std::cout << "Puck removed x: " << x << " y: " << y
+                                  << std::endl;
+                    } 
+                }
+            }
+            extract.setInputCloud(puck_and_pole_cloud);
+            extract.setIndices(inliers);
+            extract.setNegative(true);
+            extract.filter(*puck_and_pole_cloud);
+
+            // Remove goals that are outside of the field.
+            inliers = pcl::PointIndices::Ptr(new pcl::PointIndices());
+            for (int j = 0; j < map_goal_cloud->points.size(); j++) {
+                double x = map_goal_cloud->points[j].x;
+                double y = map_goal_cloud->points[j].y;
+
+                if (!(((x > -MAX_DISTANCE_FROM_IDEAL &&
+                        x < field_width + MAX_DISTANCE_FROM_IDEAL)) &&
+                      y > -MAX_DISTANCE_FROM_IDEAL &&
+                      y < 5.0 / 3.0 * field_width + MAX_DISTANCE_FROM_IDEAL)) {
+                    // Goal point outside of field -> remove
+                    // Remove these points
+                    inliers->indices.push_back(j);
+                    std::cout << "Goal point removed x: " << x << " y: " << y
+                              << std::endl;
+                }
+            }
+            extract.setInputCloud(goal_cloud);
+            extract.setIndices(inliers);
+            extract.setNegative(true);
+            extract.filter(*goal_cloud);
+        }
+    }
+
     void process_messages() {
         // -------------------------------------------------------
         // Update and add new data to map_cloud
@@ -500,8 +625,12 @@ class PlayNode {
         // increase time stamp of single points and cluster.
         update_map(puck_and_pole_cloud, 0.15, 1, 10000, 0.2, 10);
         update_map(goal_cloud, 0.15, 1, 10000, 0.2, 10);
-        
-        //update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
+
+        // Feed back, remove clearly wrong detections: poles and pucks outside
+        // of the field or inside of the field and pucks out
+        remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
+
+        // update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
         // Simple goal detection*********************
         // color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
         // voxel_grid_filter_m(temp, goal_cloud_cyan, 0.05, 1);
@@ -514,19 +643,21 @@ class PlayNode {
         // Create estimate of the environment
         // -------------------------------------------------------
         // Pucks and Poles:
-        *temp_cloud = *combine_measurements(puck_and_pole_cloud, 0.15, 1, 1000);// 0.15->0.2
+        *temp_cloud = *combine_measurements(puck_and_pole_cloud, 0.15, 1,
+                                            1000);  // 0.15->0.2
 
         // Goals:
-        *temp_cloud += *combine_measurements(goal_cloud, 0.15, 1, 1000); // 0.15->0.2
+        *temp_cloud +=
+            *combine_measurements(goal_cloud, 0.15, 1, 1000);  // 0.15->0.2
 
         // Simple
-        //temp_cloud->points.push_back(
+        // temp_cloud->points.push_back(
         //    get_centroid_of_color(goal_cloud, 255, 140, 0));
-        //temp_cloud->points.push_back(
+        // temp_cloud->points.push_back(
         //    get_centroid_of_color(goal_cloud, 0, 255, 255));
-        //temp_cloud->is_dense = false;
-        //temp_cloud->width = 1;
-        //temp_cloud->height = temp_cloud->points.size();
+        // temp_cloud->is_dense = false;
+        // temp_cloud->width = 1;
+        // temp_cloud->height = temp_cloud->points.size();
 
         // -------------------------------------------------------
         // Publish and prepare for next iteration
@@ -543,7 +674,7 @@ class PlayNode {
         pub_pointcloud(*temp_cloud,
                        map_pub);  // final map of the environment
 
-        // Publish raw map
+        // Publish raw map for debugging
         *temp_cloud = *map_cloud;  // copy
         set_alpha(temp_cloud, 0xff);
         pub_pointcloud(*temp_cloud,
@@ -555,13 +686,21 @@ class PlayNode {
     bool got_messages() const { return got_detected_objects; }
 
    private:
-    bool got_detected_objects;
+    bool got_detected_objects = false;
+    bool got_field_width = false;
 
     std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber detected_objects;
+    ros::Subscriber field_width_sub;
+
     ros::Publisher map_pub;
     ros::Publisher map_raw_pub;
 
+    tf2_ros::Buffer *tfBuffer;
+    tf2_ros::TransformListener *tf_listener;
+    int tf_delay_counter = 0;  // iterations before using feedback
+
+    double field_width = 3;
     PointCloudRGBA detected_objects_msg;
     PointCloudPtrRGBA map_cloud;   // contains points of individual detections
     PointCloudPtrRGBA temp_cloud;  // temorary

@@ -19,6 +19,7 @@ class PlayNode {
     PlayNode(int argc, char **argv) {
         ros::init(argc, argv, "location_node");
         n = std::make_unique<ros::NodeHandle>();
+        n->setParam("transformation_map_to_odom_set", false);
 
         ROS_INFO("Waiting for map_node/map");
         ros::topic::waitForMessage<PointCloud>("map_node/map");
@@ -257,6 +258,8 @@ class PlayNode {
         return transform_odom_to_map_latest;
     };
 
+    std::unique_ptr<ros::NodeHandle> n;
+
    private:
     bool got_map_cloud = false;
     bool got_field_width = false;
@@ -264,7 +267,6 @@ class PlayNode {
     bool transform_set = false;
     Eigen::Affine3f transform_odom_to_map_latest;
 
-    std::unique_ptr<ros::NodeHandle> n;
     ros::Subscriber map_cloud_sub;
     ros::Subscriber field_width_sub;
 
@@ -288,6 +290,8 @@ int main(int argc, char **argv) {
                 playNode.get_latest_transformation()(0, 3),
                 playNode.get_latest_transformation()(1, 3),
                 acos(playNode.get_latest_transformation().rotation()(0, 0)));
+
+            playNode.n->setParam("transformation_map_to_odom_set", true);
         }
 
         ros::spinOnce();

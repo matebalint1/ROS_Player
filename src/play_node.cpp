@@ -628,17 +628,11 @@ class PlayNode {
                         safe_zone_radius) {
                     // Remove these points
                     inliers->indices.push_back(j);
-
-                    // std::cout << "remove point: "
-                    //          << collision_avoidance_cloud->points[j]
-                    //          << std::endl;
                 }
             }
         }
         //std::cout << "safe zones: " << safe_points->points.size() << std::endl;
 
-        // std::cout << "size before safe zones: "
-        //          << collision_avoidance_cloud->points.size() << std::endl;
         extract.setInputCloud(collision_avoidance_cloud);
         extract.setIndices(inliers);
         extract.setNegative(true);
@@ -648,8 +642,7 @@ class PlayNode {
         collision_avoidance_cloud->width = 1;
         collision_avoidance_cloud->height = collision_avoidance_cloud->points.size();
 
-        // std::cout << "size after safe zones: "
-        //          << collision_avoidance_cloud->points.size() << std::endl;
+        // For debugging
         pub_pointcloud(*collision_avoidance_cloud, debug_cloud_pub);
 
         // -------------------------------------------------
