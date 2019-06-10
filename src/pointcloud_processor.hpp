@@ -66,6 +66,7 @@ class PointcloudProcessor {
         // blue buck or goal. The 3D regions in RGB space are determined
         // manually from sample images using a python script for visualising.
 
+        ///*
         // Green poles
         if (r >= -0.15 * b + 62 && r <= 0.15 * b + 100 &&
             g >= 1.1 * b + 0.3 * r - 15 && g <= 0.48 * b + 147 &&
@@ -84,9 +85,10 @@ class PointcloudProcessor {
         if (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
             g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235) {
             return 1;
-        }
+        }  //*/
 
-        /* // for simulator
+        /*
+         // for simulator
          // Green poles
          if (g >= 250 && r + b < 50) {
              return 2;
@@ -102,7 +104,8 @@ class PointcloudProcessor {
              (r >= 230 && r <= 255 && r >= 0.35 * b + 180 && g >= 210 &&
               g >= 2 * r - 280 && r <= 2 * r - 230 && b >= 50 && b <= 235)) {
              return 1;
-         }*/
+         }
+         */
 
         // Reserved values for filtering colors (highlighting)
         if ((r == 255 && g == 255 && b == 0) ||
