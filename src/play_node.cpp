@@ -968,7 +968,7 @@ bool got_messages() {
 int get_closest_puck(double& x, double& y, PointCloudPtr& cloud) {
     // returns coordinates of closest puck with correct color, that is not
     // already in the goal. Return int meaning 0: not found, 1: found, -1 all pucks in goal.
-    
+    return 0;
 }
 
 void update_game_logic(bool data_processing_succesful) {
@@ -992,7 +992,7 @@ void update_game_logic(bool data_processing_succesful) {
     } else if (game_state == drive_to_puck) {
         // Choose closest puck and drive to it
         state = drive_random;
-        if(state == stop){
+       /* if(state == stop){
             // Set goal to driveto
             double x = -1;
             double y = -1;
@@ -1005,7 +1005,7 @@ void update_game_logic(bool data_processing_succesful) {
 
             } else { // success == -1
                 // All pucks are in the goal
-                ROS_INFO_STREAM("All pucks in the goal stopping game!")
+                ROS_INFO_STREAM("All pucks in the goal stopping game!");
                 game_state = end;
                 state = stop;
             }
@@ -1016,7 +1016,7 @@ void update_game_logic(bool data_processing_succesful) {
         } else {
             // should not happen
             state = stop;
-        }
+        }*/
 
     } else if (game_state == drive_with_puck_to_goal) {
     } else if (game_state == initialize_location) {
