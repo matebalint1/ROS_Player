@@ -477,7 +477,6 @@ class PlayNode {
         // This function removes wrong detections from map cloud, based on known
         // information of field and robot location.
         const double MAX_DISTANCE_FROM_IDEAL = 0.2;  // m
-        const double MIN_NUMBER_OF_POLES_IN_MAP = 8;
 
         tf::Transform transform_odom_to_map;
         bool succesful_robot_pos_tf = get_transform(
@@ -514,9 +513,6 @@ class PlayNode {
                                          *map_puck_and_pole_cloud,
                                          transform_odom_to_map);
 
-            // Remove pucks and poles that are outside of the field
-            int number_of_poles_in_orginal_cloud = 0;
-
             pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
             pcl::ExtractIndices<PointTypeRGBA> extract;
             for (int j = 0; j < map_puck_and_pole_cloud->points.size(); j++) {
@@ -544,7 +540,6 @@ class PlayNode {
                                   << std::endl;
                         inliers->indices.push_back(j);
                     }
-                    number_of_poles_in_orginal_cloud++;
                 } else {  // yellow or blue -> buck
                     if (!(((x > -MAX_DISTANCE_FROM_IDEAL &&
                             x < field_width + MAX_DISTANCE_FROM_IDEAL)) &&
@@ -560,12 +555,6 @@ class PlayNode {
                     } 
                 }
             }
-            if(number_of_poles_in_orginal_cloud <= MIN_NUMBER_OF_POLES_IN_MAP){
-                // if there are not enough poles do not remove anything from map
-                // otherwise robot might get lost completely (divergence)
-                return;
-            }
-
             extract.setInputCloud(puck_and_pole_cloud);
             extract.setIndices(inliers);
             extract.setNegative(true);
@@ -638,7 +627,9 @@ class PlayNode {
 
         // Feed back, remove clearly wrong detections: poles and pucks outside
         // of the field or inside of the field and pucks out
-        remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
+        if(poles_in_map_cloud <= MIN_NUMBER_OF_POLES_IN_MAP){
+            remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
+        }
 
         // update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
         // Simple goal detection*********************
@@ -655,6 +646,10 @@ class PlayNode {
         // Pucks and Poles:
         *temp_cloud = *combine_measurements(puck_and_pole_cloud, 0.15, 1,
                                             1000);  // 0.15->0.2
+        
+        // Calculate number of poles in cloud
+        color_filter(temp_cloud, temp, 0, 255, 0);  // Green
+        poles_in_map_cloud = temp->point.size();
 
         // Goals:
         *temp_cloud +=
@@ -696,6 +691,8 @@ class PlayNode {
     bool got_messages() const { return got_detected_objects; }
 
    private:
+   const double MIN_NUMBER_OF_POLES_IN_MAP = 8;
+
     bool got_detected_objects = false;
     bool got_field_width = false;
 
@@ -709,6 +706,7 @@ class PlayNode {
     tf2_ros::Buffer *tfBuffer;
     tf2_ros::TransformListener *tf_listener;
     int tf_delay_counter = 0;  // iterations before using feedback
+    int poles_in_map_cloud = 0;
 
     double field_width = 3;
     PointCloudRGBA detected_objects_msg;
