@@ -186,7 +186,7 @@ class PlayNode {
         PointCloudPtr cloud_map(new PointCloud(map_cloud_msg));
         PointCloudPtr cloud_target = get_ideal_field_cloud(2.7, true);
 
-        // Filter puck colors from input map
+        // Filter puck colors from input map away
         color_filter(cloud_map, 255, 255, 0);  // Yellow
         color_filter(cloud_map, 0, 0, 255);    // Blue
         // color_filter(cloud_map, 255, 140, 0); // Orange goal for testing
@@ -196,6 +196,11 @@ class PlayNode {
         int orange_points =
             get_number_of_coloured_points(cloud_map, 255, 140, 0);
         int cyan_points = get_number_of_coloured_points(cloud_map, 0, 255, 255);
+        int green_ponts = get_number_of_coloured_points(cloud_map, 0, 255, 0);
+
+        if(green_ponts <= MIN_NUMBER_OF_POLES){
+            return;
+        }
 
         std::vector<Eigen::Affine3f>
             transforms;  // store transformations here untill the end
@@ -225,7 +230,7 @@ class PlayNode {
         // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
-        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.06) {
+        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.03) { // 0.06 works
             // Not succesful -> stop
             ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
                                              << icp.getFitnessScore()
@@ -261,6 +266,7 @@ class PlayNode {
     std::unique_ptr<ros::NodeHandle> n;
 
    private:
+   const int MIN_NUMBER_OF_POLES = 8;
     bool got_map_cloud = false;
     bool got_field_width = false;
 
