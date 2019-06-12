@@ -239,11 +239,15 @@ class PlayNode {
             // Not succesful -> stop
             ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
                                              << icp.getFitnessScore()
-                                             << " Not sucessfull!!!");
+                                             << " Not sucessfull!!!"
+                                             << " field W: "
+                                             << field_width);
             return;
         } else {
             ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
-                                             << icp.getFitnessScore());
+                                             << icp.getFitnessScore()
+                                             << " field W: "
+                                             << field_width);
         }
 
         Eigen::Affine3f transform_icp = Eigen::Affine3f::Identity();
