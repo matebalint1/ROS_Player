@@ -109,7 +109,7 @@ Robot_state state = stop;
 // This offset changes depending of the speed of the robot
 // between values 0 to 0.2 m to avoid stopping in collisions.
 double safety_zone_x_offset = 0;
-const double SAFETY_ZONE_X_OFFSET_MAX = 0.2; // m
+const double SAFETY_ZONE_X_OFFSET_MAX = 0.4; // m
 
 // Drive to parameters
 double goal_point_x = 0.6;  // map frame

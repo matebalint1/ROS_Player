@@ -1093,12 +1093,13 @@ class PointcloudProcessor {
         // and pucks/poles, because otherwise too much information for detection
         // is lost from one or another.
 
+        voxel_grid_filter_m(cloud, rviz_cloud, 0.03, 0);
+    
         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
 
         // For goals
         voxel_grid_filter_m(cloud, pointcloud_temp, 0.01, 0);
-        *rviz_cloud = *pointcloud_temp; // for reducing data transfer between robot and user rviz
-        bool success = planar_segmentation(pointcloud_temp, pointcloud_floor,
+       bool success = planar_segmentation(pointcloud_temp, pointcloud_floor,
                                            coefficients, true);
 
         // For pucks and poles
