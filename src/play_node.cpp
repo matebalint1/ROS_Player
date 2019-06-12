@@ -50,6 +50,7 @@ ros::Subscriber field_width_sub;
 // ros::Subscriber odometry_sub;
 
 PointCloudPtr temp = PointCloudPtr(new PointCloud);
+PointCloudPtr map_cloud_in_map_frame(new PointCloud);
 
 PointCloud map_objects_msg;
 PointCloud collision_avoidance_cloud_msg;
@@ -58,7 +59,7 @@ sensor_msgs::LaserScan laser_msg;
 nav_msgs::Odometry odometry_msg;
 
 // --------------------------------------------
-// Play field
+// Play field size
 // --------------------------------------------
 
 double field_width = 3;                     // m
@@ -129,10 +130,11 @@ double closest_obstacle_distance_g = 0;
 double closest_obstacle_direction_g = 0;
 
 // --------------------------------------------
-// Robot state parameters
+// Game state parameters
 // --------------------------------------------
 
 Game_state game_state = initialize_location;
+int is_blue_team = -1;  // -1 not set, 0 false, 1 true
 
 //--------------------------------------------
 
@@ -577,8 +579,8 @@ bool process_messages() {
 
     tf::Transform transform_laser_to_baselink;
     bool succesful_laser_tf =
-        get_transform(transform_laser_to_baselink, tfBuffer,
-                      "robot1/front_laser", "robot1/base_link");
+        get_transform(transform_laser_to_baselink, tfBuffer, "robot1/base_link",
+                      "robot1/front_laser");
     tf::Transform transform_odom_to_baselink;
     bool succesful_odom_baselink =
         get_transform(transform_odom_to_baselink, tfBuffer, "robot1/base_link",
@@ -587,9 +589,14 @@ bool process_messages() {
     bool succesful_robot_pos_tf = get_transform(
         transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
 
+    tf::Transform transform_odom_to_map;
+    bool succesful_map_tf = get_transform(
+        transform_odom_to_map, tfBuffer, "map", "robot1/odom");
+    
+
     if (succesful_laser_tf == false || succesful_odom_baselink == false) {
         ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
-        //return false;
+        // return false;
     }
 
     if (succesful_robot_pos_tf == false || got_field_width == false) {
@@ -613,17 +620,26 @@ bool process_messages() {
     // Robot position in the map frame
     // -------------------------------------------------
 
-     robot_map_x =
+    robot_map_x =
         transform_base_link_to_map.getOrigin().getX();  // m, in map frame
-     robot_map_y =
+    robot_map_y =
         transform_base_link_to_map.getOrigin().getY();  // m, in map frame
-     robot_map_yaw = yaw;                         // rad in map frame
+    robot_map_yaw = yaw;                                // rad in map frame
 
     if (robot_map_last_x == -1 && robot_map_last_y == -1) {
-        // Initialize
+        // Initialize, first time
         robot_map_last_x = robot_map_x;
         robot_map_last_y = robot_map_y;
         robot_map_last_yaw = robot_map_yaw;
+    }
+
+    if (is_blue_team == -1) {
+        // Initialize team setting once in the begining
+        if (robot_map_y < field_length / 2.0) {
+            is_blue_team = 1;  // true
+        } else {
+            is_blue_team = 0;  // false
+        }
     }
 
     // -------------------------------------------------
@@ -675,6 +691,10 @@ bool process_messages() {
     safe_points->is_dense = false;
     safe_points->width = 1;
     safe_points->height = safe_points->points.size();
+
+    // Map data for playing game, e.g. transform cloud to map frame
+     pcl_ros::transformPointCloud(*temp2, *map_cloud_in_map_frame,
+                                 transform_odom_to_map);
 
     // -------------------------------------------------
     // Apply masks for the collision avoidance data, e.g. add safe zones
@@ -762,8 +782,8 @@ bool process_messages() {
     const double DETERMINE_ROTATION_DIRECTION_BASED_ON_WALL_DISTANCE =
         DISTANCE_LINEAR_FREE;  // m
 
-     closest_obstacle_distance_g = closest_laser_distance;
-     closest_obstacle_direction_g = closest_laser_direction;
+    closest_obstacle_distance_g = closest_laser_distance;
+    closest_obstacle_direction_g = closest_laser_direction;
     if (closest_wall_distance < closest_laser_distance) {
         // Wall closer
         closest_obstacle_distance_g = closest_wall_distance;
@@ -879,16 +899,18 @@ void update_robot_state() {
         speed_rotational = MAX_ROTATIONAL_SPEEED;
         ROS_INFO_STREAM("Robot state INITIALIZE");
     } else if (state == drive_random) {
-        collision_avoidance(
-            speed_linear, speed_rotational, closest_obstacle_distance_g,
-            closest_obstacle_direction_g, robot_distance_error, robot_yaw_error);
-          
+        collision_avoidance(speed_linear, speed_rotational,
+                            closest_obstacle_distance_g,
+                            closest_obstacle_direction_g, robot_distance_error,
+                            robot_yaw_error);
+
         ROS_INFO_STREAM("Robot state DRIVE RANDOM");
 
     } else if (state == drive_to) {
-        set_speeds_drive_to(
-            speed_linear, speed_rotational, closest_obstacle_distance_g,
-            closest_obstacle_direction_g, robot_distance_error, robot_yaw_error);
+        set_speeds_drive_to(speed_linear, speed_rotational,
+                            closest_obstacle_distance_g,
+                            closest_obstacle_direction_g, robot_distance_error,
+                            robot_yaw_error);
         ROS_INFO_STREAM("Robot state DRIVE TO");
 
     } else if (state == rotate) {
@@ -942,6 +964,13 @@ bool got_messages() {
     return got_laser && got_laser && got_collision_avoidance_cloud;
 }
 
+// game logic ************************************************
+int get_closest_puck(double& x, double& y, PointCloudPtr& cloud) {
+    // returns coordinates of closest puck with correct color, that is not
+    // already in the goal. Return int meaning 0: not found, 1: found, -1 all pucks in goal.
+    
+}
+
 void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
     // wait_for_start,          initialize_location, drive_to_puck,
@@ -959,9 +988,36 @@ void update_game_logic(bool data_processing_succesful) {
             // Rotate to find location of robot
             state = initialize;
         }
+
     } else if (game_state == drive_to_puck) {
         // Choose closest puck and drive to it
         state = drive_random;
+        if(state == stop){
+            // Set goal to driveto
+            double x = -1;
+            double y = -1;
+            int success = get_closest_puck(x, y, map_cloud_in_map_frame);
+            if (success == 1){
+                // Found puck to drive to
+
+            } else if(success == 0){
+                // No puck found
+
+            } else { // success == -1
+                // All pucks are in the goal
+                ROS_INFO_STREAM("All pucks in the goal stopping game!")
+                game_state = end;
+                state = stop;
+            }
+
+        } else if (state == drive_to) {
+            // Driving to a specific point
+
+        } else {
+            // should not happen
+            state = stop;
+        }
+
     } else if (game_state == drive_with_puck_to_goal) {
     } else if (game_state == initialize_location) {
     } else if (game_state == drive_to_puck) {
@@ -971,6 +1027,7 @@ void update_game_logic(bool data_processing_succesful) {
     }
 }
 
+// **************************************************************
 void init_node(int argc, char** argv) {
     ros::init(argc, argv, "play_node");
     n = std::make_unique<ros::NodeHandle>();
