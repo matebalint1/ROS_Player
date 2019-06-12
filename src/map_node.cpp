@@ -650,7 +650,6 @@ class PlayNode {
         // Calculate number of poles in cloud
         color_filter(temp_cloud, temp, 0, 255, 0);  // Green
         poles_in_map_cloud = temp->points.size();
-        std::cout << "poles_in_map_cloud" << poles_in_map_cloud << std::endl;
 
         // Goals:
         *temp_cloud +=
@@ -692,7 +691,7 @@ class PlayNode {
     bool got_messages() const { return got_detected_objects; }
 
    private:
-   const double MIN_NUMBER_OF_POLES_IN_MAP = 8;
+   const double MIN_NUMBER_OF_POLES_IN_MAP = 10;
 
     bool got_detected_objects = false;
     bool got_field_width = false;
