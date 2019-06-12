@@ -59,11 +59,12 @@ sensor_msgs::LaserScan laser_msg;
 nav_msgs::Odometry odometry_msg;
 
 // --------------------------------------------
-// Play field size
+// Play field size and game settings
 // --------------------------------------------
 
 double field_width = 3;                         // m
 double field_length = field_width * 5.0 / 3.0;  // m
+const int NUMBER_OF_BUCKS_PER_TEAM = 3;
 
 // --------------------------------------------
 // Speed settings
@@ -142,6 +143,7 @@ Game_state game_state = initialize_location;
 int is_blue_team = -1;  // -1 not set, 0 false, 1 true
 
 //--------------------------------------------
+//--------------------------------------------
 
 void pub_pointcloud(PointCloud& cloud, ros::Publisher& pub) {
     PointCloudPtr msg(new PointCloud);
@@ -153,6 +155,7 @@ void pub_pointcloud(PointCloud& cloud, ros::Publisher& pub) {
     pub.publish(msg);
 }
 
+/*
 void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
     static tf::TransformBroadcaster transform_broadcaster;
     // Quaternion from yaw
@@ -173,6 +176,7 @@ void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
     // Send the transform
     transform_broadcaster.sendTransform(odom_trans);
 }
+*/
 
 void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     // ROS_INFO("Got new laser");
@@ -977,12 +981,99 @@ bool got_messages() {
     return got_laser && got_laser && got_collision_avoidance_cloud;
 }
 
+bool point_inside_goal(double x, double y, bool check_blue_goal){
+    if(check_blue_goal){
+        if(x > field_width/2.0 - 0.5    &&
+           x < field_width/2.0 + 0.5    &&
+           y > field_length * 0.1       &&
+           y < field_length * 0.1 + 0.5 ){
+               return true;
+        }
+    } else {
+        // Check yellow goal, on the other side of the field.
+        if(x > field_width/2.0 - 0.5    &&
+           x < field_width/2.0 + 0.5    &&
+           y > field_length * 0.9 - 0.5 &&
+           y < field_length * 0.9       ){
+               return true;
+        }
+    }
+    return false;
+}
+
+bool is_robot_in_home_goal(double x, double y){
+    return point_inside_goal(x,y,is_blue_team == 1);
+}
+
 // game logic ************************************************
-int get_closest_puck(double& x, double& y, PointCloudPtr& cloud) {
+int get_closest_puck(double& x, double& y, PointCloudPtr& map) {
     // returns coordinates of closest puck with correct color, that is not
     // already in the goal. Return int meaning 0: not found, 1: found, -1 all
     // pucks in goal.
-    return 0;
+
+    double closest_x = -1;
+    double closest_y = -1;
+    double last_distance = 1000;
+
+    int number_of_bucks_found = 0;
+    int number_of_bucks_outside_of_goals = 0;
+
+    for (int j = 0; j < map->points.size(); j++) {
+        double x = map->points[j].x;
+        double y = map->points[j].y;
+
+        // Get color of point
+        uint32_t rgb = *reinterpret_cast<int *>(
+            &map->points[j].rgb);
+        uint8_t b = (rgb >> 0) & 0xff;
+        uint8_t g = (rgb >> 8) & 0xff;
+        uint8_t r = (rgb >> 16) & 0xff;
+
+        if(is_blue_team == 1){ // blue team
+            if (r == 0 && g == 0 && b == 255) {
+                double distance = distance_between_points(robot_map_x, robot_map_y,
+                                    x, y);
+             
+                if (!point_inside_goal(x, y, false)) {
+                    if (distance < last_distance ){
+                        // So far the closest and not in the goal already
+                        last_distance = distance;
+                        closest_x = x;
+                        closest_y = y;
+                    }
+                    number_of_bucks_outside_of_goals++;
+                }
+                number_of_bucks_found++;
+            }
+        } else if (is_blue_team == 0){  // yellow team
+            if (r == 255 && g == 255 && b == 0) {
+                double distance = distance_between_points(robot_map_x, robot_map_y,
+                                    x, y);
+
+                if (!point_inside_goal(x, y, true)) {
+                    if (distance < last_distance ){
+                        // So far the closest and not in the goal already
+                        last_distance = distance;
+                        closest_x = x;
+                        closest_y = y;
+                    }
+                    number_of_bucks_outside_of_goals++;
+                }
+                number_of_bucks_found++;
+            }
+        } else {
+            // team color not known -> return
+            return 0;
+        }
+    }
+    if(number_of_bucks_found == NUMBER_OF_BUCKS_PER_TEAM &&
+        number_of_bucks_outside_of_goals == 0){
+        return -1;
+    }else if(closest_x != -1){
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 void update_game_logic(bool data_processing_succesful) {
@@ -996,6 +1087,7 @@ void update_game_logic(bool data_processing_succesful) {
         robot_map_y > field_length) {
         game_state = initialize_location;
         state = initialize;
+        
         return;  // TODO nice way of handling this case
     }
 
@@ -1014,20 +1106,36 @@ void update_game_logic(bool data_processing_succesful) {
 
     } else if (game_state == drive_to_puck) {
         // Choose closest puck and drive to it
-        state = drive_random;
-        /* if(state == stop){
+        //state = drive_random;
+         if(state == stop){
              // Set goal to driveto
              double x = -1;
              double y = -1;
              int success = get_closest_puck(x, y, map_cloud_in_map_frame);
+             ROS_INFO_STREAM("get closest puck succes: " << success << " team color: " << is_blue_team);
              if (success == 1){
                  // Found puck to drive to
+                 game_state = drive_with_puck_to_goal;
+                 state = drive_to;
+                 goal_point_x = x;
+                 goal_point_y = y;
+
 
              } else if(success == 0){
-                 // No puck found
+                 // No puck found -> drive random or home
+                 if(!is_robot_in_home_goal(robot_map_x,robot_map_y)){
+                     // Drive to home
+
+                    state = drive_to;
+                    goal_point_x = field_width / 2.0;
+                    goal_point_y = 0.1 * field_length + 0.5;
+                 }else{
+                     // Already in home but no buck found
+                    state = drive_random; 
+                 }
 
              } else { // success == -1
-                 // All pucks are in the goal
+                 // All pucks are in the goal of the enemy
                  ROS_INFO_STREAM("All pucks in the goal stopping game!");
                  game_state = end;
                  state = stop;
@@ -1039,12 +1147,13 @@ void update_game_logic(bool data_processing_succesful) {
          } else {
              // should not happen
              state = stop;
-         }*/
+         }
 
     } else if (game_state == drive_with_puck_to_goal) {
     } else if (game_state == leave_buck_in_goal) {
     } else {  // end
     }
+
 }
 
 // **************************************************************

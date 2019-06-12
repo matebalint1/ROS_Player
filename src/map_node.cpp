@@ -501,7 +501,7 @@ class PlayNode {
             // Create copy of clouds
             PointCloudPtrRGBA temp_goal_cloud(new PointCloudRGBA(*goal_cloud));
             PointCloudPtrRGBA temp_puck_and_pole_cloud(
-                new PointCloudRGBA(*puck_and_pole_cloud));
+                                new PointCloudRGBA(*puck_and_pole_cloud));
 
             PointCloudPtrRGBA map_goal_cloud(new PointCloudRGBA);
             PointCloudPtrRGBA map_puck_and_pole_cloud(new PointCloudRGBA);
@@ -515,6 +515,7 @@ class PlayNode {
 
             pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
             pcl::ExtractIndices<PointTypeRGBA> extract;
+
             for (int j = 0; j < map_puck_and_pole_cloud->points.size(); j++) {
                 // Get color of point
                 uint32_t rgb = *reinterpret_cast<int *>(
@@ -679,8 +680,8 @@ class PlayNode {
         pub_pointcloud(*temp_cloud,
                        map_pub);  // final map of the environment
 
-        save_cloud_to_file(temp_cloud,
-                           "/home/ros/team2/map_cloud.pcd");
+        //save_cloud_to_file(temp_cloud,
+        //                   "/home/ros/team2/map_cloud.pcd");
 
         // Publish raw map for debugging
         *temp_cloud = *map_cloud;  // copy
@@ -694,7 +695,7 @@ class PlayNode {
     bool got_messages() const { return got_detected_objects; }
 
    private:
-   const double MIN_NUMBER_OF_POLES_IN_MAP = 11; 
+   const double MIN_NUMBER_OF_POLES_IN_MAP = 12; // TODOOO
 
     bool got_detected_objects = false;
     bool got_field_width = false;
