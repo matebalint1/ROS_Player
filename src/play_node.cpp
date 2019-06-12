@@ -967,8 +967,8 @@ void update_robot_state() {
     robot_map_last_yaw = robot_map_yaw;
 
     // Update safety_zone_x_offset base on robot angular speed
-    safety_zone_x_offset = fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED * 
-                speed_rotational + SAFETY_ZONE_X_OFFSET_MAX), SAFETY_ZONE_X_OFFSET_MAX);
+    safety_zone_x_offset = 0.4;//fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED * 
+                //speed_rotational + SAFETY_ZONE_X_OFFSET_MAX), SAFETY_ZONE_X_OFFSET_MAX);
     ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
 }
 
