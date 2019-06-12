@@ -627,7 +627,7 @@ class PlayNode {
 
         // Feed back, remove clearly wrong detections: poles and pucks outside
         // of the field or inside of the field and pucks out
-        if(poles_in_map_cloud <= MIN_NUMBER_OF_POLES_IN_MAP){
+        if(poles_in_map_cloud > MIN_NUMBER_OF_POLES_IN_MAP){
             remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
         }
 
@@ -649,7 +649,8 @@ class PlayNode {
         
         // Calculate number of poles in cloud
         color_filter(temp_cloud, temp, 0, 255, 0);  // Green
-        poles_in_map_cloud = temp->point.size();
+        poles_in_map_cloud = temp->points.size();
+        std::cout << "poles_in_map_cloud" << poles_in_map_cloud << std::endl;
 
         // Goals:
         *temp_cloud +=
