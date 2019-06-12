@@ -679,6 +679,9 @@ class PlayNode {
         pub_pointcloud(*temp_cloud,
                        map_pub);  // final map of the environment
 
+        save_cloud_to_file(temp_cloud,
+                           "/home/ros/team2/map_cloud.pcd");
+
         // Publish raw map for debugging
         *temp_cloud = *map_cloud;  // copy
         set_alpha(temp_cloud, 0xff);
