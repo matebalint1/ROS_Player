@@ -45,6 +45,7 @@ class PointcloudProcessor {
         pointcloud_not_floor_blue = PointCloudPtr(new PointCloud);
         pointcloud_not_floor_yellow = PointCloudPtr(new PointCloud);
         collision_avoidance_cloud = PointCloudPtr(new PointCloud);
+        rviz_cloud = PointCloudPtr(new PointCloud);
 
         pass_through_filter = pcl::PassThrough<PointType>();
 
@@ -1096,6 +1097,7 @@ class PointcloudProcessor {
 
         // For goals
         voxel_grid_filter_m(cloud, pointcloud_temp, 0.01, 0);
+        *rviz_cloud = *pointcloud_temp; // for reducing data transfer between robot and user rviz
         bool success = planar_segmentation(pointcloud_temp, pointcloud_floor,
                                            coefficients, true);
 
@@ -1261,6 +1263,10 @@ class PointcloudProcessor {
         return collision_avoidance_cloud;
     }
 
+    PointCloudPtr& get_rviz_cloud() {
+        return rviz_cloud;
+    }
+
    private:
     pcl::PassThrough<PointType> pass_through_filter;
 
@@ -1282,6 +1288,7 @@ class PointcloudProcessor {
 
     PointCloudPtr recognized_objects;
     PointCloudPtr collision_avoidance_cloud;
+    PointCloudPtr rviz_cloud;
 
     // PointCloudPtr pointcloud_puck_model;
     // PointCloudPtr pointcloud_pole_model;

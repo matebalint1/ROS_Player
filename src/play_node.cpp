@@ -106,6 +106,11 @@ const double MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL = 10 * 3.1415 / 180;  // rad
 // Robot_state state = drive_random;//drive_to//rotate//move;
 Robot_state state = stop;
 
+// This offset changes depending of the speed of the robot
+// between values 0 to 0.2 m to avoid stopping in collisions.
+double safety_zone_x_offset = 0;
+const double SAFETY_ZONE_X_OFFSET_MAX = 0.2; // m
+
 // Drive to parameters
 double goal_point_x = 0.6;  // map frame
 double goal_point_y = 0.6;  // map frame
@@ -208,6 +213,11 @@ void set_velocities(float lin_vel, float ang_vel) {
     velocity_pub.publish(msg);
 }
 
+double distance_between_points(double p1_x, double p1_y, double p2_x,
+                               double p2_y) {
+    return sqrt((p1_x - p2_x) * (p1_x - p2_x) + (p1_y - p2_y) * (p1_y - p2_y));
+}
+
 void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
                                         double pa2_x, double pa2_y,
                                         double pb1_x, double pb1_y,
@@ -237,8 +247,9 @@ void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
     }
     // double c1 = (-vab_y * va_x + va_y * vab_x) / det;
     double c2 = (-vb_x * vab_y + vb_y * vab_x) / det;
-    if (c2 < 0) {
-        // intersection on wrong side
+    double distance_to_intersection = distance_between_points(pa1_x, pa1_y, c2 * va_x, c2 * va_y);
+    if (c2 < 0 || distance_to_intersection < safety_zone_x_offset) {
+        // intersection on wrong side or to close to the robot
         intersection_x = -1;
         intersection_y = -1;
         return;
@@ -248,18 +259,15 @@ void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
     intersection_y = pa1_y + c2 * va_y;
 }
 
-double distance_between_points(double p1_x, double p1_y, double p2_x,
-                               double p2_y) {
-    return sqrt((p1_x - p2_x) * (p1_x - p2_x) + (p1_y - p2_y) * (p1_y - p2_y));
-}
+
 
 void get_closest_wall(double robot_map_x, double robot_map_y,
                       double robot_map_yaw, double& closest_intersection_x,
                       double& closest_intersection_y) {
-    // Calculate intersection points between clear zone rectangle and field
-    // borders
+    // Calculate intersection points between safe zone side lines and field
+    // borders.
 
-    closest_intersection_x = 100;  // outside of the field
+    closest_intersection_x = 100;  // outside of the field, default value
     closest_intersection_y = 100;
 
     // Field corner points
@@ -404,8 +412,7 @@ void get_closest_object_in_laser(PointCloudPtr& cloud, double& closest_laser_x,
         double p_y = cloud->points[i].y;
 
         if (p_y <= ROBOT_SAFE_ZONE_WIDTH / 2 &&
-                p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= 0 /*&&
-                p_x <= ROBOT_SAFE_ZONE_LENGTH*/) {
+                p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= safety_zone_x_offset) {
             // Inside safezone
 
             // Calculate distance to origo
@@ -592,7 +599,7 @@ bool process_messages() {
     tf::Transform transform_odom_to_map;
     bool succesful_map_tf = get_transform(
         transform_odom_to_map, tfBuffer, "map", "robot1/odom");
-    
+
 
     if (succesful_laser_tf == false || succesful_odom_baselink == false) {
         ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
@@ -958,6 +965,11 @@ void update_robot_state() {
     robot_map_last_x = robot_map_x;
     robot_map_last_y = robot_map_y;
     robot_map_last_yaw = robot_map_yaw;
+
+    // Update safety_zone_x_offset base on robot angular speed
+    safety_zone_x_offset = fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED * 
+                speed_rotational + SAFETY_ZONE_X_OFFSET_MAX), SAFETY_ZONE_X_OFFSET_MAX);
+    ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
 }
 
 bool got_messages() {
@@ -1018,9 +1030,6 @@ void update_game_logic(bool data_processing_succesful) {
             state = stop;
         }*/
 
-    } else if (game_state == drive_with_puck_to_goal) {
-    } else if (game_state == initialize_location) {
-    } else if (game_state == drive_to_puck) {
     } else if (game_state == drive_with_puck_to_goal) {
     } else if (game_state == leave_buck_in_goal) {
     } else {  // end

@@ -34,6 +34,8 @@ class PlayNode {
             n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
         kinect_collision_avoidance_2d =
             n->advertise<PointCloud>("pointcloud_node/collision_avoidance", 1);
+        kinect_rviz =
+            n->advertise<PointCloud>("pointcloud_node/rviz_small_cloud", 1);
 
         // ROS_INFO("Waiting for camera image");
         // ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
@@ -152,6 +154,8 @@ class PlayNode {
                        kinect_pub);
         pub_pointcloud(*(pointcloud_processor.get_collision_avoidance_cloud()),
                        kinect_collision_avoidance_2d);
+        pub_pointcloud(*(pointcloud_processor.get_rviz_cloud()),
+                       kinect_rviz);
 
         got_kinect = false;  // reset
     }
@@ -170,6 +174,7 @@ class PlayNode {
     ros::Publisher velocity_pub;
     ros::Publisher kinect_pub;
     ros::Publisher kinect_collision_avoidance_2d;
+    ros::Publisher kinect_rviz;
 
     image_transport::Subscriber image_sub;
     ros::Subscriber laser_sub;
