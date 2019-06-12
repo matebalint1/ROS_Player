@@ -196,9 +196,15 @@ class PlayNode {
         int orange_points =
             get_number_of_coloured_points(cloud_map, 255, 140, 0);
         int cyan_points = get_number_of_coloured_points(cloud_map, 0, 255, 255);
-        int green_ponts = get_number_of_coloured_points(cloud_map, 0, 255, 0);
+        int green_points = get_number_of_coloured_points(cloud_map, 0, 255, 0);
 
-        if (green_ponts <= MIN_NUMBER_OF_POLES) {
+        std::cout << "green points: " << green_points << std::endl;
+
+        std::cout << "orange_points: " << orange_points << std::endl;
+        std::cout << "orange_points: " << orange_points << std::endl;
+
+        if (green_points <= MIN_NUMBER_OF_POLES) {
+            
             return;
         }
 

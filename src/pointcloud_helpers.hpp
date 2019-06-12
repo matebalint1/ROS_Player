@@ -167,7 +167,7 @@ PointCloudPtr get_ideal_field_cloud(double field_width, bool is_blue_team) {
     goal_point_cyan.rgb = to_pcl_rgb(0, 255, 255);
     goal_point_orange.rgb = to_pcl_rgb(255, 140, 0);
 
-    double field_lenght = field_width * 5 / 3;
+    double field_lenght = field_width * 5.0 / 3.0;
 
     // Add poles
     for (double x = 0; x <= field_width; x += field_width) {
