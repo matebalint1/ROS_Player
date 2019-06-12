@@ -198,7 +198,7 @@ class PlayNode {
         int cyan_points = get_number_of_coloured_points(cloud_map, 0, 255, 255);
         int green_ponts = get_number_of_coloured_points(cloud_map, 0, 255, 0);
 
-        if(green_ponts <= MIN_NUMBER_OF_POLES){
+        if (green_ponts <= MIN_NUMBER_OF_POLES) {
             return;
         }
 
@@ -230,7 +230,8 @@ class PlayNode {
         // std::cout << icp.getFinalTransformation() << std::endl;
 
         // Check if succesful
-        if (icp.hasConverged() == false || icp.getFitnessScore() > 0.03) { // 0.06 works
+        if (icp.hasConverged() == false ||
+            icp.getFitnessScore() > 0.03) {  // 0.06 works
             // Not succesful -> stop
             ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
                                              << icp.getFitnessScore()
@@ -266,7 +267,7 @@ class PlayNode {
     std::unique_ptr<ros::NodeHandle> n;
 
    private:
-   const int MIN_NUMBER_OF_POLES = 8;
+    const int MIN_NUMBER_OF_POLES = 8;
     bool got_map_cloud = false;
     bool got_field_width = false;
 

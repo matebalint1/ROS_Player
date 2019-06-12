@@ -671,8 +671,8 @@ class PlayNode {
         // Save clouds for next round
         *map_cloud = *puck_and_pole_cloud;
         *map_cloud += *goal_cloud;
-        //*map_cloud += *goal_cloud_cyan;
-        //*map_cloud += *goal_cloud_orange;
+        //*map_cloud += *goal_cloud_cyan;   
+          //*map_cloud += *goal_cloud_orange;
 
         // Publish final map
         set_alpha(temp_cloud, 0xff);

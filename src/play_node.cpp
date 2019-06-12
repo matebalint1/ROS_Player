@@ -62,8 +62,8 @@ nav_msgs::Odometry odometry_msg;
 // Play field size
 // --------------------------------------------
 
-double field_width = 3;                     // m
-double field_length = field_width * 5 / 3;  // m
+double field_width = 3;                         // m
+double field_length = field_width * 5.0 / 3.0;  // m
 
 // --------------------------------------------
 // Speed settings
@@ -109,7 +109,7 @@ Robot_state state = stop;
 // This offset changes depending of the speed of the robot
 // between values 0 to 0.2 m to avoid stopping in collisions.
 double safety_zone_x_offset = 0;
-const double SAFETY_ZONE_X_OFFSET_MAX = 0.4; // m
+const double SAFETY_ZONE_X_OFFSET_MAX = 0.4;  // m
 
 // Drive to parameters
 double goal_point_x = 0.6;  // map frame
@@ -194,6 +194,7 @@ void collision_avoidance_cloud_callback(const PointCloud::ConstPtr& msg) {
 void field_width_callback(const geometry_msgs::Vector3::ConstPtr& msg) {
     geometry_msgs::Vector3 width = *msg;
     field_width = width.x;
+    field_length = 5.0 / 3.0 * field_width;
     got_field_width = true;
 }
 
@@ -247,7 +248,8 @@ void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
     }
     // double c1 = (-vab_y * va_x + va_y * vab_x) / det;
     double c2 = (-vb_x * vab_y + vb_y * vab_x) / det;
-    double distance_to_intersection = distance_between_points(pa1_x, pa1_y, c2 * va_x, c2 * va_y);
+    double distance_to_intersection =
+        distance_between_points(pa1_x, pa1_y, c2 * va_x, c2 * va_y);
     if (c2 < 0 || distance_to_intersection < safety_zone_x_offset) {
         // intersection on wrong side or to close to the robot
         intersection_x = -1;
@@ -258,8 +260,6 @@ void get_intersection_beween_point_pair(double pa1_x, double pa1_y,
     intersection_x = pa1_x + c2 * va_x;
     intersection_y = pa1_y + c2 * va_y;
 }
-
-
 
 void get_closest_wall(double robot_map_x, double robot_map_y,
                       double robot_map_yaw, double& closest_intersection_x,
@@ -412,7 +412,7 @@ void get_closest_object_in_laser(PointCloudPtr& cloud, double& closest_laser_x,
         double p_y = cloud->points[i].y;
 
         if (p_y <= ROBOT_SAFE_ZONE_WIDTH / 2 &&
-                p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= safety_zone_x_offset) {
+            p_y >= -ROBOT_SAFE_ZONE_WIDTH / 2 && p_x >= safety_zone_x_offset) {
             // Inside safezone
 
             // Calculate distance to origo
@@ -597,9 +597,8 @@ bool process_messages() {
         transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
 
     tf::Transform transform_odom_to_map;
-    bool succesful_map_tf = get_transform(
-        transform_odom_to_map, tfBuffer, "map", "robot1/odom");
-
+    bool succesful_map_tf =
+        get_transform(transform_odom_to_map, tfBuffer, "map", "robot1/odom");
 
     if (succesful_laser_tf == false || succesful_odom_baselink == false) {
         ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
@@ -700,7 +699,7 @@ bool process_messages() {
     safe_points->height = safe_points->points.size();
 
     // Map data for playing game, e.g. transform cloud to map frame
-     pcl_ros::transformPointCloud(*temp2, *map_cloud_in_map_frame,
+    pcl_ros::transformPointCloud(*temp2, *map_cloud_in_map_frame,
                                  transform_odom_to_map);
 
     // -------------------------------------------------
@@ -967,8 +966,10 @@ void update_robot_state() {
     robot_map_last_yaw = robot_map_yaw;
 
     // Update safety_zone_x_offset base on robot angular speed
-    safety_zone_x_offset = 0.4;//fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED * 
-                //speed_rotational + SAFETY_ZONE_X_OFFSET_MAX), SAFETY_ZONE_X_OFFSET_MAX);
+    safety_zone_x_offset =
+        0.4;  // fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED *
+              // speed_rotational + SAFETY_ZONE_X_OFFSET_MAX),
+              // SAFETY_ZONE_X_OFFSET_MAX);
     ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
 }
 
@@ -979,7 +980,8 @@ bool got_messages() {
 // game logic ************************************************
 int get_closest_puck(double& x, double& y, PointCloudPtr& cloud) {
     // returns coordinates of closest puck with correct color, that is not
-    // already in the goal. Return int meaning 0: not found, 1: found, -1 all pucks in goal.
+    // already in the goal. Return int meaning 0: not found, 1: found, -1 all
+    // pucks in goal.
     return 0;
 }
 
@@ -987,6 +989,15 @@ void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
     // wait_for_start,          initialize_location, drive_to_puck,
     // drive_with_puck_to_goal, leave_buck_in_goal,  end};
+
+    // Check if robot is outside or inside of the field, if outside ->
+    // reinitialize
+    if (robot_map_x < 0 || robot_map_x > field_width || robot_map_y < 0 ||
+        robot_map_y > field_length) {
+        game_state = initialize_location;
+        state = initialize;
+        return;  // TODO nice way of handling this case
+    }
 
     if (game_state == wait_for_start) {
         // Change state when referee tells to
@@ -1004,31 +1015,31 @@ void update_game_logic(bool data_processing_succesful) {
     } else if (game_state == drive_to_puck) {
         // Choose closest puck and drive to it
         state = drive_random;
-       /* if(state == stop){
-            // Set goal to driveto
-            double x = -1;
-            double y = -1;
-            int success = get_closest_puck(x, y, map_cloud_in_map_frame);
-            if (success == 1){
-                // Found puck to drive to
+        /* if(state == stop){
+             // Set goal to driveto
+             double x = -1;
+             double y = -1;
+             int success = get_closest_puck(x, y, map_cloud_in_map_frame);
+             if (success == 1){
+                 // Found puck to drive to
 
-            } else if(success == 0){
-                // No puck found
+             } else if(success == 0){
+                 // No puck found
 
-            } else { // success == -1
-                // All pucks are in the goal
-                ROS_INFO_STREAM("All pucks in the goal stopping game!");
-                game_state = end;
-                state = stop;
-            }
+             } else { // success == -1
+                 // All pucks are in the goal
+                 ROS_INFO_STREAM("All pucks in the goal stopping game!");
+                 game_state = end;
+                 state = stop;
+             }
 
-        } else if (state == drive_to) {
-            // Driving to a specific point
+         } else if (state == drive_to) {
+             // Driving to a specific point
 
-        } else {
-            // should not happen
-            state = stop;
-        }*/
+         } else {
+             // should not happen
+             state = stop;
+         }*/
 
     } else if (game_state == drive_with_puck_to_goal) {
     } else if (game_state == leave_buck_in_goal) {
