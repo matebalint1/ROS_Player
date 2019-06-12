@@ -231,7 +231,7 @@ class PlayNode {
 
         // Check if succesful
         if (icp.hasConverged() == false ||
-            icp.getFitnessScore() > 0.03) {  // 0.06 works
+            icp.getFitnessScore() > 0.06) {  // 0.06 works
             // Not succesful -> stop
             ROS_INFO_STREAM("Has converged:" << icp.hasConverged() << " score: "
                                              << icp.getFitnessScore()
