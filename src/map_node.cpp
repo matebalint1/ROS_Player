@@ -694,7 +694,7 @@ class PlayNode {
     bool got_messages() const { return got_detected_objects; }
 
    private:
-   const double MIN_NUMBER_OF_POLES_IN_MAP = 120; 
+   const double MIN_NUMBER_OF_POLES_IN_MAP = 11; 
 
     bool got_detected_objects = false;
     bool got_field_width = false;
