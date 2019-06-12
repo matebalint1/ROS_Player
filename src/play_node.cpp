@@ -84,7 +84,7 @@ const double MIN_LINEAR_SPEED = 0.08;      // m/s
 // --------------------------------------------
 
 // Safety zone
-const double ROBOT_SAFE_ZONE_WIDTH = 0.5;   // m
+const double ROBOT_SAFE_ZONE_WIDTH = 0.6;   // m 0.5 tested and works
 const double ROBOT_SAFE_ZONE_LENGTH = 0.6;  // m, not relevant anymore
 
 // Linear
