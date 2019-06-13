@@ -302,7 +302,10 @@ int main(int argc, char **argv) {
         if (playNode.is_transform_set()) {
             double rotation = atan2(playNode.get_latest_transformation().rotation()(2, 0),
                                     playNode.get_latest_transformation().rotation()(2, 1));
-            //acos(playNode.get_latest_transformation().rotation()(0, 0)); // from 0 to pi, no negative
+            
+            std::cout << "MAP TO ODOM rotation now: " << rotation << std::endl;
+	    std::cout << playNode.get_latest_transformation().matrix() << std::endl;
+	    //acos(playNode.get_latest_transformation().rotation()(0, 0)); // from 0 to pi, no negative
             //if(rotation < 0 ){
             //    rotation = 2*3.1415 + rotation;
             //}
