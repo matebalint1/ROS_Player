@@ -300,10 +300,12 @@ int main(int argc, char **argv) {
         }
 
         if (playNode.is_transform_set()) {
-            double rotation = acos(playNode.get_latest_transformation().rotation()(0, 0)); // from 0 to pi, no negative
-            if(rotation < 0 ){
-                rotation = 2*3.1415 + rotation;
-            }
+            double rotation = atan2(playNode.get_latest_transformation().rotation()(2, 0),
+                                    playNode.get_latest_transformation().rotation()(2, 1));
+            //acos(playNode.get_latest_transformation().rotation()(0, 0)); // from 0 to pi, no negative
+            //if(rotation < 0 ){
+            //    rotation = 2*3.1415 + rotation;
+            //}
 
             // Publish latest succesful transfomation
             playNode.tf_map_to_odom_boardcaster(
