@@ -300,6 +300,8 @@ int main(int argc, char **argv) {
         }
 
         if (playNode.is_transform_set()) {
+            double rotation = 0; // from 0 to pi, no negative
+            
             // Publish latest succesful transfomation
             playNode.tf_map_to_odom_boardcaster(
                 playNode.get_latest_transformation()(0, 3),

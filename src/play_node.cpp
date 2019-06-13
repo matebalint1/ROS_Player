@@ -1162,7 +1162,7 @@ void update_game_logic(bool data_processing_succesful) {
          }
 
     } else if (game_state == drive_with_puck_to_goal) {
-        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal");
+        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal team color: " << is_blue_team);
         
 
         if (state == stop /*&& buck_hit_succesful() TODO check laser */){
