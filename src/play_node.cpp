@@ -653,7 +653,7 @@ bool process_messages() {
         } else {
             is_blue_team = 0;  // false
         }
-        ROS_INFO_STREAM("Setting team: " << is_blue_team);
+        ROS_INFO_STREAM("Setting team: " << is_blue_team <<" robot y: " << robot_map_y);
     }
 
     // -------------------------------------------------
