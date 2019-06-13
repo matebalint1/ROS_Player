@@ -73,7 +73,7 @@ const int NUMBER_OF_BUCKS_PER_TEAM = 3;
 // Real driving
 const double MAX_LINEAR_SPEED = 0.3;       // m/s
 const double MAX_ROTATIONAL_SPEEED = 0.3;  // rad/s
-const double MIN_LINEAR_SPEED = 0.08;      // m/s
+const double MIN_LINEAR_SPEED = 0.15;      // m/s // 0.08 works
 
 // For simulation
 //    const double MAX_LINEAR_SPEED = 0.6;       // m/s
@@ -617,6 +617,7 @@ bool process_messages() {
         return false;  // disable for debugging
     }
 
+    // Robot position in map frame
     tf::Matrix3x3 rotation(transform_base_link_to_map.getRotation());
     double roll, pitch, yaw;
     rotation.getRPY(roll, pitch, yaw);
@@ -625,6 +626,8 @@ bool process_messages() {
                     << transform_base_link_to_map.getOrigin().getX() << "\t"
                     << transform_base_link_to_map.getOrigin().getY() << "\t"
                     << yaw);
+                    
+    // Robot position in odom frame
 
     // -------------------------------------------------
     // Robot position in the map frame
@@ -974,7 +977,7 @@ void update_robot_state() {
         0.4;  // fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED *
               // speed_rotational + SAFETY_ZONE_X_OFFSET_MAX),
               // SAFETY_ZONE_X_OFFSET_MAX);
-    ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
+    //ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
 }
 
 bool got_messages() {
@@ -1066,6 +1069,10 @@ int get_closest_puck(double& x, double& y, PointCloudPtr& map) {
             return 0;
         }
     }
+
+    x = closest_x;
+    y = closest_y;
+
     if(number_of_bucks_found == NUMBER_OF_BUCKS_PER_TEAM &&
         number_of_bucks_outside_of_goals == 0){
         return -1;
@@ -1087,14 +1094,16 @@ void update_game_logic(bool data_processing_succesful) {
         robot_map_y > field_length) {
         game_state = initialize_location;
         state = initialize;
-        
+        ROS_INFO_STREAM("Robot outside of the field -> state: initialize.");
         return;  // TODO nice way of handling this case
     }
 
     if (game_state == wait_for_start) {
         // Change state when referee tells to
         state = stop;
+        ROS_INFO_STREAM("Game state: wait for start");
     } else if (game_state == initialize_location) {
+        ROS_INFO_STREAM("Game state: initialize_location");
         if (data_processing_succesful == true) {
             // robot knows where it is -> start playing game
             state = stop;
@@ -1105,6 +1114,7 @@ void update_game_logic(bool data_processing_succesful) {
         }
 
     } else if (game_state == drive_to_puck) {
+        ROS_INFO_STREAM("Game state: drive_to_puck");
         // Choose closest puck and drive to it
         //state = drive_random;
          if(state == stop){
@@ -1113,6 +1123,7 @@ void update_game_logic(bool data_processing_succesful) {
              double y = -1;
              int success = get_closest_puck(x, y, map_cloud_in_map_frame);
              ROS_INFO_STREAM("get closest puck succes: " << success << " team color: " << is_blue_team);
+             ROS_INFO_STREAM("Goal point x: " << x << " y: " << y);
              if (success == 1){
                  // Found puck to drive to
                  game_state = drive_with_puck_to_goal;
@@ -1150,8 +1161,27 @@ void update_game_logic(bool data_processing_succesful) {
          }
 
     } else if (game_state == drive_with_puck_to_goal) {
+        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal");
+        
+
+        if (state == stop /*&& buck_hit_succesful() TODO check laser */){
+            // Buck hit succesfully -> change goal point to enemy goal
+            state = drive_to;
+            goal_point_x = field_width / 2.0;
+            if(is_blue_team == 1){
+                goal_point_y = 0.1 * field_length + 0.5;
+            }else{
+                goal_point_y = 0.9 * field_length - 0.5;
+            }
+        } else if ( state == drive_to){
+            // TODO update goal point
+        }
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x << " y: " << goal_point_y);
+
     } else if (game_state == leave_buck_in_goal) {
+        ROS_INFO_STREAM("Game state: leave_buck_in_goal");
     } else {  // end
+        ROS_INFO_STREAM("Game state: end");
     }
 
 }
