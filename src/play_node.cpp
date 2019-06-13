@@ -1114,7 +1114,7 @@ void update_game_logic(bool data_processing_succesful) {
         }
 
     } else if (game_state == drive_to_puck) {
-        ROS_INFO_STREAM("Game state: drive_to_puck");
+        ROS_INFO_STREAM("Game state: drive_to_puck is_blue_team: " << is_blue_team);
         // Choose closest puck and drive to it
         //state = drive_random;
          if(state == stop){
@@ -1161,14 +1161,14 @@ void update_game_logic(bool data_processing_succesful) {
          }
 
     } else if (game_state == drive_with_puck_to_goal) {
-        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal");
+        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal is_blue_team: " << is_blue_team);
         
 
         if (state == stop /*&& buck_hit_succesful() TODO check laser */){
             // Buck hit succesfully -> change goal point to enemy goal
             state = drive_to;
             goal_point_x = field_width / 2.0;
-            if(is_blue_team == 1){
+            if(is_blue_team == 0){
                 goal_point_y = 0.1 * field_length + 0.5;
             }else{
                 goal_point_y = 0.9 * field_length - 0.5;
