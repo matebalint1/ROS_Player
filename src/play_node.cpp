@@ -1174,7 +1174,7 @@ void update_game_logic(bool data_processing_succesful) {
                 goal_point_y = 0.9 * field_length - 0.5;
             }
         } else if ( state == drive_to){
-            // TODO update goal point
+            // TODO update goal point and save goal point in odom frame
         }
         ROS_INFO_STREAM("Goal point x: " << goal_point_x << " y: " << goal_point_y);
 
