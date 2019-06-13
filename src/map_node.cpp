@@ -629,7 +629,7 @@ class PlayNode {
         // Feed back, remove clearly wrong detections: poles and pucks outside
         // of the field or inside of the field and pucks out
         if(poles_in_map_cloud > MIN_NUMBER_OF_POLES_IN_MAP){
-            remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
+            //remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
         }
 
         // update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
