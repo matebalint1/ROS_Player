@@ -1218,7 +1218,7 @@ void update_game_logic(bool data_processing_succesful) {
                  if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)){
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
-                    if(is_blue_team == 1){
+                    if(is_blue_team == 0){
                         goal_point_y = 0.1 * field_length + 0.25;
                     }else{
                         goal_point_y = 0.9 * field_length - 0.25;
