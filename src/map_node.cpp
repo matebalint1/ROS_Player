@@ -623,8 +623,10 @@ class PlayNode {
             *puck_and_pole_cloud += *temp;
             color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
             *puck_and_pole_cloud += *temp;
-            n->setParam("reset_all_pucks", false); // reset param
+            
         }
+        n->setParam("reset_all_pucks", false); // reset param
+        
 
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
