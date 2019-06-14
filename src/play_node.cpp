@@ -1214,7 +1214,7 @@ void update_game_logic(bool data_processing_succesful) {
             // Robot has reached its destination
             if(robot_has_puck()){
                 // Buck hit succesfully and not in goal -> change goal point to enemy goal  
-                 bool in_enemy_
+                 
                  if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)){
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
