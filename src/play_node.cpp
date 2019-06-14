@@ -1042,7 +1042,7 @@ bool robot_has_puck(){
         }
     }
     std::cout << laser_cloud->points.size() << std::endl;
-    return points_in_puck_zone > 0;
+    return points_in_puck_zone > 2;
 }
 
 // game logic ************************************************
