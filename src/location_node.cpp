@@ -303,6 +303,7 @@ int main(int argc, char **argv) {
             double rotation = atan2(playNode.get_latest_transformation().rotation()(1, 0),
                                     playNode.get_latest_transformation().rotation()(0, 0));
 
+
             // Publish latest succesful transfomation
             playNode.tf_map_to_odom_boardcaster(
                 playNode.get_latest_transformation()(0, 3),
