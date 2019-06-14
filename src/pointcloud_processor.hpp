@@ -322,8 +322,27 @@ class PointcloudProcessor {
         outrem.filter(*cloud_out);
     }
 
-    void edit_z_to(PointCloudPtr& cloud, double z) {
-        // Set z value of all points to a specific value.
+    void edit_z_to(PointCloudPtr& cloud, double z, double min_orginal_z = 0) {
+        // Set z value of all points to a specific value, points with a smalle z value
+        // than given are removed.
+
+        // Filter small z values away
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        for (int i = 0; i < (*cloud).size(); i++) {
+
+            double z = cloud->points[i].z;
+            if (z <= min_orginal_z) {
+                // Delete these points
+                inliers->indices.push_back(i);
+            }
+        }
+        pcl::ExtractIndices<PointType> extract;
+        extract.setInputCloud(cloud);
+        extract.setIndices(inliers);
+        extract.setNegative(true);
+        extract.filter(*cloud);
+
+        // Flatten cloud
         for (auto pt = cloud->begin(); pt != cloud->end(); ++pt) {
             pt->z = z;
         }
@@ -1149,7 +1168,7 @@ class PointcloudProcessor {
         // *********************************************
         voxel_grid_filter_m(pointcloud_not_floor, collision_avoidance_cloud,
                             0.05, 1);
-        edit_z_to(collision_avoidance_cloud, 0);
+        edit_z_to(collision_avoidance_cloud, 0, 0.1);
 
         // *********************************************
         // Goal recognition
