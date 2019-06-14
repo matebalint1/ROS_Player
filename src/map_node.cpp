@@ -611,15 +611,20 @@ class PlayNode {
         color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow
         *goal_cloud += *temp;
 
-        color_filter(map_cloud, temp, 0, 0, 255);  // Blue
-        *puck_and_pole_cloud = *temp;
         color_filter(map_cloud, temp, 0, 255, 0);  // Green
-        *puck_and_pole_cloud += *temp;
-        color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
-        *puck_and_pole_cloud += *temp;
-        // color_filter(map_cloud, temp, 255, 0,
-        //             255);  // Magenta == unknow clolored puck or pole
-        //*puck_and_pole_cloud += *temp;
+        *puck_and_pole_cloud = *temp;
+
+        // Reset pucks in field if param is set
+        bool reset_pucks = false;
+        n->param("reset_all_pucks", reset_pucks, false);
+
+        if(reset_pucks == true){
+            color_filter(map_cloud, temp, 0, 0, 255);  // Blue
+            *puck_and_pole_cloud += *temp;
+            color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
+            *puck_and_pole_cloud += *temp;
+            n->setParam("reset_all_pucks", false); // reset param
+        }
 
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
@@ -631,15 +636,6 @@ class PlayNode {
         if(poles_in_map_cloud > MIN_NUMBER_OF_POLES_IN_MAP){
             remove_outlier_based_on_feedback(puck_and_pole_cloud, goal_cloud);
         }
-
-        // update_map(goal_cloud, 1.2, 1, 20000, 1.2, 100);
-        // Simple goal detection*********************
-        // color_filter(map_cloud, temp, 0, 255, 255);  // Cyan == Blue goal
-        // voxel_grid_filter_m(temp, goal_cloud_cyan, 0.05, 1);
-
-        // color_filter(map_cloud, temp, 255, 140, 0);  // Orange == Yelllow
-        // goal voxel_grid_filter_m(temp, goal_cloud_orange, 0.05, 1);
-        // ******************************************
 
         // -------------------------------------------------------
         // Create estimate of the environment
@@ -656,14 +652,6 @@ class PlayNode {
         *temp_cloud +=
             *combine_measurements(goal_cloud, 0.15, 1, 1000);  // 0.15->0.2
 
-        // Simple
-        // temp_cloud->points.push_back(
-        //    get_centroid_of_color(goal_cloud, 255, 140, 0));
-        // temp_cloud->points.push_back(
-        //    get_centroid_of_color(goal_cloud, 0, 255, 255));
-        // temp_cloud->is_dense = false;
-        // temp_cloud->width = 1;
-        // temp_cloud->height = temp_cloud->points.size();
 
         // -------------------------------------------------------
         // Publish and prepare for next iteration
@@ -672,8 +660,6 @@ class PlayNode {
         // Save clouds for next round
         *map_cloud = *puck_and_pole_cloud;
         *map_cloud += *goal_cloud;
-        //*map_cloud += *goal_cloud_cyan;   
-          //*map_cloud += *goal_cloud_orange;
 
         // Publish final map
         set_alpha(temp_cloud, 0xff);

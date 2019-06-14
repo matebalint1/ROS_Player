@@ -1223,6 +1223,9 @@ void update_game_logic(bool data_processing_succesful) {
                 }
             } else {
                 // Robot did not hit puck -> go to previous state and try again.
+                std::cout << "Buck missed driving to home" << std::cout;
+                // remove all pucks from the field
+                n->setParam("reset_all_pucks", true);
                 game_state = drive_to_puck;
                 state = stop;
             }
