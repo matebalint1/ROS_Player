@@ -543,8 +543,8 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
         // Obstacle not in between goal and robot -> drive direcly to goal
 
         if ((robot_yaw_error > -MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL &&
-             robot_yaw_error < MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL) ||
-            (robot_distance_error > 0.6 && closest_obstacle_distance > 0.6)) {
+             robot_yaw_error < MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL) /*||
+            (robot_distance_error > 0.6 && closest_obstacle_distance > 0.6)*/) {
             // Yaw error is small enough or distance error is large
             // enough
             speed_linear =
