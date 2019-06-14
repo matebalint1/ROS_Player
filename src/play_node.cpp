@@ -1021,7 +1021,7 @@ bool robot_has_puck(){
 
     // Parameters (in base_link frame)
 
-    const double RECTANCE_SIZE = 0.1; // m
+    const double RECTANCE_SIZE = 0.15; // m
     const double RECTANGLE_MIDDLE_X_OFFSET = 0.24; // m
 
     // Count points inside rectancle
