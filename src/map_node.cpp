@@ -626,7 +626,20 @@ class PlayNode {
             
         }
         n->setParam("reset_all_pucks", false); // reset param
-        
+
+        // Remove pucks from map at a specific point if needed.
+        bool delete_puck = false;
+        double x = -1;
+        double y = -1;
+        n->param("delete_puck", delete_puck, false);
+        n->param("puck_x", x, -1.0);
+        n->param("puck_y", y, -1.0);
+
+        if(delete_puck == true){
+            // TODO
+            
+            n->setParam("delete_puck", false); // reset param  
+        }
 
         // Remove too big or too old (time stamp == alpha value) clusters,
         // increase time stamp of single points and cluster.
