@@ -1177,7 +1177,7 @@ void update_game_logic(bool data_processing_succesful) {
                      // Drive to home
 
                     state = drive_to;
-                    if(is_blue_team == 1){
+                    if(is_blue_team == 0){
                         goal_point_x = field_width / 2.0;
                         goal_point_y = 0.1 * field_length + 0.25;
                     } else {
@@ -1207,7 +1207,7 @@ void update_game_logic(bool data_processing_succesful) {
          }
 
     } else if (game_state == drive_with_puck_to_goal) {
-        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal team color: " << is_blue_team);
+        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal, team color: " << is_blue_team);
         
 
         if (state == stop){
@@ -1224,6 +1224,7 @@ void update_game_logic(bool data_processing_succesful) {
                     }
                 } else {
                     // Already in goal -> change to next state
+                    std::cout << "Changing to state to: leave_buck_in_goal" << std::endl;
                     game_state = leave_buck_in_goal;
                 }
             } else {
@@ -1251,7 +1252,7 @@ void update_game_logic(bool data_processing_succesful) {
             // Move/s finished or first move
             if(moves_done == 0){
                 // No moves done, start first move, drive backwards
-                distance_to_go = -0.6; // m
+                distance_to_go = -0.3; // m
                 state = move;
             } else if(moves_done == 1){
                 // start second move, rotate 180 deg
