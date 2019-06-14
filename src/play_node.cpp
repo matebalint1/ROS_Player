@@ -1177,7 +1177,7 @@ void update_game_logic(bool data_processing_succesful) {
                      // Drive to home
 
                     state = drive_to;
-                    if(is_blue_team == 0){
+                    if(is_blue_team == 1){ // for to home
                         goal_point_x = field_width / 2.0;
                         goal_point_y = 0.1 * field_length + 0.25;
                     } else {
@@ -1214,6 +1214,7 @@ void update_game_logic(bool data_processing_succesful) {
             // Robot has reached its destination
             if(robot_has_puck()){
                 // Buck hit succesfully and not in goal -> change goal point to enemy goal  
+                 bool in_enemy_
                  if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)){
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
