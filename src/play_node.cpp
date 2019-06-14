@@ -1208,7 +1208,7 @@ void update_game_logic(bool data_processing_succesful) {
             // Robot has reached its destination
             if(robot_has_puck()){
                 // Buck hit succesfully and not in goal -> change goal point to enemy goal  
-                /* if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)){
+                 if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)){
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
                     if(is_blue_team == 1){
@@ -1216,10 +1216,10 @@ void update_game_logic(bool data_processing_succesful) {
                     }else{
                         goal_point_y = 0.9 * field_length - 0.5;
                     }
-                } else {*/
+                } else {
                     // Already in goal -> change to next state
                     game_state = leave_buck_in_goal;
-                //}
+                }
             } else {
                 // Robot did not hit puck -> go to previous state and try again.
                 std::cout << "Buck missed driving to home" << std::endl;
