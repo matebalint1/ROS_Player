@@ -238,6 +238,12 @@ class PointcloudProcessor {
         seg.setMethodType(pcl::SAC_RANSAC);
         seg.setDistanceThreshold(0.02);
 
+        // Set limits to always find the floor plane and not the wall or similar.
+        Eigen::Vector3f z_axis(0,0,1.0);
+        seg.setAxis(z_axis);
+        seg.setEpsAngle(45.0 * 3.1415/180.0);
+
+        // Segment
         seg.setInputCloud(cloud_in);
         seg.segment(*inliers, *coefficients);
         if (inliers->indices.size() == 0) {
