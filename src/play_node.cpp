@@ -1041,7 +1041,7 @@ bool robot_has_puck(){
             points_in_puck_zone++;
         }
     }
-    std::cout << laser_cloud->points.size() << std::endl;
+    //std::cout << laser_cloud->points.size() << std::endl;
     return points_in_puck_zone > 2;
 }
 
@@ -1124,8 +1124,10 @@ void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
 
     ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck());
-game_state = wait_for_start;
-return;
+
+    //game_state = wait_for_start;
+    //return; // debugging
+
     // Check if robot is outside or inside of the field, if outside ->
     // reinitialize
     if (robot_map_x < 0 || robot_map_x > field_width || robot_map_y < 0 ||
