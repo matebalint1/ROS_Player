@@ -51,6 +51,7 @@ ros::Subscriber field_width_sub;
 
 PointCloudPtr temp = PointCloudPtr(new PointCloud);
 PointCloudPtr map_cloud_in_map_frame(new PointCloud);
+PointCloudPtr laser_cloud(new PointCloud);
 
 PointCloud map_objects_msg;
 PointCloud collision_avoidance_cloud_msg;
@@ -141,6 +142,7 @@ double closest_obstacle_direction_g = 0;
 
 Game_state game_state = initialize_location;
 int is_blue_team = -1;  // -1 not set, 0 false, 1 true
+int moves_done = 0; // used for doing move squences, e.g. leaving buck in goal
 
 //--------------------------------------------
 //--------------------------------------------
@@ -674,7 +676,7 @@ bool process_messages() {
 
     // Convert laser to pointcloud
     sensor_msgs::LaserScan cur_laser = laser_msg;
-    PointCloudPtr laser_cloud(new PointCloud);
+    
 
     temp = laser_msg_to_pointcloud(cur_laser);
 
@@ -1009,6 +1011,38 @@ bool is_robot_in_home_goal(double x, double y){
     return point_inside_goal(x,y,is_blue_team == 1);
 }
 
+bool is_robot_in_enemy_goal(double x, double y){
+    return point_inside_goal(x,y,is_blue_team == 0);
+}
+
+bool robot_has_puck(){
+    // This function returns true if the robot has te puck based on
+    // laser data.
+
+    // Parameters (in base_link frame)
+
+    const double RECTANCE_SIZE = 0.1; // m
+    const double RECTANGLE_MIDDLE_X_OFFSET = 0.24; // m
+
+    // Count points inside rectancle
+    int points_in_puck_zone = 0;
+
+    for(int i = 0; i < laser_cloud->points.size(); i++){
+        double x = laser_cloud->points[0].x; // x-axis points forward
+        double y = laser_cloud->points[0].y;
+
+        if(y > - 0.5 * RECTANCE_SIZE &&
+           y <   0.5 * RECTANCE_SIZE &&
+           x > RECTANGLE_MIDDLE_X_OFFSET - 0.5 * RECTANCE_SIZE &&
+           x < RECTANGLE_MIDDLE_X_OFFSET + 0.5 * RECTANCE_SIZE ){
+            // point inside puck zone
+            points_in_puck_zone++;
+        }
+    }
+
+    return points_in_puck_zone > 5;
+}
+
 // game logic ************************************************
 int get_closest_puck(double& x, double& y, PointCloudPtr& map) {
     // returns coordinates of closest puck with correct color, that is not
@@ -1119,7 +1153,7 @@ void update_game_logic(bool data_processing_succesful) {
         // Choose closest puck and drive to it
         //state = drive_random;
          if(state == stop){
-             // Set goal to driveto
+             // Set goal to drive to
              double x = -1;
              double y = -1;
              int success = get_closest_puck(x, y, map_cloud_in_map_frame);
@@ -1154,7 +1188,8 @@ void update_game_logic(bool data_processing_succesful) {
              }
 
          } else if (state == drive_to) {
-             // Driving to a specific point
+             // Driving to a specific poin
+             // TODO update goal point
 
          } else {
              // should not happen
@@ -1165,23 +1200,71 @@ void update_game_logic(bool data_processing_succesful) {
         ROS_INFO_STREAM("Game state: drive_with_puck_to_goal team color: " << is_blue_team);
         
 
-        if (state == stop /*&& buck_hit_succesful() TODO check laser */){
-            // Buck hit succesfully -> change goal point to enemy goal
-            state = drive_to;
-            goal_point_x = field_width / 2.0;
-            if(is_blue_team == 1){
-                goal_point_y = 0.1 * field_length + 0.5;
-            }else{
-                goal_point_y = 0.9 * field_length - 0.5;
+        if (state == stop){
+            // Robot has reached its destination
+            if(robot_has_puck()){
+                // Buck hit succesfully and not in goal -> change goal point to enemy goal  
+                if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)){
+                    state = drive_to;
+                    goal_point_x = field_width / 2.0;
+                    if(is_blue_team == 1){
+                        goal_point_y = 0.1 * field_length + 0.5;
+                    }else{
+                        goal_point_y = 0.9 * field_length - 0.5;
+                    }
+                } else {
+                    // Already in goal -> change to next state
+                    game_state = leave_buck_in_goal;
+                }
+            } else {
+                // Robot did not hit puck -> go to previous state and try again.
+                game_state = drive_to_puck;
+                state = stop;
             }
         } else if ( state == drive_to){
             // TODO update goal point and save goal point in odom frame
+            // while diving to the puck
+        } else {
+            // Shoud not be possible -> reset
+            game_state = drive_to_puck;
+            state = stop;
         }
         ROS_INFO_STREAM("Goal point x: " << goal_point_x << " y: " << goal_point_y);
 
     } else if (game_state == leave_buck_in_goal) {
+        
+        // Drive back wards and rotate to leave the puck in the goal
+        if (state == stop){
+            // Move/s finished or first move
+            if(moves_done == 0){
+                // No moves done, start first move, drive backwards
+                distance_to_go = -0.6; // m
+                state = move;
+            } else if(moves_done == 1){
+                // start second move, rotate 180 deg
+                rotation_to_go = 3.1415; // rad
+                state = rotate;
+            } else {
+                // Puck leaved in goal -> go to next puck
+                state = stop;
+                game_state = drive_to_puck;
+                moves_done = 0;
+            }
+
+        } else if (state == move){
+            moves_done = 1;
+        } else if (state == rotate){
+            moves_done = 2;
+        } else {
+            // Shoud not be possible -> reset
+            game_state = drive_to_puck;
+            state = stop;
+            moves_done = 0;
+        } 
+
         ROS_INFO_STREAM("Game state: leave_buck_in_goal");
     } else {  // end
+        state = stop;
         ROS_INFO_STREAM("Game state: end");
     }
 
