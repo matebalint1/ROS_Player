@@ -1030,8 +1030,8 @@ bool robot_has_puck(){
     int points_in_puck_zone = 0;
 
     for(int i = 0; i < laser_cloud->points.size(); i++){
-        double x = laser_cloud->points[0].x; // x-axis points forward
-        double y = laser_cloud->points[0].y;
+        double x = laser_cloud->points[i].x; // x-axis points forward
+        double y = laser_cloud->points[i].y;
 
         if(y > - 0.5 * RECTANCE_SIZE &&
            y <   0.5 * RECTANCE_SIZE &&
@@ -1041,8 +1041,8 @@ bool robot_has_puck(){
             points_in_puck_zone++;
         }
     }
-
-    return points_in_puck_zone > 5;
+    std::cout << laser_cloud->points.size() << std::endl;
+    return points_in_puck_zone > 0;
 }
 
 // game logic ************************************************
@@ -1124,7 +1124,8 @@ void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
 
     ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck());
-
+game_state = wait_for_start;
+return;
     // Check if robot is outside or inside of the field, if outside ->
     // reinitialize
     if (robot_map_x < 0 || robot_map_x > field_width || robot_map_y < 0 ||
