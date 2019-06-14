@@ -1122,7 +1122,6 @@ int get_closest_puck(double& x, double& y, PointCloudPtr& map) {
 
 void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
-
     ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck());
 
     //game_state = wait_for_start;

@@ -618,7 +618,7 @@ class PlayNode {
         bool reset_pucks = false;
         n->param("reset_all_pucks", reset_pucks, false);
 
-        if(reset_pucks == true){
+        if(reset_pucks == false){
             color_filter(map_cloud, temp, 0, 0, 255);  // Blue
             *puck_and_pole_cloud += *temp;
             color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
