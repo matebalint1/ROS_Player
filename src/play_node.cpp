@@ -1218,9 +1218,9 @@ void update_game_logic(bool data_processing_succesful) {
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
                     if(is_blue_team == 1){
-                        goal_point_y = 0.1 * field_length + 0.5;
+                        goal_point_y = 0.1 * field_length + 0.25;
                     }else{
-                        goal_point_y = 0.9 * field_length - 0.5;
+                        goal_point_y = 0.9 * field_length - 0.25;
                     }
                 } else {
                     // Already in goal -> change to next state
