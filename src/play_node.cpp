@@ -1177,8 +1177,14 @@ void update_game_logic(bool data_processing_succesful) {
                      // Drive to home
 
                     state = drive_to;
-                    goal_point_x = field_width / 2.0;
-                    goal_point_y = 0.1 * field_length + 0.5;
+                    if(is_blue_team == 1){
+                        goal_point_x = field_width / 2.0;
+                        goal_point_y = 0.1 * field_length + 0.25;
+                    } else {
+                        goal_point_x = field_width / 2.0;
+                        goal_point_y = 0.9 * field_length - 0.25;  
+                    }
+
                  }else{
                      // Already in home but no buck found
                     state = drive_random; 
