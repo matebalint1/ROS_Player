@@ -1120,8 +1120,8 @@ int get_closest_puck(double& x, double& y, PointCloudPtr& map) {
 
 void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
-    // wait_for_start,          initialize_location, drive_to_puck,
-    // drive_with_puck_to_goal, leave_buck_in_goal,  end};
+
+    ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck());
 
     // Check if robot is outside or inside of the field, if outside ->
     // reinitialize
