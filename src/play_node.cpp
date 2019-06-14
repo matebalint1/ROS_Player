@@ -1177,7 +1177,7 @@ void update_game_logic(bool data_processing_succesful) {
                      // Drive to home
 
                     state = drive_to;
-                    if(is_blue_team == 1){ // for to home
+                    if(is_blue_team == 1){ // to home
                         goal_point_x = field_width / 2.0;
                         goal_point_y = 0.1 * field_length + 0.25;
                     } else {
@@ -1187,7 +1187,10 @@ void update_game_logic(bool data_processing_succesful) {
 
                  }else{
                      // Already in home but no buck found
-                    state = drive_random; 
+                    //state = drive_random; 
+                    state = drive_to;
+                    goal_point_x = field_width / 2.0;
+                    goal_point_y = field_length / 2.0;
                  }
 
              } else { // success == -1
