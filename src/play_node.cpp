@@ -611,6 +611,22 @@ bool process_messages() {
         // return false;
     }
 
+    // -------------------------------------------------
+    // Prepare laser collision avoidance data
+    // -------------------------------------------------
+
+    // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
+
+    // Convert laser to pointcloud
+    sensor_msgs::LaserScan cur_laser = laser_msg;
+    
+
+    temp = laser_msg_to_pointcloud(cur_laser);
+
+    // Transform cloud to base_link frame
+    pcl_ros::transformPointCloud(*temp, *laser_cloud,
+                                 transform_laser_to_baselink);
+
     if (succesful_robot_pos_tf == false || got_field_width == false) {
         ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
         // Make robot rotate untill location and field width found.
@@ -668,21 +684,7 @@ bool process_messages() {
                                  *collision_avoidance_cloud,
                                  transform_odom_to_baselink);
 
-    // -------------------------------------------------
-    // Prepare laser collision avoidance data
-    // -------------------------------------------------
 
-    // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
-
-    // Convert laser to pointcloud
-    sensor_msgs::LaserScan cur_laser = laser_msg;
-    
-
-    temp = laser_msg_to_pointcloud(cur_laser);
-
-    // Transform cloud to base_link frame
-    pcl_ros::transformPointCloud(*temp, *laser_cloud,
-                                 transform_laser_to_baselink);
 
     *collision_avoidance_cloud += *laser_cloud;  // combine data
 
