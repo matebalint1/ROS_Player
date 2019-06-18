@@ -591,12 +591,12 @@ void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
     extract.filter(*cloud_out);
 }
 
-int set_team(double y_robot){
+/*int set_team(double y_robot){
     static int counter;
     counter++;
 
     if(counter)
-}
+}*/
 
 bool process_messages() {
     // This function prepares data for driving around, returns false if not
