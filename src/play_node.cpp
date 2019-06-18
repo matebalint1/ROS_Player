@@ -24,6 +24,7 @@ enum Robot_state { initialize, drive_to, drive_random, rotate, move, stop };
 enum Game_state {
     wait_for_start,
     initialize_location,
+    look_for_puck,
     drive_to_puck,
     drive_with_puck_to_goal,
     leave_buck_in_goal,
@@ -1166,19 +1167,19 @@ void update_game_logic(bool data_processing_succesful) {
         // Change state when referee tells to
         state = stop;
         ROS_INFO_STREAM("Game state: wait for start");
+
     } else if (game_state == initialize_location) {
         ROS_INFO_STREAM("Game state: initialize_location");
         if (data_processing_succesful == true) {
             // robot knows where it is -> start playing game
             state = stop;
-            game_state = drive_to_puck;
+            game_state = look_for_puck;
         } else {
             // Rotate to find location of robot
             state = initialize;
         }
-
-    } else if (game_state == drive_to_puck) {
-        ROS_INFO_STREAM("Game state: drive_to_puck");
+    } else if(game_state == look_for_puck){
+        ROS_INFO_STREAM("Game state: look_for_puck");
         // Choose closest puck and drive to it, if no buck is found
         // robot drives around.
         
@@ -1193,13 +1194,13 @@ void update_game_logic(bool data_processing_succesful) {
             ROS_INFO_STREAM("Goal point x: " << x << " y: " << y);
             if (success == 1) {
                 // Found puck to drive to
-                game_state = drive_with_puck_to_goal;
+                game_state = drive_to_puck;
                 state = drive_to;
                 goal_point_x = x;
                 goal_point_y = y;
 
             } else if (success == 0 && state == stop) {
-                // No puck found and not driving-> drive random or home
+                // No puck found and not driving-> drive middle or home
                 if (!is_robot_in_home_goal(robot_map_x, robot_map_y)) {
                     // Drive to home
 
@@ -1215,7 +1216,6 @@ void update_game_logic(bool data_processing_succesful) {
                 } else {
                     // Already in home but no buck found, drive to the middel of
                     // the field.
-                    // state = drive_random;
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
                     goal_point_y = field_length / 2.0 + 0.5;
@@ -1227,20 +1227,21 @@ void update_game_logic(bool data_processing_succesful) {
                 game_state = end;
                 state = stop;
             }
-
         } else {
             // should not happen
             state = stop;
         }
 
-    } else if (game_state == drive_with_puck_to_goal) {
-        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal, team color: "
-                        << is_blue_team);
-
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x
+                                    << " y: " << goal_point_y);
+    
+    } else if (game_state == drive_to_puck) {
+        ROS_INFO_STREAM("Game state: drive_to_puck");
+    
         if (state == stop) {
-            // Robot has reached its destination puck pick up point.
+            // Robot has reached its destination, the puck pick up point.
 
-            // Remove picked goal from map
+            // Remove picked goal from map, to avoid wrong/old data in map
             double x = 0, y = 0;
             point_map_to_odom(goal_point_x,goal_point_y,x,y);
             std::cout << "Delete pucks at map x: " << goal_point_x << " y: " 
@@ -1255,32 +1256,20 @@ void update_game_logic(bool data_processing_succesful) {
 
             if (robot_has_puck()) {
                 // Buck hit succesfully and not in goal -> drive to
-                // enemy goal
-
-                if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)) {
-                    state = drive_to;
-                    goal_point_x = field_width / 2.0;
-                    if (is_blue_team == 0) {
-                        goal_point_y = 0.1 * field_length + 0.25;
-                    } else {
-                        goal_point_y = 0.9 * field_length - 0.25;
-                    }
-                } else {
-                    // Already in goal -> change to next state
-                    std::cout << "Changing to state to: leave_buck_in_goal"
-                              << std::endl;
-                    game_state = leave_buck_in_goal;
-                }
+                // enemy goal -> change game state
+                game_state = drive_with_puck_to_goal;
+                state = stop;
             } else {
                 // Robot did not hit puck -> go to previous state and try again.
                 std::cout << "Buck missed driving to home" << std::endl;
                 // remove all pucks from the field
                 //n->setParam("reset_all_pucks", true); // is this really required TODO??
-                game_state = drive_to_puck;
+                game_state = look_for_puck;
                 state = stop;
             }
+
         } else if (state == drive_to) {
-            // while diving to the puck update goal_point
+            // while diving to the puck, update goal_point
             double x = -1;
             double y = -1;
             int success = get_closest_puck_to_point(x, y, goal_point_x, goal_point_y,
@@ -1290,18 +1279,49 @@ void update_game_logic(bool data_processing_succesful) {
                 goal_point_x = x;
                 goal_point_y = y;
             } else {
-                // Go to previous state and try again
+                // Go to previous state and try again, puck lost from map
                 state = stop;
-                game_state = drive_to_puck;
+                game_state = look_for_puck;
             }
         } else {
             // Shoud not be possible -> reset
-            game_state = drive_to_puck;
+            game_state = look_for_puck;
             state = stop;
         }
         ROS_INFO_STREAM("Goal point x: " << goal_point_x
                                          << " y: " << goal_point_y);
 
+
+    } else if (game_state == drive_with_puck_to_goal) {
+        ROS_INFO_STREAM("Game state: drive_with_puck_to_goal, team color: "
+                        << is_blue_team);
+
+        if(state == stop){
+            if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)) {
+                state = drive_to;
+                goal_point_x = field_width / 2.0;
+                // Drive to goal
+                if (is_blue_team == 0) {
+                    goal_point_y = 0.1 * field_length + 0.25;
+                } else {
+                    goal_point_y = 0.9 * field_length - 0.25;
+                }
+            } else {
+                // Already in goal -> change to next state
+                std::cout << "Changing to state to: leave_buck_in_goal"
+                            << std::endl;
+                game_state = leave_buck_in_goal;
+            }
+        } else if (state == drive_to) {
+        } else {
+            // Shoud not be possible -> reset
+            game_state = look_for_puck;
+            state = stop;
+        }
+
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x
+                                    << " y: " << goal_point_y);
+       
     } else if (game_state == leave_buck_in_goal) {
         // Drive back wards and rotate to leave the puck in the goal
         if (state == stop) {
@@ -1317,7 +1337,7 @@ void update_game_logic(bool data_processing_succesful) {
             } else {
                 // Puck leaved in goal -> go to next puck
                 state = stop;
-                game_state = drive_to_puck;
+                game_state = look_for_puck;
                 moves_done = 0;
             }
 
@@ -1327,13 +1347,13 @@ void update_game_logic(bool data_processing_succesful) {
             moves_done = 2;
         } else {
             // Shoud not be possible -> reset
-            game_state = drive_to_puck;
+            game_state = look_for_puck;
             state = stop;
             moves_done = 0;
         }
 
         ROS_INFO_STREAM("Game state: leave_buck_in_goal");
-    } else {  // end
+    } else {  // end game
         state = stop;
         ROS_INFO_STREAM("Game state: end");
     }
