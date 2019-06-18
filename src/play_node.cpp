@@ -1243,6 +1243,8 @@ void update_game_logic(bool data_processing_succesful) {
             // Remove picked goal from map
             double x = 0, y = 0;
             point_map_to_odom(goal_point_x,goal_point_y,x,y);
+            std::cout << "Delete pucks at map x: " << goal_point_x << " y: " 
+                                                   << goal_point_y << std::endl;
             if (x != -1){
                 n->setParam("delete_puck", true);
                 n->setParam("puck_x", x);
