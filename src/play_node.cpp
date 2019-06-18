@@ -148,6 +148,7 @@ int moves_done = 0;  // used for doing move squences, e.g. leaving buck in goal
 // Processing
 bool succesful_map_tf = false;
 tf::Transform transform_map_to_odom;
+int tf_delay_counter = 0;
 
 
 //--------------------------------------------
@@ -545,6 +546,8 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
         collision_avoidance(
             speed_linear, speed_rotational, closest_obstacle_distance,
             closest_obstacle_direction, robot_distance_error, robot_yaw_error);
+    
+        // TODO make robot drive around obstacle in the right direction
     } else {
         // Obstacle not in between goal and robot -> drive direcly to goal
 
@@ -586,6 +589,13 @@ void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
     extract.setInputCloud(cloud_in);
     extract.setIndices(inliers);
     extract.filter(*cloud_out);
+}
+
+int set_team(double y_robot){
+    static int counter;
+    counter++;
+
+    if(counter)
 }
 
 bool process_messages() {
@@ -635,8 +645,17 @@ bool process_messages() {
     // Transform cloud to base_link frame
     pcl_ros::transformPointCloud(*temp, *laser_cloud,
                                  transform_laser_to_baselink);
+    bool transformation_set = false;
+    n->param("transformation_map_to_odom_set", transformation_set, false);
 
-    if (succesful_robot_pos_tf == false || got_field_width == false) {
+    if (tf_delay_counter <= 10 && transformation_set) {
+        // This delay prevents the feedback from being done with old tf
+        // data.
+        tf_delay_counter++;
+    }
+
+    if (succesful_robot_pos_tf == false || got_field_width == false
+            || transformation_set == false || tf_delay_counter <= 10) {
         ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
         // Make robot rotate untill location and field width found.
 
@@ -1263,7 +1282,7 @@ void update_game_logic(bool data_processing_succesful) {
                 // Robot did not hit puck -> go to previous state and try again.
                 std::cout << "Buck missed driving to home" << std::endl;
                 // remove all pucks from the field
-                //n->setParam("reset_all_pucks", true); // is this really required TODO??
+                n->setParam("reset_all_pucks", true); // is this really required TODO??
                 game_state = look_for_puck;
                 state = stop;
             }
