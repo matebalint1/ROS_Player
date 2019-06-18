@@ -1281,7 +1281,7 @@ void update_game_logic(bool data_processing_succesful) {
             }
         } else if (state == drive_to) {
             // while diving to the puck update goal_point
-            /* double x = -1;
+            double x = -1;
             double y = -1;
             int success = get_closest_puck_to_point(x, y, goal_point_x, goal_point_y,
                                                              map_cloud_in_map_frame);
@@ -1293,7 +1293,7 @@ void update_game_logic(bool data_processing_succesful) {
                 // Go to previous state and try again
                 state = stop;
                 game_state = drive_to_puck;
-            }*/
+            }
         } else {
             // Shoud not be possible -> reset
             game_state = drive_to_puck;
