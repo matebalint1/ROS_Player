@@ -1245,6 +1245,8 @@ void update_game_logic(bool data_processing_succesful) {
             point_map_to_odom(goal_point_x,goal_point_y,x,y);
             std::cout << "Delete pucks at map x: " << goal_point_x << " y: " 
                                                    << goal_point_y << std::endl;
+            std::cout << "Delete pucks at odom x: " << x << " y: " 
+                                                   << y << std::endl;
             if (x != -1){
                 n->setParam("delete_puck", true);
                 n->setParam("puck_x", x);

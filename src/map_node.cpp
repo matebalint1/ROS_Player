@@ -592,7 +592,7 @@ class PlayNode {
 
     void delete_puck_at_pos(double x, double y, PointCloudPtrRGBA &cloud){
         // Delete pucks around a specific point on the field
-        const double DELETE_RADIUS = 0.3; // m
+        const double DELETE_RADIUS = 0.2; // m
 
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointTypeRGBA> extract;
@@ -664,7 +664,8 @@ class PlayNode {
         n->param("puck_y", y, -1.0); // in odom frame
 
         if(delete_puck == true){
-            std::cout << "Delete pucks at odom x: " << x<< " y: " << y << std::endl;
+            std::cout << "Delete puck in map_node!**********************
+            *************************************" << std::endl;
             delete_puck_at_pos(x,y,puck_and_pole_cloud);
             n->setParam("delete_puck", false); // reset param  
         }
