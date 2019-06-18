@@ -608,10 +608,10 @@ bool process_messages() {
         transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
 
     tf::Transform transform_odom_to_map;
-    bool succesful_map_tf =
+    succesful_map_tf =
         get_transform(transform_odom_to_map, tfBuffer, "map", "robot1/odom");
     
-    tf::Transform transform_map_to_odom;
+   
     succesful_map_tf =
         get_transform(transform_map_to_odom, tfBuffer, "robot1/odom", "map");
 
