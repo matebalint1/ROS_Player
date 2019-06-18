@@ -585,6 +585,34 @@ class PlayNode {
         }
     }
 
+    double distance_between_points(double p1_x, double p1_y, double p2_x,
+                               double p2_y) {
+    return sqrt((p1_x - p2_x) * (p1_x - p2_x) + (p1_y - p2_y) * (p1_y - p2_y));
+}
+
+    void delete_puck_at_pos(double x, double y, PointCloudPtrRGBA &cloud){
+        // Delete pucks around a specific point on the field
+        const double DELETE_RADIUS = 0.3; // m
+
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::ExtractIndices<PointTypeRGBA> extract;
+
+        for (int i = 0; i < cloud->points.size(); i++) {
+            if (distance_between_points(x, y,
+                    cloud->points[i].x,
+                    cloud->points[i].y) <=
+                DELETE_RADIUS) {
+                // Remove these points
+                inliers->indices.push_back(i);
+            }
+        }
+
+        extract.setInputCloud(cloud);
+        extract.setIndices(inliers);
+        extract.setNegative(true);
+        extract.filter(*cloud);
+    }
+
     void process_messages() {
         // -------------------------------------------------------
         // Update and add new data to map_cloud
@@ -632,12 +660,12 @@ class PlayNode {
         double x = -1;
         double y = -1;
         n->param("delete_puck", delete_puck, false);
-        n->param("puck_x", x, -1.0);
-        n->param("puck_y", y, -1.0);
+        n->param("puck_x", x, -1.0); // in odom frame
+        n->param("puck_y", y, -1.0); // in odom frame
 
         if(delete_puck == true){
             // TODO
-            
+            delete_puck_at_pos(x,y,puck_and_pole_cloud);
             n->setParam("delete_puck", false); // reset param  
         }
 

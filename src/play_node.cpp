@@ -144,6 +144,11 @@ Game_state game_state = initialize_location;
 int is_blue_team = -1;  // -1 not set, 0 false, 1 true
 int moves_done = 0;  // used for doing move squences, e.g. leaving buck in goal
 
+// Processing
+bool succesful_map_tf = false;
+tf::Transform transform_map_to_odom;
+
+
 //--------------------------------------------
 //--------------------------------------------
 
@@ -605,6 +610,10 @@ bool process_messages() {
     tf::Transform transform_odom_to_map;
     bool succesful_map_tf =
         get_transform(transform_odom_to_map, tfBuffer, "map", "robot1/odom");
+    
+    tf::Transform transform_map_to_odom;
+    succesful_map_tf =
+        get_transform(transform_map_to_odom, tfBuffer, "robot1/odom", "map");
 
     if (succesful_laser_tf == false || succesful_odom_baselink == false) {
         ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
@@ -1111,6 +1120,31 @@ int get_closest_puck_to_point(double& x, double& y, double px, double py, PointC
     }
 }
 
+void point_map_to_odom(double x_in, double y_in, double& x_out, double& y_out){
+    // transform single point from map to odometry frame
+
+    if(succesful_map_tf == false){
+        // No transformation set currently
+        x_out = -1;
+        y_out = -1;
+        return;
+    }
+    PointCloudPtr robot (new PointCloud);
+    PointCloudPtr robot_temp (new PointCloud);
+
+    PointType robo_point = PointType();
+    robo_point.x = x_in;
+    robo_point.y = y_in;
+    robo_point.z = 0;
+    robot->points.push_back(robo_point);
+
+    pcl_ros::transformPointCloud(*robot, *robot_temp,
+                                 transform_map_to_odom);
+
+    x_out = robot_temp->points[0].x;
+    y_out = robot_temp->points[0].y;
+}
+
 void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
     ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck());
@@ -1207,9 +1241,13 @@ void update_game_logic(bool data_processing_succesful) {
             // Robot has reached its destination puck pick up point.
 
             // Remove picked goal from map
-            n->setParam("delete_puck", true);
-            n->setParam("puck_x", goal_point_x);
-            n->setParam("puck_y", goal_point_y);
+            double x = 0, y = 0;
+            point_map_to_odom(goal_point_x,goal_point_y,x,y);
+            if (x != -1){
+                n->setParam("delete_puck", true);
+                n->setParam("puck_x", x);
+                n->setParam("puck_y", y);
+            }
 
             if (robot_has_puck()) {
                 // Buck hit succesfully and not in goal -> drive to
@@ -1233,7 +1271,7 @@ void update_game_logic(bool data_processing_succesful) {
                 // Robot did not hit puck -> go to previous state and try again.
                 std::cout << "Buck missed driving to home" << std::endl;
                 // remove all pucks from the field
-                n->setParam("reset_all_pucks", true); // is this really required TODO??
+                //n->setParam("reset_all_pucks", true); // is this really required TODO??
                 game_state = drive_to_puck;
                 state = stop;
             }
