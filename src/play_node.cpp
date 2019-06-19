@@ -690,7 +690,7 @@ double get_goal_heading_path_planning(double goal_distance,
         rot_right_total = 360 + rot_right_total;
     }*/
 
-    if (min_rotation_left < min_rotation_right){
+    if (min_rotation_left < min_rotation_right + 10){
         return rot_left_total;
     } else { 
         return rot_right_total;
