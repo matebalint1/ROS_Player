@@ -77,7 +77,7 @@ const int NUMBER_OF_BUCKS_PER_TEAM = 3;
 const double MAX_LINEAR_SPEED = 0.3;       // m/s
 const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
 const double MIN_LINEAR_SPEED = 0.15;      // m/s // 0.08 works
-const double MIN_ROTATIONAL_SPEED = 0.1;
+const double MIN_ROTATIONAL_SPEED = 0.2;
 
 // For simulation
 //    const double MAX_LINEAR_SPEED = 0.6;       // m/s
@@ -657,7 +657,7 @@ double get_goal_heading_path_planning(double goal_distance,
     // Rotate cloud so that x-axis points to the direction of the goal
     Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
     transform_2.translation() << 0, 0, 0;
-    transform_2.rotate (Eigen::AngleAxisf (goal_heading, Eigen::Vector3f::UnitZ()));
+    transform_2.rotate (Eigen::AngleAxisf (-goal_heading, Eigen::Vector3f::UnitZ()));
     pcl::transformPointCloud (*cloud, *temp, transform_2);
     *cloud = *temp;
 
@@ -670,6 +670,9 @@ double get_goal_heading_path_planning(double goal_distance,
 
     // Compare roatations to the left and right and transform to radians as heading error
     // of the robot
+
+    std::cout << "Rot to left: " << min_rotation_left << std::endl;
+    std::cout << "Rot to right: " << min_rotation_right << std::endl;
 
     double rot_left_total = min_rotation_left * 3.1415 / 180.0 + goal_heading;
     double rot_right_total = -min_rotation_right * 3.1415 / 180.0 + goal_heading;
