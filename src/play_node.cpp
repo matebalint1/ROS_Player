@@ -657,7 +657,7 @@ double get_goal_heading_path_planning(double goal_distance,
     // Rotate cloud so that x-axis points to the direction of the goal
     Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
     transform_2.translation() << 0, 0, 0;
-    transform_2.rotate (Eigen::AngleAxisf (-goal_heading, Eigen::Vector3f::UnitZ()));
+    transform_2.rotate (Eigen::AngleAxisf (goal_heading, Eigen::Vector3f::UnitZ()));
     pcl::transformPointCloud (*cloud, *temp, transform_2);
     *cloud = *temp;
 
@@ -671,8 +671,8 @@ double get_goal_heading_path_planning(double goal_distance,
     // Compare roatations to the left and right and transform to radians as heading error
     // of the robot
 
-    double rot_left_total = -min_rotation_left * 3.1415 / 180.0 + goal_heading;
-    double rot_right_total = min_rotation_right * 3.1415 / 180.0 + goal_heading;
+    double rot_left_total = min_rotation_left * 3.1415 / 180.0 + goal_heading;
+    double rot_right_total = -min_rotation_right * 3.1415 / 180.0 + goal_heading;
     
     //if (fabs(min_rotation_left - min_rotation_right) < 45 * 3.1415/180){
         // if difference is small chooce always to left
