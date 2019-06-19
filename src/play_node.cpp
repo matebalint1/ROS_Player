@@ -75,8 +75,9 @@ const int NUMBER_OF_BUCKS_PER_TEAM = 3;
 
 // Real driving
 const double MAX_LINEAR_SPEED = 0.3;       // m/s
-const double MAX_ROTATIONAL_SPEEED = 0.3;  // rad/s
+const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
 const double MIN_LINEAR_SPEED = 0.15;      // m/s // 0.08 works
+const double MIN_ROTATIONAL_SPEED = 0.1;
 
 // For simulation
 //    const double MAX_LINEAR_SPEED = 0.6;       // m/s
@@ -550,6 +551,7 @@ bool goal_point_inside_of_rectancle(double x, double y){
 
 void remove_points_inside_puck_carry_zone(PointCloudPtr& cloud){
     // Delete pucks in front of the robot (== do not avoid pucks in collison avoidance cloud)
+    const double ROBOT_WIDTH = 0.4;
 
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
     pcl::ExtractIndices<PointType> extract;
@@ -560,8 +562,8 @@ void remove_points_inside_puck_carry_zone(PointCloudPtr& cloud){
 
         if ( x <= SAFETY_ZONE_X_OFFSET_MAX && 
              x > -0.2 &&
-             y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
-             y < ROBOT_SAFE_ZONE_WIDTH / 2.0) {
+             y > -ROBOT_WIDTH / 2.0 &&
+             y < ROBOT_WIDTH / 2.0) {
             // Remove these points (these points are not dangerous)
             inliers->indices.push_back(i);
         }
@@ -669,10 +671,13 @@ double get_goal_heading_path_planning(double goal_distance,
     // Compare roatations to the left and right and transform to radians as heading error
     // of the robot
 
+    double rot_left_total = min_rotation_left * 3.1415 / 180.0 + goal_heading;
+    double rot_right_total = -min_rotation_right * 3.1415 / 180.0 + goal_heading;
+
     if (min_rotation_left < min_rotation_right){
-        return min_rotation_left * 3.1415 / 180.0 + goal_heading;
+        return rot_left_total
     } else { 
-        return -min_rotation_right * 3.1415 / 180.0 + goal_heading;
+        return rot_right_total
     }
 
 }
@@ -690,7 +695,8 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
 
     // Reduce linear speed if heading error is large. A 1/x function is used.
     speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, fabs(robot_heading_error))
-                                                                             - 1.0/3.1415));
+    //speed_linear = fmax(MIN_LINEAR_SPEED, speed_linear);/=TODO
+                                                             - 1.0/3.1415));
     // Set rotational speed
     speed_rotational = 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION *
                          robot_heading_error;
@@ -1083,7 +1089,8 @@ void update_robot_state() {
     } else if (state == rotate) {
         speed_linear = 0;
         speed_rotational =
-            rotation_to_go * 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION;
+            max(MIN_ROTATIONAL_SPEED,
+            rotation_to_go * 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION);
         ROS_INFO_STREAM("Robot state ROTATE, to rotate: " << rotation_to_go);
 
     } else if (state == move) {
