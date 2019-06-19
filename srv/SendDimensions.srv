@@ -1,0 +1,5 @@
+string team
+geometry_msgs/Point dimensions
+---
+bool ok
+geometry_msgs/Point correctDimensions
