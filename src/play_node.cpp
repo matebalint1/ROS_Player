@@ -1089,7 +1089,7 @@ void update_robot_state() {
     } else if (state == rotate) {
         speed_linear = 0;
         speed_rotational =
-            max(MIN_ROTATIONAL_SPEED,
+            fmax(MIN_ROTATIONAL_SPEED,
             rotation_to_go * 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION);
         ROS_INFO_STREAM("Robot state ROTATE, to rotate: " << rotation_to_go);
 
