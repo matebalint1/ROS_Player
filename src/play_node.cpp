@@ -708,7 +708,9 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
 
     // Reduce linear speed if heading error is large. A 1/x function is used.
     speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, fabs(robot_heading_error))
-    //speed_linear = fmax(MIN_LINEAR_SPEED, speed_linear);/=TODO
+    speed_linear = fmax(fmin(MIN_LINEAR_SPEED,  
+             goal_point_distance *MIN_LINEAR_SPEED / 1.0  ),
+             speed_linear); // min speed depends of the distance 
                                                              - 1.0/3.1415));
     // Set rotational speed
     speed_rotational = 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION *
