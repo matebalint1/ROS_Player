@@ -225,6 +225,56 @@ PointCloudPtr get_ideal_field_cloud(double field_width, bool is_blue_team) {
     return field;
 }
 
+
+PointCloudPtr get_ideal_field_edge_cloud(double field_width) {
+    // This function generates an pointcloud of the hockey field edges
+
+    // Origo is defined in the home corner of the blue team
+    // Resolution
+    const double LINE_RESOLUTION = 0.05; // put a point every 0.05 m
+    PointCloudPtr field = PointCloudPtr(new PointCloud);
+
+    PointType pole_point;
+    pole_point.z = 0;
+    pole_point.rgb = to_pcl_rgb(255, 255, 255);
+
+    double field_lenght = field_width * 5.0 / 3.0;
+
+    // Add y edges
+    for (double y = 0; y <= field_lenght; y += LINE_RESOLUTION) {
+        pole_point.x = 0;
+        pole_point.y = y;
+        field->points.push_back(pole_point);
+    }
+
+    // Add y edges
+    for (double y = 0; y <= field_lenght; y += LINE_RESOLUTION) {
+        pole_point.x = field_width;
+        pole_point.y = y;
+        field->points.push_back(pole_point);
+    }
+
+    // Add x edges
+    for (double x = 0; x <= field_width; x += LINE_RESOLUTION) {
+        pole_point.x = x;
+        pole_point.y = 0;
+        field->points.push_back(pole_point);
+    }
+
+    // Add x edges
+    for (double x = 0; x <= field_width; x += LINE_RESOLUTION) {
+        pole_point.x = x;
+        pole_point.y = field_lenght;
+        field->points.push_back(pole_point);
+    }
+
+    field->is_dense = false;
+    field->width = 1;
+    field->height = field->points.size();
+
+    return field;
+}
+
 /*
 void generate_puck_pointcloud(PointCloudPtr& cloud) {
     double radius = 0.05;  // m

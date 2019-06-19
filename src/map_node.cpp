@@ -664,7 +664,7 @@ class PlayNode {
         n->param("puck_y", y, -1.0); // in odom frame
 
         if(delete_puck == true){
-            std::cout << "Delete puck in map_node!***********************************************************" << std::endl;
+            std::cout << "Delete puck in map_node!**" << std::endl;
             delete_puck_at_pos(x,y,puck_and_pole_cloud);
             n->setParam("delete_puck", false); // reset param  
         }
