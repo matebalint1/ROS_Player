@@ -1168,7 +1168,7 @@ class PointcloudProcessor {
         // *********************************************
         voxel_grid_filter_m(pointcloud_not_floor, collision_avoidance_cloud,
                             0.05, 1);
-        edit_z_to(collision_avoidance_cloud, 0, 0.1);
+        edit_z_to(collision_avoidance_cloud, 0, 0.05);
 
         // *********************************************
         // Goal recognition
