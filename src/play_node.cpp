@@ -1706,7 +1706,7 @@ void init_node(int argc, char** argv) {
     velocity_pub = n->advertise<geometry_msgs::Twist>(addRobotName("/cmd_vel"), 1000);
     debug_cloud_pub = n->advertise<PointCloud>("play_node/debug", 1);
 
-    ROS_INFO("Waiting for referee /waitForTeams");
+    /*ROS_INFO("Waiting for referee /waitForTeams");
     ros::topic::waitForMessage<std_msgs::Empty>("waitForTeams");
     ROS_INFO("done");
     team_ready_client = n->serviceClient<player::TeamReady>(
@@ -1731,7 +1731,7 @@ void init_node(int argc, char** argv) {
         }
     } else {
         ROS_ERROR("Failed to call service TeamReady");
-    }
+    }*/
 
     game_control_sub = n->subscribe("gameControl", 1, &game_control_callback);
 
