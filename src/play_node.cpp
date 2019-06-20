@@ -158,6 +158,8 @@ double robot_map_yaw = 0;
 double closest_obstacle_distance_g = 0;
 double closest_obstacle_direction_g = 0;
 
+double drive_to_left = 0; // control wheter or not to drive to left or right.
+
 // --------------------------------------------
 // Game state parameters
 // --------------------------------------------
@@ -703,7 +705,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
     // This function edits the point cloud, rotation parameter values 1 or -1, left rotation
     // is positive (== 1);
     
-    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.2; //m, threshold for drivable direction
+    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1; //m, threshold for drivable direction
     PointCloudPtr temp(new PointCloud);
     min_rotation = 180; // degrees
     total_space = 0; // integral 0 to 180 degrees
@@ -719,7 +721,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
         double x_limit;
         if(goal_inside_rect){
             // Add 0.2 to ensure that the region behind the goal is also safe
-            x_limit = fmin(goal_point_x_rotated + 0.2, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
+            x_limit = fmin(goal_point_x_rotated + 0.1, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
         } else {
             x_limit = MIN_FREE_SPACE_IN_FRONT_OF_ROBOT;
         }
@@ -735,9 +737,9 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
                 smalles_x = x;
             }
 
-            if (x > 0.0 && x <= x_limit && // TODO test 0.2 -> 0
-                y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
-                y < ROBOT_SAFE_ZONE_WIDTH / 2.0) {
+            if (x > 0.0 && x <= x_limit && 
+                y > -(ROBOT_SAFE_ZONE_WIDTH + 0.1) / 2.0 &&
+                y < (ROBOT_SAFE_ZONE_WIDTH + 0.1)  / 2.0) {
                 // obstacle inside of rectangle and not closer than the goal point
                 obstacle_inside = true;
             }
@@ -828,7 +830,9 @@ double get_goal_heading_path_planning(double goal_distance,
         rot_right_total = 360 + rot_right_total;
     }*/
     // TODO choose on direction and use it!!
-    if (min_rotation_left < min_rotation_right + 25){
+
+    drive_to_left = 0.95 * drive_to_left + 0.05 * double(min_rotation_left < min_rotation_right);
+    if (/* min_rotation_left < min_rotation_right + 25*/drive_to_left > 0.5){
         return rot_left_total;
     } else { 
         return rot_right_total;
@@ -1574,7 +1578,12 @@ void update_game_logic(bool data_processing_succesful) {
                     // the field.
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
-                    goal_point_y = field_length / 2.0 + 0.5;
+                    if(is_blue_team == 1){
+                        goal_point_y = field_length / 2.0 + 1;
+                    } else {
+                        goal_point_y = field_length - (field_length / 2.0 + 1);
+                    }
+                    
                 }
 
             } else if (success == -1) {

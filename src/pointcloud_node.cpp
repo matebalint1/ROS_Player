@@ -29,7 +29,7 @@ class PlayNode {
         tf_listener = new tf2_ros::TransformListener(*tfBuffer);
 
         velocity_pub =
-            n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
+            n->advertise<geometry_msgs::Twist>(addRobotName("/cmd_vel"), 1000);
         kinect_pub =
             n->advertise<PointCloud>("pointcloud_node/detected_objects", 1);
         kinect_collision_avoidance_2d =
@@ -41,9 +41,9 @@ class PlayNode {
         // ros::topic::waitForMessage<sensor_msgs::Image>("robot1/front_camera/image_raw");
         // ROS_INFO("Waiting for laser scan message");
         // ros::topic::waitForMessage<sensor_msgs::LaserScan>("robot1/front_laser/scan");
-        ROS_INFO("Waiting for /robot1/kinect/depth_registered/points");
+        ROS_INFO("Waiting for /kinect/depth_registered/points");
         ros::topic::waitForMessage<PointCloud>(
-            "robot1/kinect/depth_registered/points");
+            addRobotName("/kinect/depth_registered/points"));
 
         // If not in an object, the fourth parameter here is not necessary, but
         // we need it here to ensure the callback goes to the right place, i.e.
@@ -57,10 +57,18 @@ class PlayNode {
         // n->subscribe("robot1//front_laser/scan", 1,
         // &PlayNode::laser_callback, this);
 
-        kinect_sub = n->subscribe("robot1/kinect/depth_registered/points", 1,
+        kinect_sub = n->subscribe(addRobotName("/kinect/depth_registered/points"), 1,
                                   &PlayNode::kinect_callback, this);
 
         pointcloud_processor = PointcloudProcessor();
+    }
+
+    std::string addRobotName( std::string s )
+    {
+        std::string final = "robot";
+        final.append( std::to_string( team_number ) );
+        final.append( s );
+        return final;
     }
 
     void image_callback(const sensor_msgs::Image::ConstPtr &msg) {
@@ -104,7 +112,7 @@ class PlayNode {
         PointCloud::Ptr pcl_msg(new PointCloud);
 
         // msg->header.frame_id = "robot1/base_link";
-        pcl_msg->header.frame_id = "robot1/odom";
+        pcl_msg->header.frame_id = addRobotName("/odom");
 
         pcl_msg->height = cloud.height;
         pcl_msg->width = cloud.width;
@@ -129,12 +137,12 @@ class PlayNode {
         bool succesful = true;
         tf::Transform transform_kinect_to_odom;
         succesful &=
-            get_transform(transform_kinect_to_odom, tfBuffer, "robot1/odom",
-                          "robot1/kinect_rgb_optical_frame");
+            get_transform(transform_kinect_to_odom, tfBuffer, addRobotName("/odom"),
+                          addRobotName("/kinect_rgb_optical_frame"));
 
         tf::Transform transform_odom_to_baselink;
         succesful &= get_transform(transform_odom_to_baselink, tfBuffer,
-                                   "robot1/base_link", "robot1/odom");
+                                   addRobotName("/base_link"), addRobotName("/odom"));
         if (succesful == false) {
             ROS_INFO_STREAM(
                 "Transformation missing, base_link - odom or odom - kinect.");
