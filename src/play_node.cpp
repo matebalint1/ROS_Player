@@ -643,10 +643,10 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
     const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.2; //m, threshold for drivable direction
     PointCloudPtr temp(new PointCloud);
     min_rotation = 180; // degrees
-    total_space = 0;
+    total_space = 0; // integral 0 to 180 degrees
 
     // Find optimal rotation
-    for(int rotation = 0; rotation < 180; rotation++){
+    for(int rotation = 0; rotation < 180; rotation += 2){ // 2 degree resolution for speed
         // Precision of one degree
 
         double goal_point_x_rotated = goal_distance * cos(rotation * 3.1415/180.0);
@@ -662,12 +662,12 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
         }
 
         bool obstacle_inside = false;
-        double smalles_x = 2;
+        double smalles_x = 4;
         for(int i = 0; i < cloud->points.size(); i++){
             double x = cloud->points[i].x;
             double y = cloud->points[i].y;
 
-            if(x < smalles_x){
+            if(x < smalles_x && x > 0.2){
                 // Find closest obstcle in that direction
                 smalles_x = x;
             }
@@ -689,7 +689,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
         // Rotate cloud by one degree for next iteration
         Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
         transform_2.translation() << 0, 0, 0;
-        transform_2.rotate (Eigen::AngleAxisf (-1.0 * direction * 3.1415/180.0, Eigen::Vector3f::UnitZ()));
+        transform_2.rotate (Eigen::AngleAxisf (-2.0 * direction * 3.1415/180.0, Eigen::Vector3f::UnitZ()));
         pcl::transformPointCloud (*cloud, *temp, transform_2);
         *cloud = *temp;
     }
@@ -747,6 +747,8 @@ double get_goal_heading_path_planning(double goal_distance,
 
     std::cout << "Rot to left: " << min_rotation_left << std::endl;
     std::cout << "Rot to right: " << min_rotation_right << std::endl;
+    std::cout << "Total space to left: " << total_space_left << std::endl;
+    std::cout << "Total space to right: " << total_space_right << std::endl;
     std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
     std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
     
@@ -762,15 +764,15 @@ double get_goal_heading_path_planning(double goal_distance,
     if (rot_right_total < 180){
         rot_right_total = 360 + rot_right_total;
     }*/
-    
-    /*if (min_rotation_left < min_rotation_right + 10){
+    // TODO choose on direction and use it!!
+    if (min_rotation_left < min_rotation_right + 25){
         return rot_left_total;
     } else { 
         return rot_right_total;
-    }*/
+    }
 
-    int angle_diff = fabs(min_rotation_left - min_rotation_right);
-    if (angle_diff < 20 ){ // Todo test if works
+    /*int angle_diff = fabs(min_rotation_left - min_rotation_right);
+    if (angle_diff <= 30 ){ // Todo test if works
         // Small difference -> go into the direction of smaller total difference
         if (fabs(rot_left_total) < fabs(rot_right_total)){
             return rot_left_total;
@@ -784,7 +786,7 @@ double get_goal_heading_path_planning(double goal_distance,
         } else { 
             return rot_right_total;
         }
-    }
+    }*/
 }
 
 void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
