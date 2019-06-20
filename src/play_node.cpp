@@ -656,7 +656,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
         double x_limit;
         if(goal_inside_rect){
             // Add 0.2 to ensure that the region behind the goal is also safe
-            x_limit = fmin(goal_point_x_rotated + 0.2, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
+            x_limit = fmin(goal_point_x_rotated + 0.1, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
         } else {
             x_limit = MIN_FREE_SPACE_IN_FRONT_OF_ROBOT;
         }
