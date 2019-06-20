@@ -642,7 +642,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
     // This function edits the point cloud, rotation parameter values 1 or -1, left rotation
     // is positive (== 1);
     
-    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.2; //m, threshold for drivable direction
+    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1; //m, threshold for drivable direction
     PointCloudPtr temp(new PointCloud);
     min_rotation = 180; // degrees
     total_space = 0; // integral 0 to 180 degrees
@@ -674,9 +674,9 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
                 smalles_x = x;
             }
 
-            if (x > 0.0 && x <= x_limit && // TODO test 0.2 -> 0
-                y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
-                y < ROBOT_SAFE_ZONE_WIDTH / 2.0) {
+            if (x > 0.0 && x <= x_limit && 
+                y > -(ROBOT_SAFE_ZONE_WIDTH + 0.1) / 2.0 &&
+                y < (ROBOT_SAFE_ZONE_WIDTH + 0.1)  / 2.0) {
                 // obstacle inside of rectangle and not closer than the goal point
                 obstacle_inside = true;
             }
