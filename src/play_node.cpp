@@ -78,6 +78,7 @@ sensor_msgs::LaserScan laser_msg;
 nav_msgs::Odometry odometry_msg;
 
 bool game_started_msg = false;
+int team_number = 1;
 
 // --------------------------------------------
 // Play field size and game settings
@@ -176,9 +177,17 @@ int tf_delay_counter = 0;
 //--------------------------------------------
 //--------------------------------------------
 
+std::string addRobotName( std::string s )
+{
+    std::string final = "robot";
+    final.append( std::to_string( team_number ) );
+    final.append( s );
+    return final;
+}
+
 void pub_pointcloud(PointCloud& cloud, ros::Publisher& pub) {
     PointCloudPtr msg(new PointCloud);
-    msg->header.frame_id = "robot1/base_link";
+    msg->header.frame_id = addRobotName("/base_link");
 
     msg->height = cloud.height;
     msg->width = cloud.width;
@@ -197,7 +206,7 @@ void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
     odom_trans.header.stamp = ros::Time::now();
 
     odom_trans.header.frame_id = "map";
-    odom_trans.child_frame_id = "robot1/odom";
+    odom_trans.child_frame_id = addRobotName("/odom");
 
     odom_trans.transform.translation.x = x;
     odom_trans.transform.translation.y = y;
@@ -900,24 +909,24 @@ bool process_messages() {
 
     tf::Transform transform_laser_to_baselink;
     bool succesful_laser_tf =
-        get_transform(transform_laser_to_baselink, tfBuffer, "robot1/base_link",
-                      "robot1/front_laser");
+        get_transform(transform_laser_to_baselink, tfBuffer, addRobotName("/base_link"),
+                      addRobotName("/front_laser") );
     tf::Transform transform_odom_to_baselink;
     bool succesful_odom_baselink =
-        get_transform(transform_odom_to_baselink, tfBuffer, "robot1/base_link",
-                      "robot1/odom");
+        get_transform(transform_odom_to_baselink, tfBuffer, addRobotName("/base_link"),
+                      addRobotName("/odom") );
     tf::Transform transform_base_link_to_map;
     bool succesful_robot_pos_tf = get_transform(
-        transform_base_link_to_map, tfBuffer, "map", "robot1/base_link");
+        transform_base_link_to_map, tfBuffer, "map", addRobotName("/base_link") );
 
     tf::Transform transform_odom_to_map;
     succesful_map_tf =
-        get_transform(transform_odom_to_map, tfBuffer, "map", "robot1/odom");
+        get_transform(transform_odom_to_map, tfBuffer, "map", addRobotName("/odom"));
 
     succesful_map_tf =
-        get_transform(transform_map_to_odom, tfBuffer, "robot1/odom", "map");
+        get_transform(transform_map_to_odom, tfBuffer, addRobotName("/odom"), "map");
 
-    get_transform(transform_map_to_baselink, tfBuffer, "robot1/base_link", "map");
+    get_transform(transform_map_to_baselink, tfBuffer, addRobotName("/base_link"), "map");
 
     if (succesful_laser_tf == false || succesful_odom_baselink == false) {
         ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
@@ -1711,10 +1720,14 @@ void init_node(int argc, char** argv) {
     ros::init(argc, argv, "play_node");
     n = std::make_unique<ros::NodeHandle>();
 
+    n->getParam( "play_node/param_1", team_number );
+
+    ROS_INFO_STREAM("Team number: " << team_number << "\n" );
+
     tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
     tf_listener = new tf2_ros::TransformListener(*tfBuffer);
 
-    velocity_pub = n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
+    velocity_pub = n->advertise<geometry_msgs::Twist>(addRobotName("/cmd_vel"), 1000);
     debug_cloud_pub = n->advertise<PointCloud>("play_node/debug", 1);
 
     ROS_INFO("Waiting for referee /waitForTeams");
@@ -1748,7 +1761,7 @@ void init_node(int argc, char** argv) {
 
     ROS_INFO("Waiting for laser scan message");
     ros::topic::waitForMessage<sensor_msgs::LaserScan>(
-        "robot1/front_laser/scan");
+        addRobotName( "/front_laser/scan" ) );
 
     // ROS_INFO("Waiting for map_node/map");
     // ros::topic::waitForMessage<PointCloud>("map_node/map");
@@ -1758,7 +1771,7 @@ void init_node(int argc, char** argv) {
         n->subscribe("pointcloud_node/collision_avoidance", 1,
                      &collision_avoidance_cloud_callback);
 
-    laser_sub = n->subscribe("robot1/front_laser/scan", 1, &laser_callback);
+    laser_sub = n->subscribe( addRobotName( "/front_laser/scan" ), 1, &laser_callback);
 
     field_width_sub =
         n->subscribe("field_width_node/width", 1, &field_width_callback);
