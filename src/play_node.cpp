@@ -57,7 +57,6 @@ ros::Subscriber field_width_sub;
 
 ros::ServiceClient team_ready_client;
 ros::ServiceClient send_color_client;
-ros::ServiceClient send_dimensions_client;
 
 PointCloudPtr temp = PointCloudPtr(new PointCloud);
 PointCloudPtr map_cloud_in_map_frame(new PointCloud);
@@ -1563,10 +1562,6 @@ void init_node(int argc, char** argv) {
     //    this);
 
     send_color_client = n->serviceClient<player::SendColor>("SendColor");
-
-    send_dimensions_client = n->serviceClient<player::SendDimensions>("SendDimensions");
-
-
 }
 
 int main(int argc, char** argv) {
