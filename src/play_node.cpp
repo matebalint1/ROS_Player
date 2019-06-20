@@ -1708,7 +1708,7 @@ void init_node(int argc, char** argv) {
 
     ROS_INFO("Waiting for referee /waitForTeams");
     ros::topic::waitForMessage<std_msgs::Empty>("waitForTeams");
-
+    ROS_INFO("done");
     team_ready_client = n->serviceClient<player::TeamReady>(
         "TeamReady");  // referee instead of player??
 
