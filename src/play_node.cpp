@@ -10,6 +10,8 @@
 #include "ros/ros.h"
 #include "sensor_msgs/Image.h"
 #include "std_msgs/String.h"
+#include "std_msgs/Bool.h"
+#include "std_msgs/Empty.h"
 
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
@@ -44,11 +46,17 @@ std::unique_ptr<ros::NodeHandle> n;
 ros::Publisher velocity_pub;
 ros::Publisher debug_cloud_pub;
 
+ros::Subscriber wait_for_teams_sub;
+ros::Subscriber game_control_sub;
 ros::Subscriber map_sub;
 ros::Subscriber collision_avoidance_cloud_sub;
 ros::Subscriber laser_sub;
 ros::Subscriber field_width_sub;
 // ros::Subscriber odometry_sub;
+
+ros::ServiceClient team_ready_client;
+ros::ServiceClient send_color_client;
+ros::ServiceClient send_dimensions_client;
 
 PointCloudPtr temp = PointCloudPtr(new PointCloud);
 PointCloudPtr map_cloud_in_map_frame(new PointCloud);
@@ -60,6 +68,8 @@ PointCloud collision_avoidance_cloud_msg;
 
 sensor_msgs::LaserScan laser_msg;
 nav_msgs::Odometry odometry_msg;
+
+bool game_started_msg;
 
 // --------------------------------------------
 // Play field size and game settings
@@ -142,7 +152,7 @@ double closest_obstacle_direction_g = 0;
 // Game state parameters
 // --------------------------------------------
 
-Game_state game_state = initialize_location;
+Game_state game_state = wait_for_start;
 int is_blue_team = -1;  // -1 not set, 0 false, 1 true
 int moves_done = 0;  // used for doing move squences, e.g. leaving buck in goal
 
@@ -186,6 +196,12 @@ void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
     transform_broadcaster.sendTransform(odom_trans);
 }
 */
+
+void game_control_callback(const std_msgs::Bool::ConstPtr& msg) {
+    // ROS_INFO("Got game control");
+    game_started_msg = msg->data;
+    //got_laser = true;
+}
 
 void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg) {
     // ROS_INFO("Got new laser");
@@ -1202,11 +1218,22 @@ void update_game_logic(bool data_processing_succesful) {
 
     if (game_state == wait_for_start) {
         // Change state when referee tells to
+        if( game_started_msg )
+        {
+            game_state = initialize_location;
+        }
+
         state = stop;
         ROS_INFO_STREAM("Game state: wait for start");
 
     } else if (game_state == initialize_location) {
         ROS_INFO_STREAM("Game state: initialize_location");
+
+        if( !game_started_msg )
+        {
+            game_state = end;
+        }
+
         if (data_processing_succesful == true) {
             // robot knows where it is -> start playing game
             state = stop;
@@ -1219,6 +1246,11 @@ void update_game_logic(bool data_processing_succesful) {
         ROS_INFO_STREAM("Game state: look_for_puck");
         // Choose closest puck and drive to it, if no buck is found
         // robot drives around.
+
+        if( !game_started_msg )
+        {
+            game_state = end;
+        }
 
         if (state == stop || state == drive_to) {
             // Set goal to drive to
@@ -1274,6 +1306,11 @@ void update_game_logic(bool data_processing_succesful) {
 
     } else if (game_state == drive_to_puck) {
         ROS_INFO_STREAM("Game state: drive_to_puck");
+
+        if( !game_started_msg )
+        {
+            game_state = end;
+        }
 
         if (state == stop) {
             // Robot has reached its destination, the puck pick up point.
@@ -1333,6 +1370,11 @@ void update_game_logic(bool data_processing_succesful) {
         ROS_INFO_STREAM("Game state: drive_with_puck_to_goal, team color: "
                         << is_blue_team);
 
+        if( !game_started_msg )
+        {
+            game_state = end;
+        }
+
         if (state == stop) {
             if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)) {
                 state = drive_to;
@@ -1360,6 +1402,12 @@ void update_game_logic(bool data_processing_succesful) {
                                          << " y: " << goal_point_y);
 
     } else if (game_state == leave_buck_in_goal) {
+
+        if( !game_started_msg )
+        {
+            game_state = end;
+        }
+
         // Drive back wards and rotate to leave the puck in the goal
         if (state == stop) {
             // Move/s finished or first move
@@ -1396,6 +1444,7 @@ void update_game_logic(bool data_processing_succesful) {
     }
 }
 
+
 // **************************************************************
 void init_node(int argc, char** argv) {
     ros::init(argc, argv, "play_node");
@@ -1406,6 +1455,45 @@ void init_node(int argc, char** argv) {
 
     velocity_pub = n->advertise<geometry_msgs::Twist>("robot1/cmd_vel", 1000);
     debug_cloud_pub = n->advertise<PointCloud>("play_node/debug", 1);
+
+    ROS_INFO("Waiting for referee /waitForTeams");
+    ros::topic::waitForMessage<std_msgs::Empty>(
+            "waitForTeams");
+
+    team_ready_client = n->serviceClient<player::TeamReady>("waitForTeams"); //referee instead of player??
+
+    player::TeamReady team_ready_srv;
+    team_ready_srv.request.team = "Green Peas"; //team name
+
+    if( team_ready_client.call( team_ready_srv ) )
+    {
+        if( team_ready_srv.response.ok )
+        {
+            ROS_INFO( "Team name granted" );
+        }
+        else
+        {
+            team_ready_srv.request.team = "Not Green Peas";
+            team_ready_client.call( team_ready_srv );
+
+            if( team_ready_srv.response.ok )
+            {
+                ROS_INFO( "New team name granted" );
+            }
+            else
+            {
+                ROS_INFO( "DAFUCK" );
+            }
+        }
+    }
+    else
+    {
+        ROS_ERROR( "Failed to call service TeamReady" );
+    }
+
+    game_control_sub =
+            n->subscribe("gameControl", 1, &game_control_callback);
+
 
     ROS_INFO("Waiting for laser scan message");
     ros::topic::waitForMessage<sensor_msgs::LaserScan>(
