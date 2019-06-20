@@ -1477,7 +1477,12 @@ void update_game_logic(bool data_processing_succesful) {
                     // the field.
                     state = drive_to;
                     goal_point_x = field_width / 2.0;
-                    goal_point_y = field_length / 2.0 + 0.5;
+                    if(is_blue_team == 1){
+                        goal_point_y = field_length / 2.0 + 1;
+                    } else {
+                        goal_point_y = field_length - (field_length / 2.0 + 1);
+                    }
+                    
                 }
 
             } else if (success == -1) {
