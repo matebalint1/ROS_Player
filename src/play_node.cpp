@@ -1738,18 +1738,12 @@ void init_node(int argc, char** argv) {
 
     field_width_sub =
         n->subscribe("field_width_node/width", 1, &field_width_callback);
-<<<<<<< HEAD
 
-    // odometry_sub =
-    //    n->subscribe("robot1/odom", 1, &PlayNode::odometry_callback,
-    //    this);
 
     send_color_client = n->serviceClient<player::SendColor>("SendColor");
 
     send_dimensions_client =
         n->serviceClient<player::SendDimensions>("SendDimensions");
-=======
->>>>>>> e225e6023d84a8ef668a00cf8e97d2ba1b6a93ab
 }
 
 int main(int argc, char** argv) {
