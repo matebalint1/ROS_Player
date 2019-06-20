@@ -19,6 +19,7 @@
 #include <tf/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <cstring>
 #include <algorithm>
 #include "pointcloud_helpers.hpp"
 
@@ -151,6 +152,8 @@ double closest_obstacle_direction_g = 0;
 // --------------------------------------------
 // Game state parameters
 // --------------------------------------------
+
+std::string team_name = "Green peas";
 
 Game_state game_state = wait_for_start;
 int is_blue_team = -1;  // -1 not set, 0 false, 1 true
@@ -735,6 +738,48 @@ bool process_messages() {
             is_blue_team = 0;  // false
         }
         ROS_INFO_STREAM("Setting team: " << is_blue_team);
+
+        if( is_blue_team != 1 )
+        {
+            player::SendColor send_color_srv;
+            send_color_srv.request.team = team_name;
+
+            if( is_blue_team == 1 )
+            {
+                send_color_srv.request.color = "blue";
+            }
+            else
+            {
+                send_color_srv.request.color = "yellow";
+            }
+
+            if( send_color_client.call( send_color_srv ) )
+            {
+                if( send_color_srv.response.ok )
+                {
+                    ROS_INFO( "The color is correct" );
+                }
+                else
+                {
+                    ROS_INFO( "The color was NOT correct" );
+
+                    if( is_blue_team == 0 )
+                    {
+                        is_blue_team = 1;
+                    }
+                    else
+                    {
+                        is_blue_team = 0;
+                    }
+
+                    ROS_INFO_STREAM( "New team color: " << is_blue_team );
+                }
+            }
+            else
+            {
+                ROS_ERROR( "Failed to call service SendColor" );
+            }
+        }
     }
 
     // -------------------------------------------------
@@ -1460,10 +1505,10 @@ void init_node(int argc, char** argv) {
     ros::topic::waitForMessage<std_msgs::Empty>(
             "waitForTeams");
 
-    team_ready_client = n->serviceClient<player::TeamReady>("waitForTeams"); //referee instead of player??
+    team_ready_client = n->serviceClient<player::TeamReady>("TeamReady"); //referee instead of player??
 
     player::TeamReady team_ready_srv;
-    team_ready_srv.request.team = "Green Peas"; //team name
+    team_ready_srv.request.team = team_name; //team name
 
     if( team_ready_client.call( team_ready_srv ) )
     {
@@ -1473,7 +1518,8 @@ void init_node(int argc, char** argv) {
         }
         else
         {
-            team_ready_srv.request.team = "Not Green Peas";
+            team_name = "Not Green peas"
+            team_ready_srv.request.team = team_name
             team_ready_client.call( team_ready_srv );
 
             if( team_ready_srv.response.ok )
@@ -1482,7 +1528,7 @@ void init_node(int argc, char** argv) {
             }
             else
             {
-                ROS_INFO( "DAFUCK" );
+                ROS_ERROR( "DAFUCK" );
             }
         }
     }
@@ -1515,6 +1561,12 @@ void init_node(int argc, char** argv) {
     // odometry_sub =
     //    n->subscribe("robot1/odom", 1, &PlayNode::odometry_callback,
     //    this);
+
+    send_color_client = n->serviceClient<player::SendColor>("SendColor");
+
+    send_dimensions_client = n->serviceClient<player::SendDimensions>("SendDimensions");
+
+
 }
 
 int main(int argc, char** argv) {
