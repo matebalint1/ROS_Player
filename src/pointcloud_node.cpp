@@ -63,6 +63,14 @@ class PlayNode {
         pointcloud_processor = PointcloudProcessor();
     }
 
+    std::string addRobotName( std::string s )
+    {
+        std::string final = "robot";
+        final.append( std::to_string( team_number ) );
+        final.append( s );
+        return final;
+    }
+
     void image_callback(const sensor_msgs::Image::ConstPtr &msg) {
         ROS_INFO("Got new laser scan");
         cv_bridge::CvImagePtr cv_ptr =
