@@ -93,8 +93,9 @@ const int NUMBER_OF_BUCKS_PER_TEAM = 3;
 
 // Real driving
 const double MAX_LINEAR_SPEED = 0.3;       // m/s
-const double MAX_ROTATIONAL_SPEEED = 0.3;  // rad/s
+const double MAX_ROTATIONAL_SPEEED = 0.5;  // rad/s
 const double MIN_LINEAR_SPEED = 0.15;      // m/s // 0.08 works
+const double MIN_ROTATIONAL_SPEED = 0.2;
 
 // For simulation
 //    const double MAX_LINEAR_SPEED = 0.6;       // m/s
@@ -169,6 +170,7 @@ int moves_done = 0;  // used for doing move squences, e.g. leaving buck in goal
 // Processing
 bool succesful_map_tf = false;
 tf::Transform transform_map_to_odom;
+tf::Transform transform_map_to_baselink;
 int tf_delay_counter = 0;
 
 //--------------------------------------------
@@ -575,8 +577,6 @@ bool is_obstacle_between_robot_and_goal(double closest_obstacle_distance,
     // calculation is done using a rectancular box (same width as robot safe
     // zone).
 
-    // TODO verify if this is correct, abs????
-
     // double angle_diff = fabs(closest_obstacle_direction - robot_yaw_error);
     double angle_diff = closest_obstacle_direction - robot_yaw_error;
     double obstacle_x = closest_obstacle_distance * cos(angle_diff);
@@ -592,6 +592,7 @@ bool is_obstacle_between_robot_and_goal(double closest_obstacle_distance,
     }
 }
 
+<<<<<<< HEAD
 double get_goal_heading_path_planning(double goal_heading,
                                       double goal_distance) {
     // This function calculates the heading for the robot to go around single
@@ -608,42 +609,282 @@ double get_goal_heading_path_planning(double goal_heading,
     }
 
     // Rotate right
+=======
+bool goal_point_inside_of_rectancle(double x, double y){
+    if(y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
+       y < ROBOT_SAFE_ZONE_WIDTH / 2.0){
+        return true;
+    } else {
+        return false;
+    }
+}
 
-    // Object on goal point
+void remove_points_inside_puck_carry_zone(PointCloudPtr& cloud){
+    // Delete pucks in front of the robot (== do not avoid pucks in collison avoidance cloud)
+    const double ROBOT_WIDTH = 0.4;
+
+    pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+    pcl::ExtractIndices<PointType> extract;
+
+    for (int i = 0; i < cloud->points.size(); i++) {
+        double x = cloud->points[i].x;
+        double y = cloud->points[i].y;
+
+        if ( x <= SAFETY_ZONE_X_OFFSET_MAX && 
+             x > -0.2 &&
+             y > -ROBOT_WIDTH / 2.0 &&
+             y < ROBOT_WIDTH / 2.0) {
+            // Remove these points (these points are not dangerous)
+            inliers->indices.push_back(i);
+        }
+    }
+
+    extract.setInputCloud(cloud);
+    extract.setIndices(inliers);
+    extract.setNegative(true);
+    extract.filter(*cloud);
+}
+
+double find_free_drive_direction(int direction, PointCloudPtr& cloud,
+                                        double goal_distance){
+    // This function returns the smalle rotation value that the robot shoud drive to
+    // to avoid obstacles. returns degrees
+
+    // This function edits the point cloud, rotation parameter values 1 or -1, left rotation
+    // is positive (== 1);
+    
+    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.2; //m, threshold for drivable direction
+    PointCloudPtr temp(new PointCloud);
+    double min_rotation = 0; // degrees
+
+    // Find optimal rotation
+    for(int rotation = 0; rotation < 180; rotation++){
+        // Precision of one degree
+
+        double goal_point_x_rotated = goal_distance * cos(rotation * 3.1415/180.0);
+        double goal_point_y_rotated = goal_distance * sin(rotation * 3.1415/180.0);
+        bool goal_inside_rect = goal_point_inside_of_rectancle(goal_point_x_rotated,goal_point_y_rotated); 
+
+        double x_limit;
+        if(goal_inside_rect){
+            // Add 0.2 to ensure that the region behind the goal is also safe
+            x_limit = fmin(goal_point_x_rotated + 0.2, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
+        } else {
+            x_limit = MIN_FREE_SPACE_IN_FRONT_OF_ROBOT;
+        }
+
+        bool obstacle_inside = false;
+        for(int i = 0; i < cloud->points.size(); i++){
+            double x = cloud->points[i].x;
+            double y = cloud->points[i].y;
+
+            if (x > 0.0 && x <= x_limit && // TODO test 0.2 -> 0
+                y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
+                y < ROBOT_SAFE_ZONE_WIDTH / 2.0) {
+                // obstacle inside of rectangle and not closer than the goal point
+                obstacle_inside = true;
+                break;
+            }
+        }
+        
+        min_rotation = rotation;
+        if(obstacle_inside == false){
+            // First empty region to the left: stop   
+            break;
+        }
+        
+        // Rotate cloud by one degree for next iteration
+        Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+        transform_2.translation() << 0, 0, 0;
+        transform_2.rotate (Eigen::AngleAxisf (-1.0 * direction * 3.1415/180.0, Eigen::Vector3f::UnitZ()));
+        pcl::transformPointCloud (*cloud, *temp, transform_2);
+        *cloud = *temp;
+    }
+
+    return min_rotation;
+}
+
+void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& cloud, double goal_distance,
+                double& total_space, double& min_rotation){
+    // This function returns the smallest rotation value that the robot shoud drive to
+    // to avoid obstacles. returns degrees of min rotation and total_space
+
+    // This function edits the point cloud, rotation parameter values 1 or -1, left rotation
+    // is positive (== 1);
+    
+    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.2; //m, threshold for drivable direction
+    PointCloudPtr temp(new PointCloud);
+    min_rotation = 180; // degrees
+    total_space = 0; // integral 0 to 180 degrees
+
+    // Find optimal rotation
+    for(int rotation = 0; rotation < 180; rotation += 2){ // 2 degree resolution for speed
+        // Precision of one degree
+
+        double goal_point_x_rotated = goal_distance * cos(rotation * 3.1415/180.0);
+        double goal_point_y_rotated = goal_distance * sin(rotation * 3.1415/180.0);
+        bool goal_inside_rect = goal_point_inside_of_rectancle(goal_point_x_rotated,goal_point_y_rotated); 
+
+        double x_limit;
+        if(goal_inside_rect){
+            // Add 0.2 to ensure that the region behind the goal is also safe
+            x_limit = fmin(goal_point_x_rotated + 0.2, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
+        } else {
+            x_limit = MIN_FREE_SPACE_IN_FRONT_OF_ROBOT;
+        }
+>>>>>>> 886fa95f5019eb151bb3257f1b5b77a9a95b5933
+
+        bool obstacle_inside = false;
+        double smalles_x = 4;
+        for(int i = 0; i < cloud->points.size(); i++){
+            double x = cloud->points[i].x;
+            double y = cloud->points[i].y;
+
+            if(x < smalles_x && x > 0.2){
+                // Find closest obstcle in that direction
+                smalles_x = x;
+            }
+
+            if (x > 0.0 && x <= x_limit && // TODO test 0.2 -> 0
+                y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
+                y < ROBOT_SAFE_ZONE_WIDTH / 2.0) {
+                // obstacle inside of rectangle and not closer than the goal point
+                obstacle_inside = true;
+            }
+        }
+        total_space += smalles_x; // sum of empty space in all directions
+        
+        if(obstacle_inside == false && min_rotation == 180){
+            // First empty region -> save value 
+            min_rotation = rotation;
+        }
+        
+        // Rotate cloud by one degree for next iteration
+        Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+        transform_2.translation() << 0, 0, 0;
+        transform_2.rotate (Eigen::AngleAxisf (-2.0 * direction * 3.1415/180.0, Eigen::Vector3f::UnitZ()));
+        pcl::transformPointCloud (*cloud, *temp, transform_2);
+        *cloud = *temp;
+    }
+
+}
+
+double get_goal_heading_path_planning(double goal_distance,
+                                      double goal_heading) {
+    // This function calculates the heading for the robot to go around single
+    // obstacles. It calculates the first possible direction to the left and
+    // right the one with smaller value is choseen as a new heading for the
+    // robot.
+
+    // Make copy of cloud
+    PointCloudPtr cloud(new PointCloud(*collision_avoidance_cloud));
+    remove_points_inside_puck_carry_zone(cloud);
+    PointCloudPtr temp(new PointCloud);
+
+    // Generate field edge cloud in map frame
+    PointCloudPtr field_edges_map = get_ideal_field_edge_cloud(field_width);
+    
+
+    // Rotate edge cloud to base_link
+    pcl_ros::transformPointCloud(*field_edges_map, *temp,
+                                 transform_map_to_baselink);
+    *cloud += *temp; // combine clouds
+   
+    // Rotate cloud so that x-axis points to the direction of the goal
+    Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+    transform_2.translation() << 0, 0, 0;
+    transform_2.rotate (Eigen::AngleAxisf (-goal_heading, Eigen::Vector3f::UnitZ()));
+    pcl::transformPointCloud (*cloud, *temp, transform_2);
+    *cloud = *temp;
+
+    // Make copies of each cloud for both directions
+    PointCloudPtr cloud_left(new PointCloud(*cloud));
+    PointCloudPtr cloud_right(new PointCloud(*cloud));
+
+    //double min_rotation_left = find_free_drive_direction(1, cloud_left, goal_distance); // degrees
+    //double min_rotation_right = find_free_drive_direction(-1, cloud_right, goal_distance); // degrees
+    double min_rotation_left;
+    double min_rotation_right;
+    double total_space_left;
+    double total_space_right;
+    find_free_drive_direction_and_total_space(1, cloud_left, goal_distance, total_space_left, min_rotation_left);
+    find_free_drive_direction_and_total_space(-1, cloud_right, goal_distance, total_space_right, min_rotation_right);
+
+    // Compare roatations to the left and right and transform to radians as heading error
+    // of the robot
+
+
+
+    double rot_left_total = min_rotation_left * 3.1415 / 180.0 + goal_heading;
+    double rot_right_total = -min_rotation_right * 3.1415 / 180.0 + goal_heading;
+
+    std::cout << "Rot to left: " << min_rotation_left << std::endl;
+    std::cout << "Rot to right: " << min_rotation_right << std::endl;
+    std::cout << "Total space to left: " << total_space_left << std::endl;
+    std::cout << "Total space to right: " << total_space_right << std::endl;
+    std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
+    std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
+    
+    //if (fabs(min_rotation_left - min_rotation_right) < 45 * 3.1415/180){
+        // if difference is small chooce always to left
+    //    return rot_left_total;
+    //}
+
+    /*if (rot_left_total > 180){
+        rot_left_total = 360 - rot_left_total;
+    }
+
+    if (rot_right_total < 180){
+        rot_right_total = 360 + rot_right_total;
+    }*/
+    // TODO choose on direction and use it!!
+    if (min_rotation_left < min_rotation_right + 25){
+        return rot_left_total;
+    } else { 
+        return rot_right_total;
+    }
+
+    /*int angle_diff = fabs(min_rotation_left - min_rotation_right);
+    if (angle_diff <= 30 ){ // Todo test if works
+        // Small difference -> go into the direction of smaller total difference
+        if (fabs(rot_left_total) < fabs(rot_right_total)){
+            return rot_left_total;
+        } else { 
+            return rot_right_total;
+        }
+
+    } else { 
+        if (min_rotation_left < min_rotation_right){
+            return rot_left_total;
+        } else { 
+            return rot_right_total;
+        }
+    }*/
 }
 
 void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
                          double closest_obstacle_distance,
                          double closest_obstacle_direction,
-                         double robot_distance_error, double robot_yaw_error) {
-    if (is_obstacle_between_robot_and_goal(
-            closest_obstacle_distance, closest_obstacle_direction,
-            robot_distance_error, robot_yaw_error)) {
-        // Obstacle in between goal and robot
-        collision_avoidance(
-            speed_linear, speed_rotational, closest_obstacle_distance,
-            closest_obstacle_direction, robot_distance_error, robot_yaw_error);
+                         double goal_point_distance, double goal_point_direction) {
 
-        // TODO make robot drive around obstacle in the right direction
-    } else {
-        // Obstacle not in between goal and robot -> drive direcly to goal
+    double robot_heading_error = get_goal_heading_path_planning(
+                                            goal_point_distance, goal_point_direction);
+    // Set linear speed
+    speed_linear = fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED / DISTANCE_LINEAR_FREE *
+                                                                    goal_point_distance);
 
-        if ((robot_yaw_error > -MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL &&
-             robot_yaw_error < MAX_YAW_ERROR_WHEN_DRIVING_TO_GOAL) /*||
-            (robot_distance_error > 0.6 && closest_obstacle_distance > 0.6)*/) {
-            // Yaw error is small enough or distance error is large
-            // enough
-            speed_linear =
-                fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED / DISTANCE_LINEAR_FREE *
-                                           robot_distance_error);
-        } else {
-            // Do not drive in the wrong direction when close to goal
-            speed_linear = 0;
-        }
+    // Reduce linear speed if heading error is large. A 1/x function is used.
+    speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, fabs(robot_heading_error))- 1.0/3.1415));
 
-        speed_rotational = 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION *
-                           robot_yaw_error;
-    }
+    if(fabs(robot_heading_error) < 15 * 3.14/180.0 ){
+        // if heading error is small drive forward at min linear speed // TODO test.
+        speed_linear = fmax(MIN_LINEAR_SPEED, speed_linear);
+    } 
+
+    // Set rotational speed
+    speed_rotational = 4 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION *
+                         robot_heading_error;
+
 }
 
 void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
@@ -695,6 +936,8 @@ bool process_messages() {
     succesful_map_tf =
         get_transform(transform_map_to_odom, tfBuffer, "robot1/odom", "map");
 
+    get_transform(transform_map_to_baselink, tfBuffer, "robot1/base_link", "map");
+
     if (succesful_laser_tf == false || succesful_odom_baselink == false) {
         ROS_INFO_STREAM("Laser or odom to baselink transformation missing!");
         // return false;
@@ -736,8 +979,8 @@ bool process_messages() {
     rotation.getRPY(roll, pitch, yaw);
 
     ROS_INFO_STREAM("Robot position x,y,yaw "
-                    << transform_base_link_to_map.getOrigin().getX() << "\t"
-                    << transform_base_link_to_map.getOrigin().getY() << "\t"
+                    << transform_base_link_to_map.getOrigin().getX() << " "
+                    << transform_base_link_to_map.getOrigin().getY() << " "
                     << yaw);
 
     // Robot position in odom frame
@@ -888,9 +1131,9 @@ bool process_messages() {
     to_polar(closest_laser_x, closest_laser_y, closest_laser_distance,
              closest_laser_direction);
 
-    ROS_INFO_STREAM("Closest laser obstacle r: " << closest_laser_distance
-                                                 << "\tangle: "
-                                                 << closest_laser_direction);
+    //ROS_INFO_STREAM("Closest laser obstacle r: " << closest_laser_distance
+    //                                             << "\tangle: "
+    //                                             << closest_laser_direction);
 
     // -------------------------------------------------
     // Calculate closest wall to robot of the field
@@ -909,9 +1152,9 @@ bool process_messages() {
     to_polar(closest_wall_x, closest_wall_y, closest_wall_distance,
              closest_wall_direction, robot_map_x, robot_map_y, robot_map_yaw);
 
-    ROS_INFO_STREAM("Closest wall  obstacle r: " << closest_wall_distance
-                                                 << "\tangle: "
-                                                 << closest_wall_direction);
+    //ROS_INFO_STREAM("Closest wall  obstacle r: " << closest_wall_distance
+    //                                             << "\tangle: "
+    //                                            << closest_wall_direction);
 
     // -------------------------------------------------
     // Calculate closest obstacle of all
@@ -1036,27 +1279,28 @@ void update_robot_state() {
         // rotate to find location
         speed_linear = 0;
         speed_rotational = MAX_ROTATIONAL_SPEEED;
-        ROS_INFO_STREAM("Robot state INITIALIZE");
+        ROS_INFO_STREAM("Robot state: INITIALIZE");
     } else if (state == drive_random) {
         collision_avoidance(speed_linear, speed_rotational,
                             closest_obstacle_distance_g,
                             closest_obstacle_direction_g, robot_distance_error,
                             robot_yaw_error);
 
-        ROS_INFO_STREAM("Robot state DRIVE RANDOM");
+        ROS_INFO_STREAM("Robot state: DRIVE RANDOM");
 
     } else if (state == drive_to) {
         set_speeds_drive_to(speed_linear, speed_rotational,
                             closest_obstacle_distance_g,
                             closest_obstacle_direction_g, robot_distance_error,
                             robot_yaw_error);
-        ROS_INFO_STREAM("Robot state DRIVE TO");
+        ROS_INFO_STREAM("Robot state: DRIVE TO");
 
     } else if (state == rotate) {
         speed_linear = 0;
         speed_rotational =
-            rotation_to_go * 2 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION;
-        ROS_INFO_STREAM("Robot state ROTATE, to rotate: " << rotation_to_go);
+            fmax(MIN_ROTATIONAL_SPEED,
+            rotation_to_go * 4 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION);
+        ROS_INFO_STREAM("Robot state: ROTATE, to rotate: " << rotation_to_go);
 
     } else if (state == move) {
         int sign = (distance_to_go >= 0) - (distance_to_go < 0);
@@ -1065,21 +1309,21 @@ void update_robot_state() {
                                                          DISTANCE_LINEAR_FREE);
         speed_rotational = 0;
         ROS_INFO_STREAM(
-            "Robot state MOVE, distance to move: " << distance_to_go);
+            "Robot state: MOVE, distance to move: " << distance_to_go);
 
     } else if (state == stop) {
         speed_linear = 0;
         speed_rotational = 0;
 
-        ROS_INFO_STREAM("Robot state STOP");
+        ROS_INFO_STREAM("Robot state: STOP");
     }
 
     ROS_INFO_STREAM("Error to goal r: " << robot_distance_error
-                                        << "\tangle: " << robot_yaw_error);
+                                        << " angle: " << robot_yaw_error);
 
-    ROS_INFO_STREAM("Closest control obstacle r: "
-                    << closest_obstacle_distance_g
-                    << "\tangle: " << closest_obstacle_direction_g);
+    //ROS_INFO_STREAM("Closest control obstacle r: "
+     //               << closest_obstacle_distance_g
+     //               << " angle: " << closest_obstacle_direction_g);
 
     ROS_INFO_STREAM("Rotational out: " << speed_rotational);
     ROS_INFO_STREAM("Linear out: " << speed_linear
@@ -1099,8 +1343,8 @@ void update_robot_state() {
     robot_map_last_yaw = robot_map_yaw;
 
     // Update safety_zone_x_offset base on robot angular speed
-    safety_zone_x_offset =
-        0.4;  // fmin(fmax(0, -SAFETY_ZONE_X_OFFSET_MAX/MAX_ROTATIONAL_SPEEED *
+    safety_zone_x_offset =SAFETY_ZONE_X_OFFSET_MAX
+        ;  // fmin(fmax(0, -/MAX_ROTATIONAL_SPEEED *
               // speed_rotational + SAFETY_ZONE_X_OFFSET_MAX),
               // SAFETY_ZONE_X_OFFSET_MAX);
     // ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
@@ -1260,7 +1504,8 @@ void point_map_to_odom(double x_in, double y_in, double& x_out, double& y_out) {
 
 void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
-    ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck());
+    ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck() <<
+                                 " team color blue: " << is_blue_team);
 
     // game_state = wait_for_start;
     // return; // debugging
@@ -1310,9 +1555,9 @@ void update_game_logic(bool data_processing_succesful) {
             double y = -1;
             int success = get_closest_puck_to_point(
                 x, y, robot_map_x, robot_map_y, map_cloud_in_map_frame);
-            ROS_INFO_STREAM("get closest puck succes: "
-                            << success << " team color: " << is_blue_team);
-            ROS_INFO_STREAM("Goal point x: " << x << " y: " << y);
+            ROS_INFO_STREAM("Get closest puck succes: "
+                            << success);
+            //ROS_INFO_STREAM("Goal point x: " << x << " y: " << y);
             if (success == 1) {
                 // Found puck to drive to
                 game_state = drive_to_puck;
@@ -1367,8 +1612,8 @@ void update_game_logic(bool data_processing_succesful) {
             point_map_to_odom(goal_point_x, goal_point_y, x, y);
             std::cout << "Delete pucks at map x: " << goal_point_x
                       << " y: " << goal_point_y << std::endl;
-            std::cout << "Delete pucks at odom x: " << x << " y: " << y
-                      << std::endl;
+            //std::cout << "Delete pucks at odom x: " << x << " y: " << y
+            //          << std::endl;
             if (x != -1) {
                 n->setParam("delete_puck", true);
                 n->setParam("puck_x", x);
@@ -1382,10 +1627,10 @@ void update_game_logic(bool data_processing_succesful) {
                 state = stop;
             } else {
                 // Robot did not hit puck -> go to previous state and try again.
-                std::cout << "Buck missed driving to home" << std::endl;
+                std::cout << "Buck missed -> look_for_puck" << std::endl;
                 // remove all pucks from the field
-                n->setParam("reset_all_pucks",
-                            true);  // is this really required TODO??
+                //n->setParam("reset_all_pucks",
+                //            true);  // is this really required TODO??
                 game_state = look_for_puck;
                 state = stop;
             }
@@ -1537,14 +1782,12 @@ void init_node(int argc, char** argv) {
     field_width_sub =
         n->subscribe("field_width_node/width", 1, &field_width_callback);
 
-    // odometry_sub =
-    //    n->subscribe("robot1/odom", 1, &PlayNode::odometry_callback,
-    //    this);
 
     send_color_client = n->serviceClient<player::SendColor>("SendColor");
 
     send_dimensions_client =
         n->serviceClient<player::SendDimensions>("SendDimensions");
+
 }
 
 int main(int argc, char** argv) {
