@@ -12,6 +12,10 @@
 #include "std_msgs/String.h"
 #include "std_msgs/Bool.h"
 #include "std_msgs/Empty.h"
+#include "geometry_msgs/Point.h"
+#include "../../../devel/include/player/TeamReady.h"
+#include "../../../devel/include/player/SendColor.h"
+#include "../../../devel/include/player/SendDimensions.h"
 
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
@@ -57,6 +61,7 @@ ros::Subscriber field_width_sub;
 
 ros::ServiceClient team_ready_client;
 ros::ServiceClient send_color_client;
+ros::ServiceClient send_dimensions_client;
 
 PointCloudPtr temp = PointCloudPtr(new PointCloud);
 PointCloudPtr map_cloud_in_map_frame(new PointCloud);
@@ -223,9 +228,39 @@ void collision_avoidance_cloud_callback(const PointCloud::ConstPtr& msg) {
 }
 
 void field_width_callback(const geometry_msgs::Vector3::ConstPtr& msg) {
-    geometry_msgs::Vector3 width = *msg;
-    field_width = width.x;
-    field_length = 5.0 / 3.0 * field_width;
+
+    if( !got_field_width )
+    {
+        geometry_msgs::Vector3 width = *msg;
+        field_width = width.x;
+        field_length = 5.0 / 3.0 * field_width;
+
+        player::SendDimensions send_dimensions_srv;
+        send_dimensions_srv.request.team = team_name;
+        send_dimensions_srv.request.dimensions.x = field_length;            //length in METRES!!!! TODO
+        send_dimensions_srv.request.dimensions.y = field_width;             //width in METRES!!! TODO
+        send_dimensions_srv.request.dimensions.z = 0.0;
+
+        if( send_dimensions_client.call( send_dimensions_srv ) )
+        {
+            if( send_dimensions_srv.response.ok )
+            {
+                ROS_INFO( "Dimensions are within error margin" );
+            }
+            else
+            {
+                ROS_INFO( "Dimensions are NOT within error margin" );
+            }
+
+            field_width = send_dimensions_srv.response.correctDimensions.y;
+            field_length = send_dimensions_srv.response.correctDimensions.x;
+        }
+        else
+        {
+            ROS_ERROR( "Failed to call service SendDimensions" );
+        }
+    }
+
     got_field_width = true;
 }
 
@@ -1517,8 +1552,8 @@ void init_node(int argc, char** argv) {
         }
         else
         {
-            team_name = "Not Green peas"
-            team_ready_srv.request.team = team_name
+            team_name = "Not Green peas";
+            team_ready_srv.request.team = team_name;
             team_ready_client.call( team_ready_srv );
 
             if( team_ready_srv.response.ok )
@@ -1562,6 +1597,8 @@ void init_node(int argc, char** argv) {
     //    this);
 
     send_color_client = n->serviceClient<player::SendColor>("SendColor");
+
+    send_dimensions_client = n->serviceClient<player::SendDimensions>("SendDimensions");
 }
 
 int main(int argc, char** argv) {

@@ -1,7 +1,6 @@
 #include <cmath>
 #include <iostream>
 #include <thread>
-#include <cstring>
 
 #include <pcl/filters/extract_indices.h>
 #include <pcl/io/pcd_io.h>
@@ -12,7 +11,6 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl_ros/point_cloud.h>
 #include "geometry_msgs/Vector3.h"
-#include "geometry_msgs/Point.h"
 #include "ros/ros.h"
 
 // using namespace std::literals::chrono_literals;
@@ -34,7 +32,6 @@ const int MIN_NUMBER_OF_SAMPLES = 30;     // Stops after this number is reached
 
 PointCloud map_objects_msg;
 
-ros::ServiceClient send_dimensions_client;
 
 void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
                   int g, int b) {
@@ -194,30 +191,6 @@ void process_messages() {
     if (number_of_samples > MIN_NUMBER_OF_SAMPLES) {
         width_calculation_finished = true;
         ROS_INFO_STREAM("Final field width ready");
-
-        player::SendDimensions send_dimensions_srv;
-        send_dimensions_srv.request.team = team_name;
-        send_dimensions_srv.request.dimensions.x = field_width_out * 5.0 / 3;   //length
-        send_dimensions_srv.request.dimensions.y = field_width_out;             //width
-        send_dimensions_srv.request.dimensions.z = 0.0;
-
-        if( send_dimensions_client.call( send_dimensions_srv ) )
-        {
-            if( send_dimensions_srv.response.ok )
-            {
-                ROS_INFO( "Dimensions are within error margin" );
-            }
-            else
-            {
-                ROS_INFO( "Dimensions are NOT within error margin" );
-            }
-
-            field_width_out = send_dimensions_srv.response.dimensions.y;
-        }
-        else
-        {
-            ROS_ERROR( "Failed to call service SendDimensions" );
-        }
     }
 }
 
@@ -233,8 +206,6 @@ int main(int argc, char** argv) {
     ROS_INFO("Waiting for map_node/map");
     ros::topic::waitForMessage<PointCloud>("map_node/map");
     ros::Subscriber map_sub = n->subscribe("map_node/map", 1, map_callback);
-
-    send_dimensions_client = n->serviceClient<player::SendDimensions>("SendDimensions");
 
     // 20 Hz loop
     ros::Rate r(20);
