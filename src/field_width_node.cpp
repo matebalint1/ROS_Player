@@ -214,6 +214,15 @@ int main(int argc, char** argv) {
             process_messages();
         }
 
+        bool set = false;
+        n->param("correct_width_set",set, false);
+        if(set){
+            double w = 0;
+            n->param("field_width", w, 0.0);
+            n->setParam("correct_width_set", false);
+            field_width_out = w;
+        }
+
         if (field_width_out != -1) {
             // Width value set
             geometry_msgs::Vector3 msg;

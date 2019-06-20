@@ -4,18 +4,18 @@
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/image_encodings.h>
 #include "cv_bridge/cv_bridge.h"
+#include "geometry_msgs/Point.h"
 #include "geometry_msgs/Vector3.h"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/opencv.hpp"
+#include "player/SendColor.h"
+#include "player/SendDimensions.h"
+#include "player/TeamReady.h"
 #include "ros/ros.h"
 #include "sensor_msgs/Image.h"
-#include "std_msgs/String.h"
 #include "std_msgs/Bool.h"
 #include "std_msgs/Empty.h"
-#include "geometry_msgs/Point.h"
-#include "../../../devel/include/player/TeamReady.h"
-#include "../../../devel/include/player/SendColor.h"
-#include "../../../devel/include/player/SendDimensions.h"
+#include "std_msgs/String.h"
 
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
@@ -23,8 +23,8 @@
 #include <tf/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
-#include <cstring>
 #include <algorithm>
+#include <cstring>
 #include "pointcloud_helpers.hpp"
 
 enum Robot_state { initialize, drive_to, drive_random, rotate, move, stop };
@@ -34,8 +34,7 @@ enum Game_state {
     look_for_puck,
     drive_to_puck,
     drive_with_puck_to_goal,
-    leave_buck_in_goal,
-    end
+    leave_buck_in_goal
 };
 
 bool got_odometry = false;
@@ -74,7 +73,7 @@ PointCloud collision_avoidance_cloud_msg;
 sensor_msgs::LaserScan laser_msg;
 nav_msgs::Odometry odometry_msg;
 
-bool game_started_msg;
+bool game_started_msg = false;
 
 // --------------------------------------------
 // Play field size and game settings
@@ -207,7 +206,7 @@ void tf_map_to_odom_boardcaster(double x, double y, double yaw) {
 void game_control_callback(const std_msgs::Bool::ConstPtr& msg) {
     // ROS_INFO("Got game control");
     game_started_msg = msg->data;
-    //got_laser = true;
+    // got_laser = true;
 }
 
 void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg) {
@@ -228,36 +227,34 @@ void collision_avoidance_cloud_callback(const PointCloud::ConstPtr& msg) {
 }
 
 void field_width_callback(const geometry_msgs::Vector3::ConstPtr& msg) {
-
-    if( !got_field_width )
-    {
+    if (!got_field_width) {
         geometry_msgs::Vector3 width = *msg;
         field_width = width.x;
         field_length = 5.0 / 3.0 * field_width;
 
         player::SendDimensions send_dimensions_srv;
         send_dimensions_srv.request.team = team_name;
-        send_dimensions_srv.request.dimensions.x = field_length;            //length in METRES!!!! TODO
-        send_dimensions_srv.request.dimensions.y = field_width;             //width in METRES!!! TODO
+        send_dimensions_srv.request.dimensions.x =
+            field_length;  // length in METRES!!!! TODO
+        send_dimensions_srv.request.dimensions.y =
+            field_width;  // width in METRES!!! TODO
         send_dimensions_srv.request.dimensions.z = 0.0;
 
-        if( send_dimensions_client.call( send_dimensions_srv ) )
-        {
-            if( send_dimensions_srv.response.ok )
-            {
-                ROS_INFO( "Dimensions are within error margin" );
-            }
-            else
-            {
-                ROS_INFO( "Dimensions are NOT within error margin" );
+        if (send_dimensions_client.call(send_dimensions_srv)) {
+            if (send_dimensions_srv.response.ok) {
+                ROS_INFO("Dimensions are within error margin");
+            } else {
+                ROS_INFO("Dimensions are NOT within error margin");
             }
 
             field_width = send_dimensions_srv.response.correctDimensions.y;
             field_length = send_dimensions_srv.response.correctDimensions.x;
-        }
-        else
-        {
-            ROS_ERROR( "Failed to call service SendDimensions" );
+
+            // Update width in the field width node
+            n->setParam("correct_width_set", true);
+            n->setParam("field_width", field_width);
+        } else {
+            ROS_ERROR("Failed to call service SendDimensions");
         }
     }
 
@@ -595,20 +592,16 @@ double get_goal_heading_path_planning(double goal_heading,
                                       double goal_distance) {
     // This function calculates the heading for the robot to go around single
     // obstacles.
-    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.0; //m
+    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.0;  // m
     // TODO
     // collision_avoidance_cloud
     double rotation_left = 0;
     double rotation_right = 0;
     // Find optimal rotation rotate left
 
-    for(int rotation = 0; rotation < 180; rotation++){
+    for (int rotation = 0; rotation < 180; rotation++) {
         // Precision of one degree
-
-
-
     }
-
 
     // Rotate right
 
@@ -773,46 +766,31 @@ bool process_messages() {
         }
         ROS_INFO_STREAM("Setting team: " << is_blue_team);
 
-        if( is_blue_team != 1 )
-        {
-            player::SendColor send_color_srv;
-            send_color_srv.request.team = team_name;
+        player::SendColor send_color_srv;
+        send_color_srv.request.team = team_name;
 
-            if( is_blue_team == 1 )
-            {
-                send_color_srv.request.color = "blue";
-            }
-            else
-            {
-                send_color_srv.request.color = "yellow";
-            }
+        if (is_blue_team == 1) {
+            send_color_srv.request.color = "blue";
+        } else {
+            send_color_srv.request.color = "yellow";
+        }
 
-            if( send_color_client.call( send_color_srv ) )
-            {
-                if( send_color_srv.response.ok )
-                {
-                    ROS_INFO( "The color is correct" );
+        if (send_color_client.call(send_color_srv)) {
+            if (send_color_srv.response.ok) {
+                ROS_INFO("The color is correct");
+            } else {
+                ROS_INFO("The color was NOT correct");
+
+                if (is_blue_team == 0) {
+                    is_blue_team = 1;
+                } else {
+                    is_blue_team = 0;
                 }
-                else
-                {
-                    ROS_INFO( "The color was NOT correct" );
 
-                    if( is_blue_team == 0 )
-                    {
-                        is_blue_team = 1;
-                    }
-                    else
-                    {
-                        is_blue_team = 0;
-                    }
-
-                    ROS_INFO_STREAM( "New team color: " << is_blue_team );
-                }
+                ROS_INFO_STREAM("New team color: " << is_blue_team);
             }
-            else
-            {
-                ROS_ERROR( "Failed to call service SendColor" );
-            }
+        } else {
+            ROS_ERROR("Failed to call service SendColor");
         }
     }
 
@@ -994,7 +972,7 @@ void update_robot_state() {
             if (robot_distance_error <= DISTANCE_GOAL_REACHED) {
                 // Goal reached
                 state = stop;
-                // goal_point_x = -1; 
+                // goal_point_x = -1;
                 // goal_point_y = -1;
             } else {
                 // Goal not reached
@@ -1285,6 +1263,15 @@ void update_game_logic(bool data_processing_succesful) {
     // game_state = wait_for_start;
     // return; // debugging
 
+    // Change state when referee tells to
+    if (game_started_msg && game_state == wait_for_start) {
+        game_state = initialize_location;
+    } else if (game_started_msg == false) {
+        game_state = wait_for_start;
+        state = stop;
+        return;
+    }
+
     // Check if robot is outside or inside of the field, if outside ->
     // reinitialize
     if (robot_map_x < 0 || robot_map_x > field_width || robot_map_y < 0 ||
@@ -1296,22 +1283,11 @@ void update_game_logic(bool data_processing_succesful) {
     }
 
     if (game_state == wait_for_start) {
-        // Change state when referee tells to
-        if( game_started_msg )
-        {
-            game_state = initialize_location;
-        }
-
         state = stop;
         ROS_INFO_STREAM("Game state: wait for start");
 
     } else if (game_state == initialize_location) {
         ROS_INFO_STREAM("Game state: initialize_location");
-
-        if( !game_started_msg )
-        {
-            game_state = end;
-        }
 
         if (data_processing_succesful == true) {
             // robot knows where it is -> start playing game
@@ -1325,11 +1301,6 @@ void update_game_logic(bool data_processing_succesful) {
         ROS_INFO_STREAM("Game state: look_for_puck");
         // Choose closest puck and drive to it, if no buck is found
         // robot drives around.
-
-        if( !game_started_msg )
-        {
-            game_state = end;
-        }
 
         if (state == stop || state == drive_to) {
             // Set goal to drive to
@@ -1372,7 +1343,7 @@ void update_game_logic(bool data_processing_succesful) {
             } else if (success == -1) {
                 // All pucks are in the goal of the enemy
                 ROS_INFO_STREAM("All pucks in the goal stopping game!");
-                game_state = end;
+                game_state = wait_for_start;
                 state = stop;
             }
         } else {
@@ -1385,11 +1356,6 @@ void update_game_logic(bool data_processing_succesful) {
 
     } else if (game_state == drive_to_puck) {
         ROS_INFO_STREAM("Game state: drive_to_puck");
-
-        if( !game_started_msg )
-        {
-            game_state = end;
-        }
 
         if (state == stop) {
             // Robot has reached its destination, the puck pick up point.
@@ -1449,11 +1415,6 @@ void update_game_logic(bool data_processing_succesful) {
         ROS_INFO_STREAM("Game state: drive_with_puck_to_goal, team color: "
                         << is_blue_team);
 
-        if( !game_started_msg )
-        {
-            game_state = end;
-        }
-
         if (state == stop) {
             if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)) {
                 state = drive_to;
@@ -1481,12 +1442,6 @@ void update_game_logic(bool data_processing_succesful) {
                                          << " y: " << goal_point_y);
 
     } else if (game_state == leave_buck_in_goal) {
-
-        if( !game_started_msg )
-        {
-            game_state = end;
-        }
-
         // Drive back wards and rotate to leave the puck in the goal
         if (state == stop) {
             // Move/s finished or first move
@@ -1518,11 +1473,10 @@ void update_game_logic(bool data_processing_succesful) {
 
         ROS_INFO_STREAM("Game state: leave_buck_in_goal");
     } else {  // end game
+        game_state = wait_for_start;
         state = stop;
-        ROS_INFO_STREAM("Game state: end");
     }
 }
-
 
 // **************************************************************
 void init_node(int argc, char** argv) {
@@ -1536,44 +1490,33 @@ void init_node(int argc, char** argv) {
     debug_cloud_pub = n->advertise<PointCloud>("play_node/debug", 1);
 
     ROS_INFO("Waiting for referee /waitForTeams");
-    ros::topic::waitForMessage<std_msgs::Empty>(
-            "waitForTeams");
+    ros::topic::waitForMessage<std_msgs::Empty>("waitForTeams");
 
-    team_ready_client = n->serviceClient<player::TeamReady>("TeamReady"); //referee instead of player??
+    team_ready_client = n->serviceClient<player::TeamReady>(
+        "TeamReady");  // referee instead of player??
 
     player::TeamReady team_ready_srv;
-    team_ready_srv.request.team = team_name; //team name
+    team_ready_srv.request.team = team_name;  // team name
 
-    if( team_ready_client.call( team_ready_srv ) )
-    {
-        if( team_ready_srv.response.ok )
-        {
-            ROS_INFO( "Team name granted" );
-        }
-        else
-        {
+    if (team_ready_client.call(team_ready_srv)) {
+        if (team_ready_srv.response.ok) {
+            ROS_INFO("Team name granted");
+        } else {
             team_name = "Not Green peas";
             team_ready_srv.request.team = team_name;
-            team_ready_client.call( team_ready_srv );
+            team_ready_client.call(team_ready_srv);
 
-            if( team_ready_srv.response.ok )
-            {
-                ROS_INFO( "New team name granted" );
-            }
-            else
-            {
-                ROS_ERROR( "DAFUCK" );
+            if (team_ready_srv.response.ok) {
+                ROS_INFO("New team name granted");
+            } else {
+                ROS_ERROR("DAFUCK");
             }
         }
-    }
-    else
-    {
-        ROS_ERROR( "Failed to call service TeamReady" );
+    } else {
+        ROS_ERROR("Failed to call service TeamReady");
     }
 
-    game_control_sub =
-            n->subscribe("gameControl", 1, &game_control_callback);
-
+    game_control_sub = n->subscribe("gameControl", 1, &game_control_callback);
 
     ROS_INFO("Waiting for laser scan message");
     ros::topic::waitForMessage<sensor_msgs::LaserScan>(
@@ -1598,7 +1541,8 @@ void init_node(int argc, char** argv) {
 
     send_color_client = n->serviceClient<player::SendColor>("SendColor");
 
-    send_dimensions_client = n->serviceClient<player::SendDimensions>("SendDimensions");
+    send_dimensions_client =
+        n->serviceClient<player::SendDimensions>("SendDimensions");
 }
 
 int main(int argc, char** argv) {
