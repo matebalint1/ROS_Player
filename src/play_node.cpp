@@ -139,6 +139,8 @@ double robot_map_yaw = 0;
 double closest_obstacle_distance_g = 0;
 double closest_obstacle_direction_g = 0;
 
+double drive_to_left = 0; // control wheter or not to drive to left or right.
+
 // --------------------------------------------
 // Game state parameters
 // --------------------------------------------
@@ -765,7 +767,9 @@ double get_goal_heading_path_planning(double goal_distance,
         rot_right_total = 360 + rot_right_total;
     }*/
     // TODO choose on direction and use it!!
-    if (min_rotation_left < min_rotation_right + 25){
+
+    drive_to_left = 0.8 * drive_to_left + 0.2 * double(min_rotation_left < min_rotation_right);
+    if (/* min_rotation_left < min_rotation_right + 25*/drive_to_left > 0.5){
         return rot_left_total;
     } else { 
         return rot_right_total;
