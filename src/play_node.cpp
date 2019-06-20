@@ -31,6 +31,8 @@
 #include <cstring>
 #include "pointcloud_helpers.hpp"
 
+//#define use_referee
+
 enum Robot_state { initialize, drive_to, drive_random, rotate, move, stop };
 enum Game_state {
     wait_for_start,
@@ -166,7 +168,12 @@ double drive_to_left = 0; // control wheter or not to drive to left or right.
 
 std::string team_name = "Green peas";
 
+#ifdef use_referee
 Game_state game_state = wait_for_start;
+#else
+Game_state game_state = initialize_location;
+#endif
+
 int is_blue_team = -1;  // -1 not set, 0 false, 1 true
 int moves_done = 0;  // used for doing move squences, e.g. leaving buck in goal
 
@@ -1471,6 +1478,7 @@ void update_game_logic(bool data_processing_succesful) {
     // game_state = wait_for_start;
     // return; // debugging
 
+#ifdef use_referee
     // Change state when referee tells to
     if (game_started_msg && game_state == wait_for_start) {
         game_state = initialize_location;
@@ -1479,6 +1487,7 @@ void update_game_logic(bool data_processing_succesful) {
         state = stop;
         return;
     }
+#endif
 
     // Check if robot is outside or inside of the field, if outside ->
     // reinitialize
@@ -1706,7 +1715,8 @@ void init_node(int argc, char** argv) {
     velocity_pub = n->advertise<geometry_msgs::Twist>(addRobotName("/cmd_vel"), 1000);
     debug_cloud_pub = n->advertise<PointCloud>("play_node/debug", 1);
 
-    /*ROS_INFO("Waiting for referee /waitForTeams");
+#ifdef use_referee
+    ROS_INFO("Waiting for referee /waitForTeams");
     ros::topic::waitForMessage<std_msgs::Empty>("waitForTeams");
     ROS_INFO("done");
     team_ready_client = n->serviceClient<player::TeamReady>(
@@ -1731,7 +1741,8 @@ void init_node(int argc, char** argv) {
         }
     } else {
         ROS_ERROR("Failed to call service TeamReady");
-    }*/
+    }
+#endif
 
     game_control_sub = n->subscribe("gameControl", 1, &game_control_callback);
 
