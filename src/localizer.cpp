@@ -32,6 +32,14 @@ bool got_width = false;
 
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_detected_objects;
 
+std::string addRobotName( std::string s )
+{
+    std::string final = "robot";
+    final.append( std::to_string( team_number ) );
+    final.append( s );
+    return final;
+}
+
 void pcl_Callback(const PointCloud::ConstPtr &msg)
 {
     pcl_detected_objects = PointCloudPtr(new PointCloud(*msg));

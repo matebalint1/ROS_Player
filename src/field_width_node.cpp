@@ -32,6 +32,7 @@ const int MIN_NUMBER_OF_SAMPLES = 30;     // Stops after this number is reached
 
 PointCloud map_objects_msg;
 
+
 void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
                   int g, int b) {
     // Filters pointcloud by a specific color
@@ -211,6 +212,15 @@ int main(int argc, char** argv) {
     while (ros::ok()) {
         if (got_messages() && !width_calculation_finished) {
             process_messages();
+        }
+
+        bool set = false;
+        n->param("correct_width_set",set, false);
+        if(set){
+            double w = 0;
+            n->param("field_width", w, 0.0);
+            n->setParam("correct_width_set", false);
+            field_width_out = w;
         }
 
         if (field_width_out != -1) {

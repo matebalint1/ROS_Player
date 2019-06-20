@@ -35,6 +35,14 @@ class PlayNode {
                                      &PlayNode::map_cloud_callback, this);
     }
 
+    std::string addRobotName( std::string s )
+    {
+        std::string final = "robot";
+        final.append( std::to_string( team_number ) );
+        final.append( s );
+        return final;
+    }
+
     void map_cloud_callback(const PointCloud::ConstPtr &msg) {
         // ROS_INFO("Got new detected objects");
 

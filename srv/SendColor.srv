@@ -1,0 +1,5 @@
+string team
+string color
+---
+bool ok
+string correctColor

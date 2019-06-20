@@ -47,6 +47,14 @@ class PlayNode {
                          &PlayNode::detected_objects_callback, this);
     }
 
+    std::string addRobotName( std::string s )
+    {
+        std::string final = "robot";
+        final.append( std::to_string( team_number ) );
+        final.append( s );
+        return final;
+    }
+
     void detected_objects_callback(const PointCloudRGBA::ConstPtr &msg) {
         // ROS_INFO("Got new detected objects");
 

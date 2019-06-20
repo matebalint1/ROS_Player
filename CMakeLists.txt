@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   message_filters
   pcl_ros
+  message_generation                                                                
 )
 
 ## System dependencies are found with CMake's conventions
@@ -57,12 +58,13 @@ catkin_python_setup()
 #   Message2.msg
 # )
 
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+# Generate services in the 'srv' folder
+ add_service_files(
+   FILES
+   SendColor.srv
+   SendDimensions.srv
+   TeamReady.srv
+ )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -71,11 +73,12 @@ catkin_python_setup()
 #   Action2.action
 # )
 
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+# Generate added messages and services with any dependencies listed header                  
+ generate_messages(
+   DEPENDENCIES
+   std_msgs
+   geometry_msgs
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -111,6 +114,7 @@ catkin_package(
 #  LIBRARIES robohockey
 #  CATKIN_DEPENDS roscpp std_msgs
 #  DEPENDS system_lib
+CATKIN_DEPENDS message_runtime
 )
 
 ###########
