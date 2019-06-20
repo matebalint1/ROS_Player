@@ -592,24 +592,6 @@ bool is_obstacle_between_robot_and_goal(double closest_obstacle_distance,
     }
 }
 
-<<<<<<< HEAD
-double get_goal_heading_path_planning(double goal_heading,
-                                      double goal_distance) {
-    // This function calculates the heading for the robot to go around single
-    // obstacles.
-    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1.0;  // m
-    // TODO
-    // collision_avoidance_cloud
-    double rotation_left = 0;
-    double rotation_right = 0;
-    // Find optimal rotation rotate left
-
-    for (int rotation = 0; rotation < 180; rotation++) {
-        // Precision of one degree
-    }
-
-    // Rotate right
-=======
 bool goal_point_inside_of_rectancle(double x, double y){
     if(y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
        y < ROBOT_SAFE_ZONE_WIDTH / 2.0){
@@ -732,7 +714,6 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
         } else {
             x_limit = MIN_FREE_SPACE_IN_FRONT_OF_ROBOT;
         }
->>>>>>> 886fa95f5019eb151bb3257f1b5b77a9a95b5933
 
         bool obstacle_inside = false;
         double smalles_x = 4;
