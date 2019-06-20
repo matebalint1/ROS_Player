@@ -725,10 +725,8 @@ bool process_messages() {
 
     if (succesful_robot_pos_tf == false || got_field_width == false ||
         transformation_set == false || tf_delay_counter <= 10) {
-        ROS_INFO_STREAM("Map to Odom transformation missing, rotating.");
+        ROS_INFO_STREAM("Map to Odom transformation missing");
         // Make robot rotate untill location and field width found.
-
-        // set_velocities(0, MAX_ROTATIONAL_SPEEED);
         return false;  // disable for debugging
     }
 
