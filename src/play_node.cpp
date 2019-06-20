@@ -1720,7 +1720,7 @@ void init_node(int argc, char** argv) {
     ros::init(argc, argv, "play_node");
     n = std::make_unique<ros::NodeHandle>();
 
-    n->getParam( "play_node/param_1", team_number );
+    n->getParam( "play_node/team", team_number );
 
     ROS_INFO_STREAM("Team number: " << team_number << "\n" );
 

@@ -26,6 +26,8 @@ class PlayNode {
     PlayNode(int argc, char **argv) {
         ros::init(argc, argv, "map_node");
         n = std::make_unique<ros::NodeHandle>();
+
+        n->getParam( "map_node/team", team_number );
         map_pub = n->advertise<PointCloud>("map_node/map", 1);
         map_raw_pub = n->advertise<PointCloud>("map_node/map_raw", 1);
 
@@ -70,7 +72,7 @@ class PlayNode {
 
     void pub_pointcloud(PointCloudRGBA &cloud, ros::Publisher &pub) {
         PointCloudPtrRGBA msg(new PointCloudRGBA);
-        msg->header.frame_id = "robot1/odom";
+        msg->header.frame_id = addRobotName("/odom");
 
         msg->height = cloud.height;
         msg->width = cloud.width;
@@ -488,7 +490,7 @@ class PlayNode {
 
         tf::Transform transform_odom_to_map;
         bool succesful_robot_pos_tf = get_transform(
-            transform_odom_to_map, tfBuffer, "map", "robot1/odom");
+            transform_odom_to_map, tfBuffer, "map", addRobotName("/odom"));
 
         bool transformation_set = false;
         n->param("transformation_map_to_odom_set", transformation_set, false);
@@ -753,6 +755,8 @@ class PlayNode {
     PointCloudRGBA detected_objects_msg;
     PointCloudPtrRGBA map_cloud;   // contains points of individual detections
     PointCloudPtrRGBA temp_cloud;  // temorary
+
+    int team_number = 1;
 };
 
 int main(int argc, char **argv) {

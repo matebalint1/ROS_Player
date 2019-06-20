@@ -142,7 +142,7 @@ include_directories(
 ## Declare a C++ executable
 
 #add_executable(player_node src/playnode.cpp)
-add_executable(localizer_node src/localizer.cpp)
+#add_executable(localizer_node src/localizer.cpp)
 add_executable(play_node src/play_node.cpp)
 add_executable(pointcloud_node src/pointcloud_node.cpp)
 add_executable(map_node src/map_node.cpp)
@@ -153,7 +153,7 @@ add_executable(location_node src/location_node.cpp)
 ## same as for the library above
 
 #add_dependencies(player_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(localizer_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+#add_dependencies(localizer_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(play_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(pointcloud_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(map_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -172,10 +172,10 @@ target_link_libraries(pointcloud_node
   ${OpenCV_LIBRARIES}
 )
 
-target_link_libraries(localizer_node
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-)
+#target_link_libraries(localizer_node
+#  ${catkin_LIBRARIES}
+#  ${OpenCV_LIBRARIES}
+#)
 
 target_link_libraries(map_node
   ${catkin_LIBRARIES}

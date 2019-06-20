@@ -20,6 +20,7 @@ class PlayNode {
         ros::init(argc, argv, "location_node");
         n = std::make_unique<ros::NodeHandle>();
         n->setParam("transformation_map_to_odom_set", false);
+        n->getParam( "location_node/team", team_number );
 
         ROS_INFO("Waiting for map_node/map");
         ros::topic::waitForMessage<PointCloud>("map_node/map");
@@ -295,6 +296,8 @@ class PlayNode {
 
     PointCloud map_cloud_msg;
     double field_width = 3;
+
+    int team_number = 1;
 };
 
 int main(int argc, char **argv) {
