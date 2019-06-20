@@ -608,9 +608,9 @@ double find_free_drive_direction(int direction, PointCloudPtr& cloud,
             double x = cloud->points[i].x;
             double y = cloud->points[i].y;
 
-            if (x > 0.0 && x <= x_limit && // TODO test 0.2 -> 0
-                y > -ROBOT_SAFE_ZONE_WIDTH / 2.0 &&
-                y < ROBOT_SAFE_ZONE_WIDTH / 2.0) {
+            if (x > 0.0 && x <= x_limit &&
+                y > -(ROBOT_SAFE_ZONE_WIDTH + 0.1) / 2.0 &&
+                y < (ROBOT_SAFE_ZONE_WIDTH + 0.1) / 2.0) {
                 // obstacle inside of rectangle and not closer than the goal point
                 obstacle_inside = true;
                 break;
@@ -657,7 +657,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
 
         double x_limit;
         if(goal_inside_rect){
-            // Add 0.2 to ensure that the region behind the goal is also safe
+            // Add 0.1 to ensure that the region behind the goal is also safe
             x_limit = fmin(goal_point_x_rotated + 0.1, MIN_FREE_SPACE_IN_FRONT_OF_ROBOT);
         } else {
             x_limit = MIN_FREE_SPACE_IN_FRONT_OF_ROBOT;
@@ -730,67 +730,34 @@ double get_goal_heading_path_planning(double goal_distance,
     PointCloudPtr cloud_left(new PointCloud(*cloud));
     PointCloudPtr cloud_right(new PointCloud(*cloud));
 
-    //double min_rotation_left = find_free_drive_direction(1, cloud_left, goal_distance); // degrees
-    //double min_rotation_right = find_free_drive_direction(-1, cloud_right, goal_distance); // degrees
-    double min_rotation_left;
-    double min_rotation_right;
-    double total_space_left;
-    double total_space_right;
-    find_free_drive_direction_and_total_space(1, cloud_left, goal_distance, total_space_left, min_rotation_left);
-    find_free_drive_direction_and_total_space(-1, cloud_right, goal_distance, total_space_right, min_rotation_right);
+    double min_rotation_left = find_free_drive_direction(1, cloud_left, goal_distance); // degrees
+    double min_rotation_right = find_free_drive_direction(-1, cloud_right, goal_distance); // degrees
+    //double min_rotation_left;
+    //double min_rotation_right;
+    //double total_space_left;
+    //double total_space_right;
+    //find_free_drive_direction_and_total_space(1, cloud_left, goal_distance, total_space_left, min_rotation_left);
+    //find_free_drive_direction_and_total_space(-1, cloud_right, goal_distance, total_space_right, min_rotation_right);
 
-    // Compare roatations to the left and right and transform to radians as heading error
+    // Compare rotations to the left and right and transform to radians as heading error
     // of the robot
-
-
-
     double rot_left_total = min_rotation_left * 3.1415 / 180.0 + goal_heading;
     double rot_right_total = -min_rotation_right * 3.1415 / 180.0 + goal_heading;
 
     std::cout << "Rot to left: " << min_rotation_left << std::endl;
     std::cout << "Rot to right: " << min_rotation_right << std::endl;
-    std::cout << "Total space to left: " << total_space_left << std::endl;
-    std::cout << "Total space to right: " << total_space_right << std::endl;
+    //std::cout << "Total space to left: " << total_space_left << std::endl;
+    //std::cout << "Total space to right: " << total_space_right << std::endl;
     std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
     std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
-    
-    //if (fabs(min_rotation_left - min_rotation_right) < 45 * 3.1415/180){
-        // if difference is small chooce always to left
-    //    return rot_left_total;
-    //}
 
-    /*if (rot_left_total > 180){
-        rot_left_total = 360 - rot_left_total;
-    }
-
-    if (rot_right_total < 180){
-        rot_right_total = 360 + rot_right_total;
-    }*/
-    // TODO choose on direction and use it!!
-
+    // Use averaging to stick on the decision to use the same direction
     drive_to_left = 0.95 * drive_to_left + 0.05 * double(min_rotation_left < min_rotation_right);
-    if (/* min_rotation_left < min_rotation_right + 25*/drive_to_left > 0.5){
+    if (drive_to_left > 0.5){
         return rot_left_total;
     } else { 
         return rot_right_total;
     }
-
-    /*int angle_diff = fabs(min_rotation_left - min_rotation_right);
-    if (angle_diff <= 30 ){ // Todo test if works
-        // Small difference -> go into the direction of smaller total difference
-        if (fabs(rot_left_total) < fabs(rot_right_total)){
-            return rot_left_total;
-        } else { 
-            return rot_right_total;
-        }
-
-    } else { 
-        if (min_rotation_left < min_rotation_right){
-            return rot_left_total;
-        } else { 
-            return rot_right_total;
-        }
-    }*/
 }
 
 void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
