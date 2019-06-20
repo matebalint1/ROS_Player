@@ -768,7 +768,7 @@ double get_goal_heading_path_planning(double goal_distance,
     }*/
     // TODO choose on direction and use it!!
 
-    drive_to_left = 0.8 * drive_to_left + 0.2 * double(min_rotation_left < min_rotation_right);
+    drive_to_left = 0.9 * drive_to_left + 0.1 * double(min_rotation_left < min_rotation_right);
     if (/* min_rotation_left < min_rotation_right + 25*/drive_to_left > 0.5){
         return rot_left_total;
     } else { 
