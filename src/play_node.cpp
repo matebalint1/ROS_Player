@@ -13,9 +13,9 @@
 #include "std_msgs/Bool.h"
 #include "std_msgs/Empty.h"
 #include "geometry_msgs/Point.h"
-#include "../../../devel/include/player/TeamReady.h"
-#include "../../../devel/include/player/SendColor.h"
-#include "../../../devel/include/player/SendDimensions.h"
+#include "player/TeamReady.h" //../../../devel/include/
+#include "player/SendColor.h"
+#include "player/SendDimensions.h"
 
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
