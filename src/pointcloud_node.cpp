@@ -24,6 +24,7 @@ class PlayNode {
     PlayNode(int argc, char **argv) {
         ros::init(argc, argv, "pointcloud_node");
         n = std::make_unique<ros::NodeHandle>();
+        n->getParam( "pointcloud_node/team", team_number );
 
         tfBuffer = new tf2_ros::Buffer(ros::Duration(100));
         tf_listener = new tf2_ros::TransformListener(*tfBuffer);
@@ -196,6 +197,7 @@ class PlayNode {
     PointCloud kinect_msg;
 
     PointcloudProcessor pointcloud_processor;
+    int team_number = 1;
 };
 
 int main(int argc, char **argv) {
