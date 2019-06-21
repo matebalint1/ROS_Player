@@ -819,13 +819,13 @@ double get_goal_heading_path_planning(double goal_distance,
     PointCloudPtr cloud_left(new PointCloud(*cloud));
     PointCloudPtr cloud_right(new PointCloud(*cloud));
 
-    if(goal_distance < 0.8){ // TODO testing
+    /*if(goal_distance < 0.8){ // TODO testing
         double closest_obstacle_to_goal = get_closest_obstacle_distance_to_goal_point(cloud_left,goal_distance);
         if(closest_obstacle_to_goal < 0.1){
             // obstacle too close -> stop robot
             state = stop;
         }
-    }
+    }*/
     
 
     double min_rotation_left = find_free_drive_direction(1, cloud_left, goal_distance); // degrees
