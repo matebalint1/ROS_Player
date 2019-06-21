@@ -854,7 +854,7 @@ double get_goal_heading_path_planning(double goal_distance,
     if (drive_to_left > 0.5){
         return rot_left_total;
     } else { 
-        return rot_right_total;
+        return rot_right_total; 
     }
 }
 
@@ -1339,8 +1339,8 @@ void update_robot_state() {
     robot_map_last_yaw = robot_map_yaw;
 
     // Update safety_zone_x_offset base on robot angular speed
-    safety_zone_x_offset =SAFETY_ZONE_X_OFFSET_MAX
-        ;  // fmin(fmax(0, -/MAX_ROTATIONAL_SPEEED *
+    safety_zone_x_offset =SAFETY_ZONE_X_OFFSET_MAX;
+      // fmin(fmax(0, -/MAX_ROTATIONAL_SPEEED *
               // speed_rotational + SAFETY_ZONE_X_OFFSET_MAX),
               // SAFETY_ZONE_X_OFFSET_MAX);
     // ROS_INFO_STREAM("safety_zone_x_offset: " << safety_zone_x_offset);
@@ -1671,9 +1671,25 @@ void update_game_logic(bool data_processing_succesful) {
                 goal_point_x = field_width / 2.0;
                 // Drive to goal
                 if (is_blue_team == 0) {
-                    goal_point_y = 0.1 * field_length + 0.25;
+                    if(robot_map_y > 0.1 * field_length && robot_map_y < 0.1 * field_length + 0.5){
+                        // middle
+                        goal_point_y = 0.1 * field_length + 0.25;
+                    }else if(robot_map_y > 0.1 * field_length + 0.5){
+                        goal_point_y = 0.1 * field_length + 0.5;
+                    } else {
+                         goal_point_y = 0.1 * field_length;
+                    }
+                    
                 } else {
-                    goal_point_y = 0.9 * field_length - 0.25;
+
+                    if(robot_map_y < 0.9 * field_length && robot_map_y > 0.9 * field_length - 0.5){
+                        // middle
+                        goal_point_y = 0.9 * field_length - 0.25;
+                    }else if(robot_map_y < 0.9 * field_length - 0.5){
+                        goal_point_y = 0.9 * field_length - 0.5;
+                    } else {
+                         goal_point_y = 0.9 * field_length;
+                    }
                 }
             } else {
                 // Already in goal -> change to next state
@@ -1819,4 +1835,3 @@ int main(int argc, char** argv) {
     set_velocities(0, 0);
     return 0;
 }
-
