@@ -768,6 +768,25 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
 
 }
 
+double get_closest_obstacle_distance_to_goal_point(PointCloudPtr& cloud, double goal_distance){
+    // Input cloud must be aligned so that x axis points directly to goal
+    double closest_obs_distance = 100;
+
+    double goal_y = 0;
+    double goal_x = goal_distance;
+
+    for(int i = 0; i < cloud->points.size(); i++){
+        double x = cloud->points[i].x;
+        double y = cloud->points[i].y;
+        double distance = distance_between_points(goal_x, goal_y, x, y);
+
+        if(distance < closest_obs_distance){
+            closest_obs_distance = distance;
+        }
+    }
+    return closest_obs_distance;
+}
+
 double get_goal_heading_path_planning(double goal_distance,
                                       double goal_heading) {
     // This function calculates the heading for the robot to go around single
@@ -799,6 +818,15 @@ double get_goal_heading_path_planning(double goal_distance,
     // Make copies of each cloud for both directions
     PointCloudPtr cloud_left(new PointCloud(*cloud));
     PointCloudPtr cloud_right(new PointCloud(*cloud));
+
+    if(goal_distance < 0.8){ // TODO testing
+        double closest_obstacle_to_goal = get_closest_obstacle_distance_to_goal_point(cloud_left,goal_distance);
+        if(closest_obstacle_to_goal < 0.1){
+            // obstacle too close -> stop robot
+            state = stop;
+        }
+    }
+    
 
     double min_rotation_left = find_free_drive_direction(1, cloud_left, goal_distance); // degrees
     double min_rotation_right = find_free_drive_direction(-1, cloud_right, goal_distance); // degrees
