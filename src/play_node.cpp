@@ -31,7 +31,7 @@
 #include <cstring>
 #include "pointcloud_helpers.hpp"
 
-//#define use_referee
+#define use_referee
 
 enum Robot_state { initialize, drive_to, drive_random, rotate, move, stop };
 enum Game_state {
