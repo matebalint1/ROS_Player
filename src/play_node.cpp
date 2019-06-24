@@ -868,7 +868,7 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
                                             goal_point_distance, goal_point_direction);
 
     if (game_state == initialize_location){ 
-        // do use collision avoidance in initialization
+        // do not use collision avoidance in initialization
         robot_heading_error = goal_point_direction;
     }
 
@@ -1224,28 +1224,38 @@ void update_robot_state() {
     if (state == initialize) {
     } else if (state == drive_random) {
     } else if (state == drive_to) {
-        // Check if goal is valid or it has been reached already
-        if (goal_point_x > 0 && goal_point_y > 0 &&
-            goal_point_x < field_width && goal_point_y < field_length) {
-            // Valid goal, calculate errors
+        if(game_state != initialize_location)
+            // Check if goal is valid or it has been reached already
+            if (goal_point_x > 0 && goal_point_y > 0 &&
+                goal_point_x < field_width && goal_point_y < field_length) {
+                // Valid goal, calculate errors
+                to_polar(goal_point_x, goal_point_y, robot_distance_error,
+                        robot_yaw_error, robot_map_x, robot_map_y, robot_map_yaw);
+
+                if (robot_distance_error <= DISTANCE_GOAL_REACHED) {
+                    // Goal reached
+                    state = stop;
+                    // goal_point_x = -1;
+                    // goal_point_y = -1;
+                } else {
+                    // Goal not reached
+                    state = drive_to;
+                }
+            } else {
+                // No valid goal point change state to stop
+                state = stop;
+            }
+        } else {
+            // Initialization -> different rules (drive outside of field)
             to_polar(goal_point_x, goal_point_y, robot_distance_error,
-                     robot_yaw_error, robot_map_x, robot_map_y, robot_map_yaw);
+                    robot_yaw_error, robot_map_x, robot_map_y, robot_map_yaw);
 
             if (robot_distance_error <= DISTANCE_GOAL_REACHED) {
                 // Goal reached
                 state = stop;
-                // goal_point_x = -1;
-                // goal_point_y = -1;
             } else {
                 // Goal not reached
                 state = drive_to;
-            }
-        } else {
-            if (game_state == initialize_location){
-                // In this state everythin is allowed
-            } else {
-                // No valid goal point change state to stop
-                state = stop;
             }
         }
 
@@ -1667,7 +1677,7 @@ void update_game_logic(bool data_processing_succesful) {
                     // Set team color:
                     set_team_color(color);
                 } else {
-                    // not fould -> try again
+                    // not found -> try again
                     state = rotate;
                     rotation_to_go = 2*3.1415;
                     moves_done = 1;
