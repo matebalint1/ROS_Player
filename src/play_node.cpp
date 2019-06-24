@@ -799,15 +799,15 @@ double get_goal_heading_path_planning(double goal_distance,
     remove_points_inside_puck_carry_zone(cloud);
     PointCloudPtr temp(new PointCloud);
 
-    if (game_state != initialize_location){ // do not avoid edges when initializing robot
-        // Generate field edge cloud in map frame
-        PointCloudPtr field_edges_map = get_ideal_field_edge_cloud(field_width);
 
-        // Rotate edge cloud to base_link
-        pcl_ros::transformPointCloud(*field_edges_map, *temp,
-                                    transform_map_to_baselink);
-        *cloud += *temp; // combine clouds
-    }
+    // Generate field edge cloud in map frame
+    PointCloudPtr field_edges_map = get_ideal_field_edge_cloud(field_width);
+
+    // Rotate edge cloud to base_link
+    pcl_ros::transformPointCloud(*field_edges_map, *temp,
+                                transform_map_to_baselink);
+    *cloud += *temp; // combine clouds
+    
    
     // Rotate cloud so that x-axis points to the direction of the goal
     Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
@@ -863,9 +863,15 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
                          double closest_obstacle_distance,
                          double closest_obstacle_direction,
                          double goal_point_distance, double goal_point_direction) {
-
+    
     double robot_heading_error = get_goal_heading_path_planning(
                                             goal_point_distance, goal_point_direction);
+
+    if (game_state == initialize_location){ 
+        // do use collision avoidance in initialization
+        robot_heading_error = goal_point_direction;
+    }
+
     // Set linear speed
     speed_linear = fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED / DISTANCE_LINEAR_FREE *
                                                                     goal_point_distance);
