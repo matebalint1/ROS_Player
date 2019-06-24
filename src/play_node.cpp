@@ -1224,7 +1224,7 @@ void update_robot_state() {
     if (state == initialize) {
     } else if (state == drive_random) {
     } else if (state == drive_to) {
-        if(game_state != initialize_location)
+        if(game_state != initialize_location){
             // Check if goal is valid or it has been reached already
             if (goal_point_x > 0 && goal_point_y > 0 &&
                 goal_point_x < field_width && goal_point_y < field_length) {
