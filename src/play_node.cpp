@@ -1635,12 +1635,12 @@ void update_game_logic(bool data_processing_succesful) {
     } else if (game_state == initialize_location) {
         ROS_INFO_STREAM("Game state: initialize_location");
 
-        //if (data_processing_succesful == true) {
+        if (data_processing_succesful == true) {
             // robot knows where it is -> start playing game
-        //    state = stop;
-       //     game_state = look_for_puck;
-       //     moves_done = 0; // reset counter
-       // } else {
+            state = stop;
+            game_state = look_for_puck;
+            moves_done = 0; // reset counter
+        } else {
             // Robot does not know where it is
             // -> rotate 360
             // -> drive to closest puck
@@ -1678,7 +1678,7 @@ void update_game_logic(bool data_processing_succesful) {
                 state = initialize;
                 moves_done = 0;
             }  
-        //}
+        }
 
     } else if (game_state == look_for_puck) {
         ROS_INFO_STREAM("Game state: look_for_puck");
