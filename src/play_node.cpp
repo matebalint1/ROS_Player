@@ -31,7 +31,7 @@
 #include <cstring>
 #include "pointcloud_helpers.hpp"
 
-#define use_referee
+//#define use_referee
 
 enum Robot_state { initialize, drive_to, drive_random, rotate, move, stop };
 enum Game_state {
@@ -1624,12 +1624,12 @@ void update_game_logic(bool data_processing_succesful) {
     } else if (game_state == initialize_location) {
         ROS_INFO_STREAM("Game state: initialize_location");
 
-        if (data_processing_succesful == true) {
+        //if (data_processing_succesful == true) {
             // robot knows where it is -> start playing game
-            state = stop;
-            game_state = look_for_puck;
-            moves_done = 0; // reset counter
-        } else {
+        //    state = stop;
+       //     game_state = look_for_puck;
+       //     moves_done = 0; // reset counter
+       // } else {
             // Robot does not know where it is
             // -> rotate 360
             // -> drive to closest puck
@@ -1660,7 +1660,7 @@ void update_game_logic(bool data_processing_succesful) {
                     state = rotate;
                     rotation_to_go = 2*3.1415;
                     moves_done = 1;
-                }
+              //  }
                 
             } else if (state = stop){
                 // robot moved to closest puck -> rotate untill position found
