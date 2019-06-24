@@ -1660,14 +1660,14 @@ void update_game_logic(bool data_processing_succesful) {
                     state = rotate;
                     rotation_to_go = 2*3.1415;
                     moves_done = 1;
-              //  }
+                }
                 
             } else if (state = stop){
                 // robot moved to closest puck -> rotate untill position found
                 state = initialize;
                 moves_done = 0;
             }  
-        }
+        //}
 
     } else if (game_state == look_for_puck) {
         ROS_INFO_STREAM("Game state: look_for_puck");
