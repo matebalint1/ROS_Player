@@ -1089,7 +1089,7 @@ bool process_messages() {
         // Make robot rotate untill location and field width found.
         return false;  // disable for debugging
     }
-/*
+
    // ---------------------------------------------------------
    // Game has started -> set team:
    // ---------------------------------------------------------
@@ -1131,7 +1131,7 @@ bool process_messages() {
         }
     }
 
-    
+ /*   
     // -------------------------------------------------
     // Find closest obstacle in collision_avoidance_cloud
     // -------------------------------------------------
