@@ -1401,12 +1401,29 @@ bool point_inside_goal(double x, double y, bool check_blue_goal) {
     return false;
 }
 
+bool point_inside_goal_and_close_area(double x, double y, bool check_blue_goal) {
+    double margin = 0.2; // m
+    if (check_blue_goal) {
+        if (x > field_width / 2.0 - 0.5 - margin && x < field_width / 2.0 + 0.5 + margin&&
+            y > field_length * 0.1 - margin&& y < field_length * 0.1 + 0.5 + margin) {
+            return true;
+        }
+    } else {
+        // Check yellow goal, on the other side of the field.
+        if (x > field_width / 2.0 - 0.5 - margin && x < field_width / 2.0 + 0.5 + margin &&
+            y > field_length * 0.9 - 0.5 - margin && y < field_length * 0.9 + margin) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool is_robot_in_home_goal(double x, double y) {
     return point_inside_goal(x, y, is_blue_team == 1);
 }
 
 bool is_robot_in_enemy_goal(double x, double y) {
-    return point_inside_goal(x, y, is_blue_team == 0);
+    return point_inside_goal_and_close_area(x, y, is_blue_team == 0);
 }
 
 bool robot_has_puck() {
