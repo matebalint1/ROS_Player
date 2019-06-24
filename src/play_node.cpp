@@ -939,20 +939,134 @@ bool process_messages() {
         // return false;
     }
 
-    // -------------------------------------------------
-    // Prepare laser collision avoidance data
-    // -------------------------------------------------
+    // Update robot pos if tf succesful---------------------------------
+    if(succesful_robot_pos_tf == true && 
+        succesful_laser_tf == true && 
+        succesful_odom_baselink == true){
+        // -------------------------------------------------
+        // Prepare laser collision avoidance data
+        // -------------------------------------------------
 
-    // save_cloud_to_file(temp, "/home/cnc/Desktop/Hockey/laser_old.pcd");
+        // Convert laser to pointcloud
+        sensor_msgs::LaserScan cur_laser = laser_msg;
 
-    // Convert laser to pointcloud
-    sensor_msgs::LaserScan cur_laser = laser_msg;
+        temp = laser_msg_to_pointcloud(cur_laser);
 
-    temp = laser_msg_to_pointcloud(cur_laser);
+        // Transform cloud to base_link frame
+        pcl_ros::transformPointCloud(*temp, *laser_cloud,
+                                    transform_laser_to_baselink);
 
-    // Transform cloud to base_link frame
-    pcl_ros::transformPointCloud(*temp, *laser_cloud,
-                                 transform_laser_to_baselink);
+            // Robot position in map frame
+        tf::Matrix3x3 rotation(transform_base_link_to_map.getRotation());
+        double roll, pitch, yaw;
+        rotation.getRPY(roll, pitch, yaw);
+
+        ROS_INFO_STREAM("Robot position x,y,yaw "
+                        << transform_base_link_to_map.getOrigin().getX() << " "
+                        << transform_base_link_to_map.getOrigin().getY() << " "
+                        << yaw);
+
+        // Robot position in odom frame
+
+        // -------------------------------------------------
+        // Robot position in the map frame
+        // -------------------------------------------------
+
+        robot_map_x =
+            transform_base_link_to_map.getOrigin().getX();  // m, in map frame
+        robot_map_y =
+            transform_base_link_to_map.getOrigin().getY();  // m, in map frame
+        robot_map_yaw = yaw;                                // rad in map frame
+
+        if (robot_map_last_x == -1 && robot_map_last_y == -1) {
+            // Initialize, first time
+            robot_map_last_x = robot_map_x;
+            robot_map_last_y = robot_map_y;
+            robot_map_last_yaw = robot_map_yaw;
+        }
+
+
+        // -------------------------------------------------
+        // Prepare kinect collision avoidance data
+        // -------------------------------------------------
+
+        // Transform to baselink frame
+        pcl_ros::transformPointCloud(collision_avoidance_cloud_msg,
+                                    *collision_avoidance_cloud,
+                                    transform_odom_to_baselink);
+
+        *collision_avoidance_cloud += *laser_cloud;  // combine data
+
+        // -------------------------------------------------
+        // Prepare map data
+        // -------------------------------------------------
+        PointCloudPtr map_cloud(new PointCloud);
+        PointCloudPtr safe_points(new PointCloud);
+
+        // Transform to baselink frame
+        PointCloudPtr temp2(new PointCloud(map_objects_msg));
+        pcl_ros::transformPointCloud(*temp2, *map_cloud,
+                                    transform_odom_to_baselink);
+        // std::cout << "map cloud: " << map_cloud->points.size() << std::endl;
+
+        // Filter pucks to a own cloud
+        color_filter(map_cloud, temp, 0, 0, 255);  // Blue
+        *safe_points = *temp;
+        color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
+        *safe_points += *temp;
+
+        safe_points->is_dense = false;
+        safe_points->width = 1;
+        safe_points->height = safe_points->points.size();
+
+        // Map data for playing game, e.g. transform cloud to map frame
+        pcl_ros::transformPointCloud(*temp2, *map_cloud_in_map_frame,
+                                    transform_odom_to_map);
+
+        // -------------------------------------------------
+        // Apply masks for the collision avoidance data, e.g. add safe zones
+        // -------------------------------------------------
+
+        // Do not avoid any bucks -> remove all pucks from the collision
+        // avoidance cloud
+        double safe_zone_radius = 0.2;  // m
+
+        pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+        pcl::ExtractIndices<PointType> extract;
+
+        // Add safe zone around pucks (robot does not avoid them)
+        for (int i = 0; i < safe_points->points.size(); i++) {
+            for (int j = 0; j < collision_avoidance_cloud->points.size(); j++) {
+                if (distance_between_points(
+                        safe_points->points[i].x, safe_points->points[i].y,
+                        collision_avoidance_cloud->points[j].x,
+                        collision_avoidance_cloud->points[j].y) <=
+                    safe_zone_radius) {
+                    // Remove these points
+                    inliers->indices.push_back(j);
+                }
+            }
+        }
+        // std::cout << "safe zones: " << safe_points->points.size() << std::endl;
+
+        extract.setInputCloud(collision_avoidance_cloud);
+        extract.setIndices(inliers);
+        extract.setNegative(true);
+        extract.filter(*collision_avoidance_cloud);
+
+        collision_avoidance_cloud->is_dense = false;
+        collision_avoidance_cloud->width = 1;
+        collision_avoidance_cloud->height =
+            collision_avoidance_cloud->points.size();
+
+        // For debugging
+        pub_pointcloud(*collision_avoidance_cloud, debug_cloud_pub);
+    }
+
+   // ---------------------------------------------------------
+   // Check if location is really known
+   // ---------------------------------------------------------
+
     bool transformation_set = false;
     n->param("transformation_map_to_odom_set", transformation_set, false);
 
@@ -968,35 +1082,10 @@ bool process_messages() {
         // Make robot rotate untill location and field width found.
         return false;  // disable for debugging
     }
-
-    // Robot position in map frame
-    tf::Matrix3x3 rotation(transform_base_link_to_map.getRotation());
-    double roll, pitch, yaw;
-    rotation.getRPY(roll, pitch, yaw);
-
-    ROS_INFO_STREAM("Robot position x,y,yaw "
-                    << transform_base_link_to_map.getOrigin().getX() << " "
-                    << transform_base_link_to_map.getOrigin().getY() << " "
-                    << yaw);
-
-    // Robot position in odom frame
-
-    // -------------------------------------------------
-    // Robot position in the map frame
-    // -------------------------------------------------
-
-    robot_map_x =
-        transform_base_link_to_map.getOrigin().getX();  // m, in map frame
-    robot_map_y =
-        transform_base_link_to_map.getOrigin().getY();  // m, in map frame
-    robot_map_yaw = yaw;                                // rad in map frame
-
-    if (robot_map_last_x == -1 && robot_map_last_y == -1) {
-        // Initialize, first time
-        robot_map_last_x = robot_map_x;
-        robot_map_last_y = robot_map_y;
-        robot_map_last_yaw = robot_map_yaw;
-    }
+/*
+   // ---------------------------------------------------------
+   // Game has started -> set team:
+   // ---------------------------------------------------------
 
     if (is_blue_team == -1) {
         // Initialize team setting once in the begining
@@ -1035,82 +1124,7 @@ bool process_messages() {
         }
     }
 
-    // -------------------------------------------------
-    // Prepare kinect collision avoidance data
-    // -------------------------------------------------
-
-    // Transform to baselink frame
-    pcl_ros::transformPointCloud(collision_avoidance_cloud_msg,
-                                 *collision_avoidance_cloud,
-                                 transform_odom_to_baselink);
-
-    *collision_avoidance_cloud += *laser_cloud;  // combine data
-
-    // -------------------------------------------------
-    // Prepare map data
-    // -------------------------------------------------
-    PointCloudPtr map_cloud(new PointCloud);
-    PointCloudPtr safe_points(new PointCloud);
-
-    // Transform to baselink frame
-    PointCloudPtr temp2(new PointCloud(map_objects_msg));
-    pcl_ros::transformPointCloud(*temp2, *map_cloud,
-                                 transform_odom_to_baselink);
-    // std::cout << "map cloud: " << map_cloud->points.size() << std::endl;
-
-    // Filter pucks to a own cloud
-    color_filter(map_cloud, temp, 0, 0, 255);  // Blue
-    *safe_points = *temp;
-    color_filter(map_cloud, temp, 255, 255, 0);  // Yelllow
-    *safe_points += *temp;
-
-    safe_points->is_dense = false;
-    safe_points->width = 1;
-    safe_points->height = safe_points->points.size();
-
-    // Map data for playing game, e.g. transform cloud to map frame
-    pcl_ros::transformPointCloud(*temp2, *map_cloud_in_map_frame,
-                                 transform_odom_to_map);
-
-    // -------------------------------------------------
-    // Apply masks for the collision avoidance data, e.g. add safe zones
-    // -------------------------------------------------
-
-    // Do not avoid any bucks -> remove all pucks from the collision
-    // avoidance cloud
-    double safe_zone_radius = 0.2;  // m
-
-    pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-    pcl::ExtractIndices<PointType> extract;
-
-    // Add safe zone around pucks (robot does not avoid them)
-    for (int i = 0; i < safe_points->points.size(); i++) {
-        for (int j = 0; j < collision_avoidance_cloud->points.size(); j++) {
-            if (distance_between_points(
-                    safe_points->points[i].x, safe_points->points[i].y,
-                    collision_avoidance_cloud->points[j].x,
-                    collision_avoidance_cloud->points[j].y) <=
-                safe_zone_radius) {
-                // Remove these points
-                inliers->indices.push_back(j);
-            }
-        }
-    }
-    // std::cout << "safe zones: " << safe_points->points.size() << std::endl;
-
-    extract.setInputCloud(collision_avoidance_cloud);
-    extract.setIndices(inliers);
-    extract.setNegative(true);
-    extract.filter(*collision_avoidance_cloud);
-
-    collision_avoidance_cloud->is_dense = false;
-    collision_avoidance_cloud->width = 1;
-    collision_avoidance_cloud->height =
-        collision_avoidance_cloud->points.size();
-
-    // For debugging
-    pub_pointcloud(*collision_avoidance_cloud, debug_cloud_pub);
-
+    
     // -------------------------------------------------
     // Find closest obstacle in collision_avoidance_cloud
     // -------------------------------------------------
@@ -1178,7 +1192,7 @@ bool process_messages() {
         } else {
             closest_obstacle_direction_g = closest_laser_direction;
         }
-    }
+    }*/
 
     // Reset
     got_map = false;
@@ -1474,6 +1488,56 @@ int get_closest_puck_to_point(double& x, double& y, double px, double py,
     }
 }
 
+int get_any_closest_puck_to_point(double& x, double& y, double px, double py,
+                              PointCloudPtr& map) {
+    // returns coordinates of closest puck.
+    // Return int meaning -1: not found, 1 found blue, 0: found yewllow
+
+    double closest_x = -100;
+    double closest_y = -100;
+    double last_distance = 1000;
+
+    int closest_clolor = -1;
+
+    for (int j = 0; j < map->points.size(); j++) {
+        double x = map->points[j].x;
+        double y = map->points[j].y;
+
+        // Get color of point
+        uint32_t rgb = *reinterpret_cast<int*>(&map->points[j].rgb);
+        uint8_t b = (rgb >> 0) & 0xff;
+        uint8_t g = (rgb >> 8) & 0xff;
+        uint8_t r = (rgb >> 16) & 0xff;
+
+
+        if (r == 0 && g == 0 && b == 255) {
+            double distance = distance_between_points(px, py, x, y);
+         
+            if (distance < last_distance) {
+                // So far the closest
+                last_distance = distance;
+                closest_x = x;
+                closest_y = y;
+                closest_clolor = 1; // blue
+            }
+        } else if (r == 255 && g == 255 && b == 0) {
+            double distance = distance_between_points(px, py, x, y);
+
+            if (distance < last_distance) {
+                // So far the closest
+                last_distance = distance;
+                closest_x = x;
+                closest_y = y;
+                closest_clolor = 0; // yellow
+            }
+        }
+    }
+
+    x = closest_x;
+    y = closest_y;
+   return closest_clolor;
+}
+
 void point_map_to_odom(double x_in, double y_in, double& x_out, double& y_out) {
     // transform single point from map to odometry frame
 
@@ -1498,13 +1562,39 @@ void point_map_to_odom(double x_in, double y_in, double& x_out, double& y_out) {
     y_out = robot_temp->points[0].y;
 }
 
+void set_team_color(int is_blue){
+    is_blue_team = is_blue;
+    ROS_INFO_STREAM("Setting team: " << is_blue_team);
+
+    player::SendColor send_color_srv;
+    send_color_srv.request.team = team_name;
+    if (is_blue_team == 1) {
+        send_color_srv.request.color = "blue";
+    } else {
+        send_color_srv.request.color = "yellow";
+    }
+
+    if (send_color_client.call(send_color_srv)) {
+        if (send_color_srv.response.ok) {
+            ROS_INFO("The color is correct");
+        } else {
+            ROS_INFO("The color was NOT correct");
+            if (is_blue_team == 0) {
+                is_blue_team = 1;
+            } else {
+                is_blue_team = 0;
+            }
+            ROS_INFO_STREAM("New team color: " << is_blue_team);
+        }
+    } else {
+        ROS_ERROR("Failed to call service SendColor");
+    }
+}
+
 void update_game_logic(bool data_processing_succesful) {
     // This function updates the game state and controls the robot
     ROS_INFO_STREAM("ROBOT has puck: " << robot_has_puck() <<
                                  " team color blue: " << is_blue_team);
-
-    // game_state = wait_for_start;
-    // return; // debugging
 
 #ifdef use_referee
     // Change state when referee tells to
@@ -1517,7 +1607,7 @@ void update_game_logic(bool data_processing_succesful) {
     }
 #endif
 
-    // Check if robot is outside or inside of the field, if outside ->
+    /*/ Check if robot is outside or inside of the field, if outside ->
     // reinitialize
     if (robot_map_x < 0 || robot_map_x > field_width || robot_map_y < 0 ||
         robot_map_y > field_length) {
@@ -1525,7 +1615,7 @@ void update_game_logic(bool data_processing_succesful) {
         state = initialize;
         ROS_INFO_STREAM("Robot outside of the field -> state: initialize.");
         return;  // TODO nice way of handling this case
-    }
+    }*/
 
     if (game_state == wait_for_start) {
         state = stop;
@@ -1538,10 +1628,47 @@ void update_game_logic(bool data_processing_succesful) {
             // robot knows where it is -> start playing game
             state = stop;
             game_state = look_for_puck;
+            moves_done = 0; // reset counter
         } else {
-            // Rotate to find location of robot
-            state = initialize;
+            // Robot does not know where it is
+            // -> rotate 360
+            // -> drive to closest puck
+            // -> start rotating
+
+            if(state == stop && moves_done == 0){
+                // First move rotate 360
+                state = rotate;
+                rotation_to_go = 2*3.1415;
+                moves_done = 1;
+            } else if (state == stop && moves_done == 1){
+                // drive to closest buck
+                
+                double x = -100;
+                double y = -100;
+                int color = get_any_closest_puck_to_point(x,y,robot_map_x,robot_map_y, map_cloud_in_map_frame);
+                if(color != -1){
+                    // found puck:
+                    state = drive_to;
+                    goal_point_x = x;
+                    goal_point_y = y;
+                    moves_done = 2; 
+
+                    // Set team color:
+                    set_team_color(color);
+                } else {
+                    // not fould -> try again
+                    state = rotate;
+                    rotation_to_go = 2*3.1415;
+                    moves_done = 1;
+                }
+                
+            } else if (state = stop){
+                // robot moved to closest puck -> rotate untill position found
+                state = initialize;
+                moves_done = 0;
+            }  
         }
+
     } else if (game_state == look_for_puck) {
         ROS_INFO_STREAM("Game state: look_for_puck");
         // Choose closest puck and drive to it, if no buck is found
@@ -1819,9 +1946,10 @@ int main(int argc, char** argv) {
 
     // 20 Hz loop
     ros::Rate r(20);
+    //playNode.tf_map_to_odom_boardcaster(0, 0, 0); // boardcast
     while (ros::ok()) {
         // ROS_INFO("%d", playNode.got_messages());
-        //        playNode.tf_map_to_odom_boardcaster(1.5, 2.5, 0);
+        //        
 
         if (got_messages()) {
             bool success = process_messages();
