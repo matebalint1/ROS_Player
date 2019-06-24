@@ -1662,7 +1662,7 @@ void update_game_logic(bool data_processing_succesful) {
                     moves_done = 1;
                 }
                 
-            } else if (state = stop){
+            } else if (state = stop && moves_done == 2){
                 // robot moved to closest puck -> rotate untill position found
                 state = initialize;
                 moves_done = 0;
