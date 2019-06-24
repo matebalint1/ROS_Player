@@ -799,14 +799,15 @@ double get_goal_heading_path_planning(double goal_distance,
     remove_points_inside_puck_carry_zone(cloud);
     PointCloudPtr temp(new PointCloud);
 
-    // Generate field edge cloud in map frame
-    PointCloudPtr field_edges_map = get_ideal_field_edge_cloud(field_width);
-    
+    if (game_state != initialize_location){ // do not avoid edges when initializing robot
+        // Generate field edge cloud in map frame
+        PointCloudPtr field_edges_map = get_ideal_field_edge_cloud(field_width);
 
-    // Rotate edge cloud to base_link
-    pcl_ros::transformPointCloud(*field_edges_map, *temp,
-                                 transform_map_to_baselink);
-    *cloud += *temp; // combine clouds
+        // Rotate edge cloud to base_link
+        pcl_ros::transformPointCloud(*field_edges_map, *temp,
+                                    transform_map_to_baselink);
+        *cloud += *temp; // combine clouds
+    }
    
     // Rotate cloud so that x-axis points to the direction of the goal
     Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
@@ -1234,8 +1235,12 @@ void update_robot_state() {
                 state = drive_to;
             }
         } else {
-            // No valid goal point change state to stop
-            state = stop;
+            if (game_state == initialize_location){
+                // In this state everythin is allowed
+            } else {
+                // No valid goal point change state to stop
+                state = stop;
+            }
         }
 
     } else if (state == rotate) {
