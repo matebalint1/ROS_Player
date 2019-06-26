@@ -816,21 +816,29 @@ double get_goal_heading_path_planning(double goal_distance,
     std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
     std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
     
-    if(goal_point_x.size() < 2 && (fabs(min_rotation_left) > 20 * 3.14/180.0
-                || fabs(min_rotation_right) > 20 * 3.14/180.0)){
-        // robot has no sub goal and it has to rotate alot -> create a sub goal.
+    double dir = min_rotation_left; // find smaller direction
+    if(min_rotation_right < min_rotation_left){
+        dir = min_rotation_right;
+    }
 
-        double dir = min_rotation_left;
-        if(min_rotation_right < min_rotation_left){
-            dir = min_rotation_right;
-        }
-        double distance_to_drive = 1; //m
+    if(fabs(dir) > 20 * 3.14/180.0){
+        // there is an obstacle in the way between the robot and goal point ->
+        // add or edit sub goal.
+        
+        double distance_to_drive = 0.6; //m
 
         double x = distance_to_drive * cos(dir) + robot_map_x;
         double y = distance_to_drive * sin(dir) + robot_map_y;
 
-        goal_point_x.insert(goal_point_x.begin(),x);
-        goal_point_y.insert(goal_point_y.begin(),y);
+        if(goal_point_x.size() < 2){
+            // There is currently no sub goal -> create one
+            goal_point_x.insert(goal_point_x.begin(),x);
+            goal_point_y.insert(goal_point_y.begin(),y);
+        }else{
+            // There is already one -> update
+            goal_point_x[0] = x;
+            goal_point_y[0] = y;
+        }
     }
 }
 
