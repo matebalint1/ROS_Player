@@ -813,21 +813,25 @@ double get_goal_heading_path_planning(double goal_distance,
 
     std::cout << "Rot to left: " << min_rotation_left << std::endl;
     std::cout << "Rot to right: " << min_rotation_right << std::endl;
-    //std::cout << "Total space to left: " << total_space_left << std::endl;
-    //std::cout << "Total space to right: " << total_space_right << std::endl;
     std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
     std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
     
-    if(goal_point_x.size() < 2 && (fabs(rot_left_total) > 10 * 3.14/180.0
-                || fabs(rot_right_total) > 10 * 3.14/180.0)){
+    if(goal_point_x.size() < 2 && (fabs(min_rotation_left) > 20 * 3.14/180.0
+                || fabs(min_rotation_right) > 20 * 3.14/180.0)){
         // robot has no sub goal and it has to rotate alot -> create a sub goal.
 
-        goal_point_x.insert(goal_point_x.begin(),field_width/2.0);
-        goal_point_y.insert(goal_point_y.begin(),field_length/2.0);
+        double dir = min_rotation_left;
+        if(min_rotation_right < min_rotation_left){
+            dir = min_rotation_right;
+        }
+        double distance_to_drive = 1; //m
 
+        double x = distance_to_drive * cos(dir) + robot_map_x;
+        double y = distance_to_drive * sin(dir) + robot_map_y;
+
+        goal_point_x.insert(goal_point_x.begin(),x);
+        goal_point_y.insert(goal_point_y.begin(),y);
     }
-
-
 }
 
 void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
@@ -1208,12 +1212,7 @@ void update_robot_state() {
                         // Delete waypoint
                         goal_point_x.erase (goal_point_x.begin());
                         goal_point_y.erase (goal_point_y.begin());
-
                     }
-                    // Goal reached
-                    state = stop;
-                    // goal_point_x = -1;
-                    // goal_point_y = -1;
                 } else {
                     // Goal not reached
                     state = drive_to;
@@ -1235,7 +1234,6 @@ void update_robot_state() {
                         // Delete waypoint
                         goal_point_x.erase (goal_point_x.begin());
                         goal_point_y.erase (goal_point_y.begin());
-
                     }
             } else {
                 // Goal not reached
@@ -1671,8 +1669,8 @@ void update_game_logic(bool data_processing_succesful) {
                 if(color != -1){
                     // found puck:
                     state = drive_to;
-                    goal_point_x[0] = x;
-                    goal_point_y[0] = y;
+                    goal_point_x.back() = x;
+                    goal_point_y.back() = y;
                     moves_done = 2; 
 
                     // Set team color:
@@ -1709,8 +1707,8 @@ void update_game_logic(bool data_processing_succesful) {
                 // Found puck to drive to
                 game_state = drive_to_puck;
                 state = drive_to;
-                goal_point_x[0] = x;
-                goal_point_y[0] = y;
+                goal_point_x.back() = x;
+                goal_point_y.back() = y;
 
             } else if (success == 0 && state == stop) {
                 // No puck found and not driving-> drive middle or home
@@ -1719,22 +1717,22 @@ void update_game_logic(bool data_processing_succesful) {
 
                     state = drive_to;
                     if (is_blue_team == 1) {  // to home
-                        goal_point_x[0] = field_width / 2.0;
-                        goal_point_y[0] = 0.1 * field_length + 0.25;
+                        goal_point_x.back() = field_width / 2.0;
+                        goal_point_y.back() = 0.1 * field_length + 0.25;
                     } else {
-                        goal_point_x[0] = field_width / 2.0;
-                        goal_point_y[0] = 0.9 * field_length - 0.25;
+                        goal_point_x.back() = field_width / 2.0;
+                        goal_point_y.back() = 0.9 * field_length - 0.25;
                     }
 
                 } else {
                     // Already in home but no buck found, drive to the middel of
                     // the field.
                     state = drive_to;
-                    goal_point_x[0] = field_width / 2.0;
+                    goal_point_x.back() = field_width / 2.0;
                     if(is_blue_team == 1){
-                        goal_point_y[0] = field_length / 2.0 + 1;
+                        goal_point_y.back() = field_length / 2.0 + 1;
                     } else {
-                        goal_point_y[0] = field_length - (field_length / 2.0 + 1);
+                        goal_point_y.back() = field_length - (field_length / 2.0 + 1);
                     }
                     
                 }
@@ -1750,8 +1748,8 @@ void update_game_logic(bool data_processing_succesful) {
             state = stop;
         }
 
-        ROS_INFO_STREAM("Goal point x: " << goal_point_x[0]
-                                         << " y: " << goal_point_y[0]);
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x.back()
+                                         << " y: " << goal_point_y.back());
 
     } else if (game_state == drive_to_puck) {
         ROS_INFO_STREAM("Game state: drive_to_puck");
@@ -1761,9 +1759,9 @@ void update_game_logic(bool data_processing_succesful) {
 
             // Remove picked goal from map, to avoid wrong/old data in map
             double x = 0, y = 0;
-            point_map_to_odom(goal_point_x[0], goal_point_y[0], x, y);
-            std::cout << "Delete pucks at map x: " << goal_point_x[0]
-                      << " y: " << goal_point_y[0] << std::endl;
+            point_map_to_odom(goal_point_x.back(), goal_point_y.back(), x, y);
+            std::cout << "Delete pucks at map x: " << goal_point_x.back()
+                      << " y: " << goal_point_y.back() << std::endl;
             //std::cout << "Delete pucks at odom x: " << x << " y: " << y
             //          << std::endl;
             if (x != -1) {
