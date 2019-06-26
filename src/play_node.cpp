@@ -864,7 +864,7 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
 
     if(closest_obstacle_distance_g < 0.65){
         // if obstacle too close set linear speed to zero
-        speed_linear = 0;
+       // speed_linear = 0;
     } 
 
     // Set rotational speed
