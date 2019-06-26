@@ -62,7 +62,6 @@ ros::Subscriber map_sub;
 ros::Subscriber collision_avoidance_cloud_sub;
 ros::Subscriber laser_sub;
 ros::Subscriber field_width_sub;
-// ros::Subscriber odometry_sub;
 
 ros::ServiceClient team_ready_client;
 ros::ServiceClient send_color_client;
@@ -99,11 +98,6 @@ const double MAX_LINEAR_SPEED = 0.3;       // m/s
 const double MAX_ROTATIONAL_SPEEED = 0.5;  // rad/s
 const double MIN_LINEAR_SPEED = 0.15;      // m/s // 0.08 works
 const double MIN_ROTATIONAL_SPEED = 0.2;
-
-// For simulation
-//    const double MAX_LINEAR_SPEED = 0.6;       // m/s
-//    const double MAX_ROTATIONAL_SPEEED = 0.4;  // rad/s
-// const double MIN_LINEAR_SPEED = 0.1;       // m/s
 
 // --------------------------------------------
 // Collision Avoidance
@@ -284,14 +278,6 @@ void field_width_callback(const geometry_msgs::Vector3::ConstPtr& msg) {
 
     got_field_width = true;
 }
-
-/*
-void odometry_callback(const nav_msgs::Odometry::ConstPtr& msg) {
-    odometry_msg = *msg;
-    got_odometry = true;
-    // std::cout << msg->pose.pose.position << std::endl;
-}
-*/
 
 void set_velocities(float lin_vel, float ang_vel) {
     geometry_msgs::Twist msg;
@@ -578,11 +564,8 @@ void collision_avoidance(double& speed_linear, double& speed_rotational,
         ROS_INFO_STREAM("Angular speed mode: CONTROL");
     } else {
         // No obstacle in view
-        // if (state == drive_to) {
-        //} else {
         // Random
         speed_rotational = 0;
-        // }
         ROS_INFO_STREAM("Angular speed mode: FREE");
     }
 }
@@ -879,9 +862,9 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
     // Reduce linear speed if heading error is large. A 1/x function is used.
     speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, fabs(robot_heading_error))- 1.0/3.1415));
 
-    if(fabs(robot_heading_error) < 15 * 3.14/180.0 ){
-        // if heading error is small drive forward at min linear speed // TODO test.
-        speed_linear = fmax(MIN_LINEAR_SPEED, speed_linear);
+    if(closest_obstacle_distance_g < 0.65){
+        // if obstacle too close set linear speed to zero
+        speed_linear = 0;
     } 
 
     // Set rotational speed
@@ -946,7 +929,7 @@ bool process_messages() {
         // return false;
     }
 
-    // Update robot pos if tf succesful---------------------------------
+    // Update robot pos if tf succesful tf:s*********************************
     if(succesful_robot_pos_tf == true && 
         succesful_laser_tf == true && 
         succesful_odom_baselink == true){
@@ -991,7 +974,6 @@ bool process_messages() {
             robot_map_last_y = robot_map_y;
             robot_map_last_yaw = robot_map_yaw;
         }
-
 
         // -------------------------------------------------
         // Prepare kinect collision avoidance data
@@ -1086,7 +1068,7 @@ bool process_messages() {
     if (succesful_robot_pos_tf == false || got_field_width == false ||
         transformation_set == false || tf_delay_counter <= 10) {
         ROS_INFO_STREAM("Map to Odom transformation missing");
-        // Make robot rotate untill location and field width found.
+        // Make robot initialize untill location and field width found.
         return false;  // disable for debugging
     }
 
@@ -1131,7 +1113,7 @@ bool process_messages() {
         }
     }
 
- /*   
+   
     // -------------------------------------------------
     // Find closest obstacle in collision_avoidance_cloud
     // -------------------------------------------------
@@ -1199,7 +1181,7 @@ bool process_messages() {
         } else {
             closest_obstacle_direction_g = closest_laser_direction;
         }
-    }*/
+    }
 
     // Reset
     got_map = false;
@@ -1671,7 +1653,7 @@ void update_game_logic(bool data_processing_succesful) {
             // Robot does not know where it is
             // -> rotate 360
             // -> drive to closest puck
-            // -> start rotating
+            // -> start rotating to find location
 
             if(state == stop && moves_done == 0){
                 // First move rotate 360
