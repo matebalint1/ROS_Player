@@ -31,7 +31,7 @@
 #include <cstring>
 #include "pointcloud_helpers.hpp"
 
-//#define use_referee
+#define use_referee
 
 enum Robot_state { initialize, drive_to, drive_random, rotate, move, stop };
 enum Game_state {
@@ -1020,7 +1020,7 @@ bool process_messages() {
 
         // Do not avoid any bucks -> remove all pucks from the collision
         // avoidance cloud
-        double safe_zone_radius = 0.25;  // m
+        double safe_zone_radius = 0.2;  // m
 
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
