@@ -132,8 +132,8 @@ double safety_zone_x_offset = 0;
 const double SAFETY_ZONE_X_OFFSET_MAX = 0.4;  // m
 
 // Drive to parameters
-double goal_point_x = 0.6;  // map frame
-double goal_point_y = 0.6;  // map frame
+std::vector<double> goal_point_x = {0.6};  // map frame
+std::vector<double> goal_point_y = {0.6};  // map frame
 
 // Rotate parameters
 double rotation_to_go = 3 * 3.14;  // rad
@@ -803,23 +803,8 @@ double get_goal_heading_path_planning(double goal_distance,
     PointCloudPtr cloud_left(new PointCloud(*cloud));
     PointCloudPtr cloud_right(new PointCloud(*cloud));
 
-    /*if(goal_distance < 0.8){ // TODO testing
-        double closest_obstacle_to_goal = get_closest_obstacle_distance_to_goal_point(cloud_left,goal_distance);
-        if(closest_obstacle_to_goal < 0.1){
-            // obstacle too close -> stop robot
-            state = stop;
-        }
-    }*/
-    
-
     double min_rotation_left = find_free_drive_direction(1, cloud_left, goal_distance); // degrees
     double min_rotation_right = find_free_drive_direction(-1, cloud_right, goal_distance); // degrees
-    //double min_rotation_left;
-    //double min_rotation_right;
-    //double total_space_left;
-    //double total_space_right;
-    //find_free_drive_direction_and_total_space(1, cloud_left, goal_distance, total_space_left, min_rotation_left);
-    //find_free_drive_direction_and_total_space(-1, cloud_right, goal_distance, total_space_right, min_rotation_right);
 
     // Compare rotations to the left and right and transform to radians as heading error
     // of the robot
@@ -833,29 +818,33 @@ double get_goal_heading_path_planning(double goal_distance,
     std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
     std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
     
-    //return rot_left_total;
+    if(goal_point_x.size() < 2 && (fabs(rot_left_total) > 10 * 3.14/180.0
+                || fabs(rot_right_total) > 10 * 3.14/180.0)){
+        // robot has no sub goal and it has to rotate alot -> create a sub goal.
 
-    // Use averaging to stick on the decision to use the same direction
-    drive_to_left = 0.97 * drive_to_left + 0.03 * double(min_rotation_left < min_rotation_right);
-    if (drive_to_left > 0.5){
-        return rot_left_total;
-    } else { 
-        return rot_right_total; 
+        goal_point_x.insert(goal_point_x.begin(),field_width/2.0);
+        goal_point_y.insert(goal_point_y.begin(),field_length/2.0);
+
     }
+
+
 }
 
 void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
                          double closest_obstacle_distance,
                          double closest_obstacle_direction,
                          double goal_point_distance, double goal_point_direction) {
+        
     
-    double robot_heading_error = get_goal_heading_path_planning(
-                                            goal_point_distance, goal_point_direction);
+    get_goal_heading_path_planning(goal_point_distance, goal_point_direction);
 
-    if (game_state == initialize_location){ 
-        // do not use collision avoidance in initialization
-        robot_heading_error = goal_point_direction;
-    }
+    to_polar(goal_point_x[0], goal_point_y[0], goal_point_distance,
+                    goal_point_direction, robot_map_x, robot_map_y, robot_map_yaw);
+
+    //if (game_state == initialize_location){ 
+        // do not use collision avoidance in initialization or when robot has a sub goal
+    double robot_heading_error = goal_point_direction;
+    //}
 
     // Set linear speed
     speed_linear = fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED / DISTANCE_LINEAR_FREE *
@@ -863,11 +852,6 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
 
     // Reduce linear speed if heading error is large. A 1/x function is used.
     speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, fabs(robot_heading_error))- 1.0/3.1415));
-
-    if(closest_obstacle_distance_g < 0.65){
-        // if obstacle too close set linear speed to zero
-       // speed_linear = 0;
-    } 
 
     // Set rotational speed
     speed_rotational = 4 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION *
@@ -1210,13 +1194,22 @@ void update_robot_state() {
     } else if (state == drive_to) {
         if(game_state != initialize_location){
             // Check if goal is valid or it has been reached already
-            if (goal_point_x > 0 && goal_point_y > 0 &&
-                goal_point_x < field_width && goal_point_y < field_length) {
+            if (goal_point_x[0] > 0 && goal_point_y[0] > 0 &&
+                goal_point_x[0] < field_width && goal_point_y[0] < field_length) {
                 // Valid goal, calculate errors
-                to_polar(goal_point_x, goal_point_y, robot_distance_error,
+                to_polar(goal_point_x[0], goal_point_y[0], robot_distance_error,
                         robot_yaw_error, robot_map_x, robot_map_y, robot_map_yaw);
 
                 if (robot_distance_error <= DISTANCE_GOAL_REACHED) {
+                    if(goal_point_x.size() == 1){
+                       // Final Goal reached
+                        state = stop; 
+                    } else {
+                        // Delete waypoint
+                        goal_point_x.erase (goal_point_x.begin());
+                        goal_point_y.erase (goal_point_y.begin());
+
+                    }
                     // Goal reached
                     state = stop;
                     // goal_point_x = -1;
@@ -1231,12 +1224,19 @@ void update_robot_state() {
             }
         } else {
             // Initialization -> different rules (drive outside of field)
-            to_polar(goal_point_x, goal_point_y, robot_distance_error,
+            to_polar(goal_point_x[0], goal_point_y[0], robot_distance_error,
                     robot_yaw_error, robot_map_x, robot_map_y, robot_map_yaw);
 
             if (robot_distance_error <= DISTANCE_GOAL_REACHED) {
-                // Goal reached
-                state = stop;
+                if(goal_point_x.size() == 1){
+                       // Final Goal reached
+                        state = stop; 
+                    } else {
+                        // Delete waypoint
+                        goal_point_x.erase (goal_point_x.begin());
+                        goal_point_y.erase (goal_point_y.begin());
+
+                    }
             } else {
                 // Goal not reached
                 state = drive_to;
@@ -1671,8 +1671,8 @@ void update_game_logic(bool data_processing_succesful) {
                 if(color != -1){
                     // found puck:
                     state = drive_to;
-                    goal_point_x = x;
-                    goal_point_y = y;
+                    goal_point_x[0] = x;
+                    goal_point_y[0] = y;
                     moves_done = 2; 
 
                     // Set team color:
@@ -1709,8 +1709,8 @@ void update_game_logic(bool data_processing_succesful) {
                 // Found puck to drive to
                 game_state = drive_to_puck;
                 state = drive_to;
-                goal_point_x = x;
-                goal_point_y = y;
+                goal_point_x[0] = x;
+                goal_point_y[0] = y;
 
             } else if (success == 0 && state == stop) {
                 // No puck found and not driving-> drive middle or home
@@ -1719,22 +1719,22 @@ void update_game_logic(bool data_processing_succesful) {
 
                     state = drive_to;
                     if (is_blue_team == 1) {  // to home
-                        goal_point_x = field_width / 2.0;
-                        goal_point_y = 0.1 * field_length + 0.25;
+                        goal_point_x[0] = field_width / 2.0;
+                        goal_point_y[0] = 0.1 * field_length + 0.25;
                     } else {
-                        goal_point_x = field_width / 2.0;
-                        goal_point_y = 0.9 * field_length - 0.25;
+                        goal_point_x[0] = field_width / 2.0;
+                        goal_point_y[0] = 0.9 * field_length - 0.25;
                     }
 
                 } else {
                     // Already in home but no buck found, drive to the middel of
                     // the field.
                     state = drive_to;
-                    goal_point_x = field_width / 2.0;
+                    goal_point_x[0] = field_width / 2.0;
                     if(is_blue_team == 1){
-                        goal_point_y = field_length / 2.0 + 1;
+                        goal_point_y[0] = field_length / 2.0 + 1;
                     } else {
-                        goal_point_y = field_length - (field_length / 2.0 + 1);
+                        goal_point_y[0] = field_length - (field_length / 2.0 + 1);
                     }
                     
                 }
@@ -1750,8 +1750,8 @@ void update_game_logic(bool data_processing_succesful) {
             state = stop;
         }
 
-        ROS_INFO_STREAM("Goal point x: " << goal_point_x
-                                         << " y: " << goal_point_y);
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x[0]
+                                         << " y: " << goal_point_y[0]);
 
     } else if (game_state == drive_to_puck) {
         ROS_INFO_STREAM("Game state: drive_to_puck");
@@ -1761,9 +1761,9 @@ void update_game_logic(bool data_processing_succesful) {
 
             // Remove picked goal from map, to avoid wrong/old data in map
             double x = 0, y = 0;
-            point_map_to_odom(goal_point_x, goal_point_y, x, y);
-            std::cout << "Delete pucks at map x: " << goal_point_x
-                      << " y: " << goal_point_y << std::endl;
+            point_map_to_odom(goal_point_x[0], goal_point_y[0], x, y);
+            std::cout << "Delete pucks at map x: " << goal_point_x[0]
+                      << " y: " << goal_point_y[0] << std::endl;
             //std::cout << "Delete pucks at odom x: " << x << " y: " << y
             //          << std::endl;
             if (x != -1) {
@@ -1792,11 +1792,11 @@ void update_game_logic(bool data_processing_succesful) {
             double x = -1;
             double y = -1;
             int success = get_closest_puck_to_point(
-                x, y, goal_point_x, goal_point_y, map_cloud_in_map_frame);
+                x, y, goal_point_x.back(), goal_point_y.back(), map_cloud_in_map_frame);
             if (success == 1) {
                 // Set updated coordinates
-                goal_point_x = x;
-                goal_point_y = y;
+                goal_point_x.back() = x;
+                goal_point_y.back() = y;
             } else {
                 // Go to previous state and try again, puck lost from map
                 state = stop;
@@ -1807,8 +1807,8 @@ void update_game_logic(bool data_processing_succesful) {
             game_state = look_for_puck;
             state = stop;
         }
-        ROS_INFO_STREAM("Goal point x: " << goal_point_x
-                                         << " y: " << goal_point_y);
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x.back()
+                                         << " y: " << goal_point_y.back());
 
     } else if (game_state == drive_with_puck_to_goal) {
         ROS_INFO_STREAM("Game state: drive_with_puck_to_goal, team color: "
@@ -1817,27 +1817,27 @@ void update_game_logic(bool data_processing_succesful) {
         if (state == stop) {
             if (!is_robot_in_enemy_goal(robot_map_x, robot_map_y)) {
                 state = drive_to;
-                goal_point_x = field_width / 2.0;
+                goal_point_x.back() = field_width / 2.0;
                 // Drive to goal
                 if (is_blue_team == 0) {
                     if(robot_map_y > 0.1 * field_length && robot_map_y < 0.1 * field_length + 0.5){
                         // middle
-                        goal_point_y = 0.1 * field_length + 0.25;
+                        goal_point_y.back() = 0.1 * field_length + 0.25;
                     }else if(robot_map_y > 0.1 * field_length + 0.5){
-                        goal_point_y = 0.1 * field_length + 0.5;
+                        goal_point_y.back() = 0.1 * field_length + 0.5;
                     } else {
-                         goal_point_y = 0.1 * field_length;
+                         goal_point_y.back() = 0.1 * field_length;
                     }
                     
                 } else {
 
                     if(robot_map_y < 0.9 * field_length && robot_map_y > 0.9 * field_length - 0.5){
                         // middle
-                        goal_point_y = 0.9 * field_length - 0.25;
+                        goal_point_y.back() = 0.9 * field_length - 0.25;
                     }else if(robot_map_y < 0.9 * field_length - 0.5){
-                        goal_point_y = 0.9 * field_length - 0.5;
+                        goal_point_y.back() = 0.9 * field_length - 0.5;
                     } else {
-                         goal_point_y = 0.9 * field_length;
+                         goal_point_y.back() = 0.9 * field_length;
                     }
                 }
             } else {
@@ -1853,8 +1853,8 @@ void update_game_logic(bool data_processing_succesful) {
             state = stop;
         }
 
-        ROS_INFO_STREAM("Goal point x: " << goal_point_x
-                                         << " y: " << goal_point_y);
+        ROS_INFO_STREAM("Goal point x: " << goal_point_x.back()
+                                         << " y: " << goal_point_y.back());
 
     } else if (game_state == leave_buck_in_goal) {
         // Drive back wards and rotate to leave the puck in the goal
