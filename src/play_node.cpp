@@ -1020,7 +1020,7 @@ bool process_messages() {
 
         // Do not avoid any bucks -> remove all pucks from the collision
         // avoidance cloud
-        double safe_zone_radius = 0.2;  // m
+        double safe_zone_radius = 0.25;  // m
 
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
         pcl::ExtractIndices<PointType> extract;
