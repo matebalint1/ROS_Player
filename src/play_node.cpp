@@ -695,7 +695,7 @@ void find_free_drive_direction_and_total_space(int direction, PointCloudPtr& clo
     // This function edits the point cloud, rotation parameter values 1 or -1, left rotation
     // is positive (== 1);
     
-    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 0.8; //m, threshold for drivable direction
+    const double MIN_FREE_SPACE_IN_FRONT_OF_ROBOT = 1; //m, threshold for drivable direction
     PointCloudPtr temp(new PointCloud);
     min_rotation = 180; // degrees
     total_space = 0; // integral 0 to 180 degrees
@@ -833,7 +833,7 @@ double get_goal_heading_path_planning(double goal_distance,
     std::cout << "Total Rot to left: " << rot_left_total *180.0/3.14 << std::endl;
     std::cout << "Total Rot to right: " << rot_right_total *180.0/3.14  << std::endl;   
     
-    return rot_left_total;
+    //return rot_left_total;
 
     // Use averaging to stick on the decision to use the same direction
     drive_to_left = 0.95 * drive_to_left + 0.05 * double(min_rotation_left < min_rotation_right);
