@@ -770,18 +770,17 @@ double get_closest_obstacle_distance_to_goal_point(PointCloudPtr& cloud, double 
     return closest_obs_distance;
 }
 
-double get_goal_heading_path_planning(double goal_distance,
+double path_planning(double goal_distance,
                                       double goal_heading) {
     // This function calculates the heading for the robot to go around single
     // obstacles. It calculates the first possible direction to the left and
-    // right the one with smaller value is choseen as a new heading for the
+    // right the one with smaller value is choseen as a new sub goal for the
     // robot.
 
     // Make copy of cloud
     PointCloudPtr cloud(new PointCloud(*collision_avoidance_cloud));
     remove_points_inside_puck_carry_zone(cloud);
     PointCloudPtr temp(new PointCloud);
-
 
     // Generate field edge cloud in map frame
     PointCloudPtr field_edges_map = get_ideal_field_edge_cloud(field_width);
@@ -790,7 +789,6 @@ double get_goal_heading_path_planning(double goal_distance,
     pcl_ros::transformPointCloud(*field_edges_map, *temp,
                                 transform_map_to_baselink);
     *cloud += *temp; // combine clouds
-    
    
     // Rotate cloud so that x-axis points to the direction of the goal
     Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
@@ -835,7 +833,7 @@ double get_goal_heading_path_planning(double goal_distance,
             goal_point_x.insert(goal_point_x.begin(),x);
             goal_point_y.insert(goal_point_y.begin(),y);
         }else{
-            // There is already one -> update
+            // There is already one sub goal -> update sub goal
             goal_point_x[0] = x;
             goal_point_y[0] = y;
         }
@@ -847,28 +845,28 @@ void set_speeds_drive_to(double& speed_linear, double& speed_rotational,
                          double closest_obstacle_direction,
                          double goal_point_distance, double goal_point_direction) {
         
-    
-    get_goal_heading_path_planning(goal_point_distance, goal_point_direction);
+    path_planning(goal_point_distance, goal_point_direction);
 
     to_polar(goal_point_x[0], goal_point_y[0], goal_point_distance,
                     goal_point_direction, robot_map_x, robot_map_y, robot_map_yaw);
 
-    //if (game_state == initialize_location){ 
-        // do not use collision avoidance in initialization or when robot has a sub goal
-    double robot_heading_error = goal_point_direction;
-    //}
+    if (game_state == initialize_location){ 
+        // do not use collision avoidance (=sub goal) in initialization
+        to_polar(goal_point_x.back(), goal_point_y.back(), goal_point_distance,
+                    goal_point_direction, robot_map_x, robot_map_y, robot_map_yaw);
+    }
 
     // Set linear speed
     speed_linear = fmax(MIN_LINEAR_SPEED, MAX_LINEAR_SPEED / DISTANCE_LINEAR_FREE *
                                                                     goal_point_distance);
 
     // Reduce linear speed if heading error is large. A 1/x function is used.
-    speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, fabs(robot_heading_error))- 1.0/3.1415));
+    speed_linear = speed_linear * fmax(0.0, fmin(1.0, 0.1/fmax(0.01, 
+                                                fabs(goal_point_direction))- 1.0/3.1415));
 
     // Set rotational speed
     speed_rotational = 4 * MAX_ROTATIONAL_SPEEED / DISTANCE_FREE_ROTATION *
-                         robot_heading_error;
-
+                         goal_point_direction;
 }
 
 void color_filter(PointCloudPtr& cloud_in, PointCloudPtr& cloud_out, int r,
