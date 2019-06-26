@@ -836,7 +836,7 @@ double get_goal_heading_path_planning(double goal_distance,
     //return rot_left_total;
 
     // Use averaging to stick on the decision to use the same direction
-    drive_to_left = 0.95 * drive_to_left + 0.05 * double(min_rotation_left < min_rotation_right);
+    drive_to_left = 0.99 * drive_to_left + 0.01 * double(min_rotation_left < min_rotation_right);
     if (drive_to_left > 0.5){
         return rot_left_total;
     } else { 
